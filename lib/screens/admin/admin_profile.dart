@@ -106,6 +106,14 @@ class AdminProfile extends StatelessWidget {
                           label: 'Correo electrónico',
                           value: user.email,
                         ),
+                        if (user.telefono.isNotEmpty)
+                          InfoRow(
+                            icon: Icons.phone_outlined,
+                            iconColor: AppColors.blue,
+                            iconBg: AppColors.blueBg,
+                            label: 'Teléfono',
+                            value: user.telefono,
+                          ),
                         InfoRow(
                           icon: Icons.shield_outlined,
                           iconColor: AppColors.purple,

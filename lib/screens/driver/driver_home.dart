@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/models.dart';
+import '../../services/anticipo_service.dart';
 import '../../widgets/widgets.dart';
-import '../login_screen.dart';
 import '../admin/anticipo_detail.dart';
 import '../admin/anticipo_edit.dart';
 import 'driver_profile.dart';
@@ -15,8 +15,10 @@ class DriverHome extends StatefulWidget {
 }
 
 class _DriverHomeState extends State<DriverHome> {
+  final _anticipoService = AnticipoService();
   int _tab = 0;
   late List<Anticipo> _anticipos;
+  bool _loading = true;
   final _searchCtrl = TextEditingController();
   bool _showFiltros = false;
   String _filtroEstado = 'Todos';
@@ -24,10 +26,20 @@ class _DriverHomeState extends State<DriverHome> {
   @override
   void initState() {
     super.initState();
-    _anticipos = anticiposDemo
-        .where((a) => a.conductorId == widget.user.id)
-        .toList();
+    _anticipos = [];
+    _loadAnticipos();
     _searchCtrl.addListener(() => setState(() {}));
+  }
+
+  Future<void> _loadAnticipos() async {
+    setState(() => _loading = true);
+    final data = await _anticipoService.getAnticipos();
+    if (mounted) {
+      setState(() {
+        _anticipos = data.where((a) => a.conductorId == widget.user.id).toList();
+        _loading = false;
+      });
+    }
   }
 
   List<Anticipo> get _filtrados {
@@ -71,17 +83,27 @@ class _DriverHomeState extends State<DriverHome> {
           ),
           padding: EdgeInsets.fromLTRB(
               20, MediaQuery.of(context).padding.top + 16, 20, 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Mis anticipos',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w800)),
-              Text('Gestiona tus anticipos y excedentes',
-                  style: TextStyle(
-                      color: Colors.white.withOpacity(0.8), fontSize: 13)),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Mis anticipos',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800)),
+                  Text('Gestiona tus anticipos y excedentes',
+                      style: TextStyle(
+                          color: Colors.white.withOpacity(0.8), fontSize: 13)),
+                ],
+              ),
+              GestureDetector(
+                onTap: _loading ? null : _loadAnticipos,
+                child: const Icon(Icons.refresh,
+                    color: Colors.white, size: 26),
+              ),
             ],
           ),
         ),
@@ -177,41 +199,46 @@ class _DriverHomeState extends State<DriverHome> {
         ),
         const SizedBox(height: 10),
         Expanded(
-          child: _filtrados.isEmpty
-              ? Center(
-                  child: Text('Sin anticipos',
-                      style: TextStyle(
-                          color: AppColors.textSub, fontSize: 14)))
-              : ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
-                  itemCount: _filtrados.length,
-                  itemBuilder: (_, i) => AnticipoCard(
-                    anticipo: _filtrados[i],
-                    isAdmin: false,
-                    onVer: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => AnticipoDetail(
-                                anticipo: _filtrados[i],
-                                isAdmin: false))),
-                    onEditar: () async {
-                      final updated =
-                          await Navigator.push<Anticipo>(
+          child: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _filtrados.isEmpty
+                  ? Center(
+                      child: Text('Sin anticipos',
+                          style: TextStyle(
+                              color: AppColors.textSub, fontSize: 14)))
+                  : RefreshIndicator(
+                      onRefresh: _loadAnticipos,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
+                        itemCount: _filtrados.length,
+                        itemBuilder: (_, i) => AnticipoCard(
+                          anticipo: _filtrados[i],
+                          isAdmin: false,
+                          onVer: () => Navigator.push(
                               context,
                               MaterialPageRoute(
-                                  builder: (_) => AnticipoEdit(
+                                  builder: (_) => AnticipoDetail(
                                       anticipo: _filtrados[i],
-                                      isAdmin: false)));
-                      if (updated != null) {
-                        setState(() {
-                          final idx = _anticipos
-                              .indexWhere((x) => x.id == updated.id);
-                          if (idx != -1) _anticipos[idx] = updated;
-                        });
-                      }
-                    },
-                  ),
-                ),
+                                      isAdmin: false))),
+                          onEditar: () async {
+                            final updated =
+                                await Navigator.push<Anticipo>(
+                                    context,
+                                    MaterialPageRoute(
+                                        builder: (_) => AnticipoEdit(
+                                            anticipo: _filtrados[i],
+                                            isAdmin: false)));
+                            if (updated != null) {
+                              setState(() {
+                                final idx = _anticipos
+                                    .indexWhere((x) => x.id == updated.id);
+                                if (idx != -1) _anticipos[idx] = updated;
+                              });
+                            }
+                          },
+                        ),
+                      ),
+                    ),
         ),
       ],
     );

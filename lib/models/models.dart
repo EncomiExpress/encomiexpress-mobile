@@ -44,6 +44,26 @@ class UserModel {
     required this.telefono,
     required this.rol,
   });
+
+  factory UserModel.fromJson(Map<String, dynamic> json) {
+    return UserModel(
+      id: json['id']?.toString() ?? '',
+      nombre: json['nombre'] ?? json['name'] ?? '',
+      email: json['email'] ?? '',
+      telefono: json['telefono'] ?? json['phone'] ?? '',
+      rol: json['rol'] ?? json['role'] ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'nombre': nombre,
+      'email': email,
+      'telefono': telefono,
+      'rol': rol,
+    };
+  }
 }
 
 class Anticipo {
@@ -72,6 +92,36 @@ class Anticipo {
     required this.fechaMaxima,
     this.soporte,
   });
+
+  factory Anticipo.fromJson(Map<String, dynamic> json) {
+    return Anticipo(
+      id: json['id']?.toString() ?? '',
+      tipo: json['tipo'] ?? json['tipoAnticipo'] ?? '',
+      conductorNombre: json['conductorNombre'] ?? json['conductor']?['nombre'] ?? '',
+      conductorId: json['conductorId']?.toString() ?? json['conductor']?['id']?.toString() ?? '',
+      anticipo: _parseDouble(json['anticipo'] ?? json['monto']),
+      gastado: _parseDouble(json['gastado'] ?? json['montoGastado']),
+      estado: json['estado'] ?? 'Pendiente',
+      fechaEntrega: _formatDate(json['fechaEntrega'] ?? json['fecha']),
+      fechaLegalizacion: _formatDate(json['fechaLegalizacion']),
+      fechaMaxima: _formatDate(json['fechaMaxima']),
+      soporte: json['soporte'] ?? json['documento'],
+    );
+  }
+
+  static double _parseDouble(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    return 0.0;
+  }
+
+  static String _formatDate(dynamic date) {
+    if (date == null) return '';
+    if (date is String) return date;
+    return date.toString();
+  }
 
   double get excedente => anticipo - gastado;
   bool get tieneDeficit => excedente < 0;

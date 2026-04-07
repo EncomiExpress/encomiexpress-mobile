@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
+import '../services/auth_service.dart';
 import 'admin/admin_home.dart';
 import 'driver/driver_home.dart';
 
@@ -14,6 +16,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
   final _passCtrl  = TextEditingController();
+  final _authService = AuthService();
 
   bool _obscure  = true;
   bool _loading  = false;
@@ -22,41 +25,98 @@ class _LoginScreenState extends State<LoginScreen> {
   void _login() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() { _loading = true; _error = null; });
-    await Future.delayed(const Duration(milliseconds: 400));
 
-    final found = usuariosDemo.firstWhere(
-      (u) => u['email'] == _emailCtrl.text.trim() &&
-             u['password'] == _passCtrl.text,
-      orElse: () => {},
+    final result = await _authService.login(
+      _emailCtrl.text.trim(),
+      _passCtrl.text,
     );
 
     if (!mounted) return;
-    if (found.isEmpty) {
-      setState(() { _loading = false; _error = 'Correo o contraseña incorrectos'; });
-      return;
+
+    if (result['success'] == true) {
+      final responseData = result['data'];
+      
+      print('DEBUG - responseData: $responseData');
+      
+      String rol = 'conductor';
+      String nombre = '';
+      String email = '';
+      String id = '';
+      String telefono = '';
+      
+      // Buscar en responseData directamente
+      if (responseData['rol'] != null) {
+        rol = responseData['rol'].toString();
+      }
+      // Buscar en responseData.data
+      else if (responseData['data'] != null && responseData['data']['usuario'] != null && responseData['data']['usuario']['rol'] != null) {
+        rol = responseData['data']['usuario']['rol'].toString();
+      }
+      // Buscar en responseData.data.usuario
+      else if (responseData['data'] != null && responseData['data']['rol'] != null) {
+        rol = responseData['data']['rol'].toString();
+      }
+      // Buscar en responseData.usuario
+      else if (responseData['usuario'] != null && responseData['usuario']['rol'] != null) {
+        rol = responseData['usuario']['rol'].toString();
+      }
+      
+      print('DEBUG - rol extraido: $rol');
+      
+      // Extraer datos del usuario - buscar en múltiples ubicaciones
+      Map<String, dynamic>? usuario;
+      if (responseData['data']?['usuario'] != null) {
+        usuario = Map<String, dynamic>.from(responseData['data']['usuario']);
+      } else if (responseData['usuario'] != null) {
+        usuario = Map<String, dynamic>.from(responseData['usuario']);
+      }
+      
+      if (usuario != null) {
+        nombre = usuario['nombre'] ?? usuario['name'] ?? '';
+        email = usuario['email'] ?? _emailCtrl.text.trim();
+        id = usuario['idUsuario']?.toString() ?? usuario['id']?.toString() ?? '';
+        telefono = usuario['telefono'] ?? '';
+      } else {
+        email = _emailCtrl.text.trim();
+      }
+      
+      final user = UserModel(
+        id: id,
+        nombre: nombre,
+        email: email,
+        telefono: telefono,
+        rol: rol,
+      );
+
+      print('DEBUG - Usuario creado - rol final: ${user.rol}');
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('user_data', user.toJson().toString());
+
+      setState(() => _loading = false);
+
+      final rolLower = user.rol.toLowerCase();
+      Widget dest = rolLower == 'admin' || rolLower == 'administrador'
+          ? AdminHome(user: user)
+          : DriverHome(user: user);
+
+      Navigator.pushReplacement(context,
+          MaterialPageRoute(builder: (_) => dest));
+    } else {
+      setState(() {
+        _loading = false;
+        _error = result['message'] ?? 'Error al iniciar sesión';
+      });
     }
-
-    final user = UserModel(
-      id: found['id']!,
-      nombre: found['nombre']!,
-      email: found['email']!,
-      telefono: found['telefono']!,
-      rol: found['rol']!,
-    );
-
-    setState(() => _loading = false);
-
-    Widget dest = user.rol == 'admin'
-        ? AdminHome(user: user)
-        : DriverHome(user: user);
-
-    Navigator.pushReplacement(context,
-        MaterialPageRoute(builder: (_) => dest));
   }
 
   void _fillDemo(String email) {
     _emailCtrl.text = email;
-    _passCtrl.text  = '123456';
+    if (email == 'admin@encomiexpress.com') {
+      _passCtrl.text = 'admin123';
+    } else if (email == 'conductor@encomiexpress.com') {
+      _passCtrl.text = 'conductor123';
+    }
     setState(() {});
   }
 
@@ -213,11 +273,11 @@ class _LoginScreenState extends State<LoginScreen> {
                                 color: AppColors.textSub, fontSize: 12)),
                       ),
                       const SizedBox(height: 10),
-                      _demoTile('Admin:', 'admin@test.com',
-                          () => _fillDemo('admin@test.com')),
+                      _demoTile('Admin:', 'admin@encomiexpress.com',
+                          () => _fillDemo('admin@encomiexpress.com')),
                       const SizedBox(height: 6),
-                      _demoTile('Conductor:', 'conductor@test.com',
-                          () => _fillDemo('conductor@test.com')),
+                      _demoTile('Conductor:', 'conductor@encomiexpress.com',
+                          () => _fillDemo('conductor@encomiexpress.com')),
                     ],
                   ),
                 ),
