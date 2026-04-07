@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:file_picker/file_picker.dart';
 import '../../models/models.dart';
 import '../../widgets/widgets.dart';
 
@@ -25,6 +26,7 @@ class _AnticipoEditState extends State<AnticipoEdit> {
   late String _fechaLeg;
   late String _fechaMax;
   String? _soporte;
+  PlatformFile? _soporteFile;
 
   final _tipos    = ['Combustible', 'Peajes', 'Viáticos', 'Mantenimiento', 'Otro'];
   final _estados  = ['Activo', 'Pendiente', 'Pagado', 'Rechazado'];
@@ -82,6 +84,19 @@ class _AnticipoEditState extends State<AnticipoEdit> {
       if (field == 'leg')       _fechaLeg     = str;
       if (field == 'max')       _fechaMax     = str;
     });
+  }
+
+  Future<void> _pickFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
+    );
+    if (result != null && result.files.isNotEmpty) {
+      setState(() {
+        _soporteFile = result.files.first;
+        _soporte = _soporteFile!.name;
+      });
+    }
   }
 
   void _guardar() {
@@ -292,8 +307,7 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                           _label('Adjuntar soporte'),
                           const SizedBox(height: 12),
                           GestureDetector(
-                            onTap: () => setState(
-                                () => _soporte = 'documento_soporte.pdf'),
+                            onTap: _pickFile,
                             child: Container(
                               width: double.infinity,
                               padding: const EdgeInsets.all(20),
@@ -326,8 +340,7 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                                       ],
                                     ),
                                   TextButton(
-                                    onPressed: () => setState(
-                                        () => _soporte = 'archivo_seleccionado.pdf'),
+                                    onPressed: _pickFile,
                                     child: Text('Seleccionar archivo',
                                         style: TextStyle(color: primary)),
                                   ),
