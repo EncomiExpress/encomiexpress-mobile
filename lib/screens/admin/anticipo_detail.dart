@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../models/models.dart';
 import '../../widgets/widgets.dart';
 
@@ -213,14 +214,17 @@ class AnticipoDetail extends StatelessWidget {
                                             fontSize: 14)),
                                     if (anticipo.soporte != null && anticipo.soporte!.isNotEmpty)
                                       GestureDetector(
-                                        onTap: () {
-                                          // Abrir URL en navegador (simulado)
+                                        onTap: () async {
+                                          final url = Uri.parse('http://localhost:3000/uploads/${anticipo.soporte}');
+                                          if (await canLaunchUrl(url)) {
+                                            await launchUrl(url);
+                                          }
                                         },
                                         child: const Text('Tocar para abrir imagen',
-                                            style: TextStyle(
-                                                color: AppColors.blue,
-                                                fontSize: 12,
-                                                decoration: TextDecoration.underline)),
+                                                style: TextStyle(
+                                                    color: AppColors.blue,
+                                                    fontSize: 12,
+                                                    decoration: TextDecoration.underline)),
                                       ),
                                   ],
                                 ),
