@@ -71,6 +71,11 @@ class _LoginScreenState extends State<LoginScreen> {
         usuario = Map<String, dynamic>.from(responseData['usuario']);
       }
       
+      String? conductorId;
+      if (responseData['data']?['conductor'] != null) {
+        conductorId = responseData['data']['conductor']['idConductor']?.toString();
+      }
+      
       if (usuario != null) {
         nombre = usuario['nombre'] ?? usuario['name'] ?? '';
         email = usuario['email'] ?? _emailCtrl.text.trim();
@@ -86,6 +91,7 @@ class _LoginScreenState extends State<LoginScreen> {
         email: email,
         telefono: telefono,
         rol: rol,
+        conductorId: conductorId,
       );
 
       print('DEBUG - Usuario creado - rol final: ${user.rol}');

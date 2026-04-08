@@ -36,6 +36,7 @@ class UserModel {
   final String email;
   final String telefono;
   final String rol;
+  final String? conductorId;
 
   const UserModel({
     required this.id,
@@ -43,6 +44,7 @@ class UserModel {
     required this.email,
     required this.telefono,
     required this.rol,
+    this.conductorId,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -52,6 +54,7 @@ class UserModel {
       email: json['email'] ?? '',
       telefono: json['telefono'] ?? json['phone'] ?? '',
       rol: json['rol'] ?? json['role'] ?? '',
+      conductorId: json['conductorId']?.toString() ?? json['conductor']?['idConductor']?.toString(),
     );
   }
 
@@ -62,6 +65,7 @@ class UserModel {
       'email': email,
       'telefono': telefono,
       'rol': rol,
+      'conductorId': conductorId,
     };
   }
 }

@@ -2,11 +2,16 @@ import 'api_client.dart';
 import '../models/models.dart';
 
 class AnticipoService {
-  final ApiClient _api = ApiClient();
+  ApiClient get _api => ApiClient();
 
-  Future<List<Anticipo>> getAnticipos() async {
+  Future<List<Anticipo>> getAnticipos({String? conductorId}) async {
     try {
-      final response = await _api.get('/api/anticipos');
+      String endpoint = '/api/anticipos';
+      if (conductorId != null && conductorId.isNotEmpty) {
+        endpoint = '/api/anticipos?idConductor=$conductorId';
+      }
+      
+      final response = await _api.get(endpoint);
       
       if (response.statusCode == 200) {
         final List<dynamic> data = response.data['data'] ?? response.data;
@@ -47,6 +52,20 @@ class AnticipoService {
     }
   }
 
+  Future<Map<String, dynamic>> actualizarAnticipo(String id, Map<String, dynamic> data) async {
+    try {
+      final response = await _api.put('/api/anticipos/$id', data: data);
+      
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': response.data};
+      }
+      
+      return {'success': false, 'message': 'Error al actualizar anticipo'};
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
   Future<Map<String, dynamic>> liquidarAnticipo(String id, Map<String, dynamic> data) async {
     try {
       final response = await _api.post('/api/anticipos/liquidar/$id', data: data);
@@ -62,19 +81,38 @@ class AnticipoService {
   }
 
   Anticipo _fromJson(Map<String, dynamic> json) {
+    final conductorData = json['conductor'];
+    String conductorNombre = '';
+    String conductorId = '';
+    if (conductorData != null) {
+      final usuarioData = conductorData['usuario'];
+      conductorNombre = conductorData['nombre'] ?? conductorData['usuario']?['nombre'] ?? usuarioData?['nombre'] ?? '';
+      conductorId = conductorData['idConductor']?.toString() ?? conductorData['id']?.toString() ?? '';
+    }
+    
     return Anticipo(
-      id: json['id']?.toString() ?? '',
-      tipo: json['tipo'] ?? json['tipoAnticipo'] ?? '',
-      conductorNombre: json['conductorNombre'] ?? json['conductor']?['nombre'] ?? '',
-      conductorId: json['conductorId']?.toString() ?? json['conductor']?['id']?.toString() ?? '',
-      anticipo: _parseDouble(json['anticipo'] ?? json['monto']),
-      gastado: _parseDouble(json['gastado'] ?? json['montoGastado']),
-      estado: json['estado'] ?? 'Pendiente',
+      id: json['idAnticipo']?.toString() ?? json['id']?.toString() ?? '',
+      tipo: json['tipo'] ?? 'Anticipo',
+      conductorNombre: conductorNombre,
+      conductorId: conductorId,
+      anticipo: _parseDouble(json['valorAnticipo'] ?? json['anticipo'] ?? json['monto']),
+      gastado: _parseDouble(json['valorGastado'] ?? json['gastado'] ?? json['montoGastado']),
+      estado: _mapEstado(json['estado'] ?? ''),
       fechaEntrega: _formatDate(json['fechaEntrega'] ?? json['fecha']),
       fechaLegalizacion: _formatDate(json['fechaLegalizacion']),
       fechaMaxima: _formatDate(json['fechaMaxima']),
       soporte: json['soporte'] ?? json['documento'],
     );
+  }
+  
+  String _mapEstado(String estado) {
+    switch (estado.toLowerCase()) {
+      case 'pendiente': return 'Pendiente';
+      case 'liquidado': return 'Pagado';
+      case 'con excedente': return 'Activo';
+      case 'excedente entregado': return 'Pagado';
+      default: return estado.isEmpty ? 'Pendiente' : estado;
+    }
   }
 
   double _parseDouble(dynamic value) {

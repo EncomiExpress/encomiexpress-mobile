@@ -2,13 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../models/models.dart';
+import '../../services/anticipo_service.dart';
 import '../../widgets/widgets.dart';
 
 class AnticipoEdit extends StatefulWidget {
   final Anticipo? anticipo;
   final bool isAdmin;
+  final String? conductorId;
 
-  const AnticipoEdit({super.key, this.anticipo, required this.isAdmin});
+  const AnticipoEdit({super.key, this.anticipo, required this.isAdmin, this.conductorId});
 
   @override
   State<AnticipoEdit> createState() => _AnticipoEditState();
@@ -16,6 +18,8 @@ class AnticipoEdit extends StatefulWidget {
 
 class _AnticipoEditState extends State<AnticipoEdit> {
   final _formKey = GlobalKey<FormState>();
+  final _anticipoService = AnticipoService();
+  bool _saving = false;
 
   late String _conductor;
   late String _tipo;
@@ -29,8 +33,24 @@ class _AnticipoEditState extends State<AnticipoEdit> {
   PlatformFile? _soporteFile;
 
   final _tipos    = ['Combustible', 'Peajes', 'Viáticos', 'Mantenimiento', 'Otro'];
-  final _estados  = ['Activo', 'Pendiente', 'Pagado', 'Rechazado'];
+  final _estados  = ['Pendiente', 'Activo', 'Pagado', 'Rechazado'];
   final _conductores = ['Juan Pérez', 'María García', 'Pedro Ramírez'];
+
+  String _normalizeEstado(String? estado) {
+    if (estado == null) return 'Pendiente';
+    final lower = estado.toLowerCase();
+    if (lower == 'pendiente') return 'Pendiente';
+    if (lower == 'acti' || lower == 'con excedente') return 'Activo';
+    if (lower == 'liquidado' || lower == 'pagado') return 'Pagado';
+    if (lower == 'rechazado') return 'Rechazado';
+    return 'Pendiente';
+  }
+
+  String _normalizeTipo(String? tipo) {
+    if (tipo == null) return 'Combustible';
+    if (_tipos.contains(tipo)) return tipo;
+    return 'Otro';
+  }
 
   bool get _isNew => widget.anticipo == null;
 
@@ -45,8 +65,8 @@ class _AnticipoEditState extends State<AnticipoEdit> {
     super.initState();
     final a = widget.anticipo;
     _conductor    = a?.conductorNombre ?? _conductores.first;
-    _tipo         = a?.tipo ?? _tipos.first;
-    _estado       = a?.estado ?? 'Activo';
+    _tipo         = _normalizeTipo(a?.tipo);
+    _estado       = _normalizeEstado(a?.estado);
     _anticipoCtrl = TextEditingController(text: a != null ? a.anticipo.toStringAsFixed(0) : '');
     _gastadoCtrl  = TextEditingController(text: a != null ? a.gastado.toStringAsFixed(0) : '');
     _fechaEntrega = a?.fechaEntrega ?? '';
@@ -99,24 +119,74 @@ class _AnticipoEditState extends State<AnticipoEdit> {
     }
   }
 
-  void _guardar() {
+  void _guardar() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final updated = Anticipo(
-      id: widget.anticipo?.id ?? 'A-${DateTime.now().millisecondsSinceEpoch}',
-      tipo: _tipo,
-      conductorNombre: _conductor,
-      conductorId: widget.anticipo?.conductorId ?? '2',
-      anticipo: double.tryParse(_anticipoCtrl.text) ?? 0,
-      gastado: double.tryParse(_gastadoCtrl.text) ?? 0,
-      estado: _estado,
-      fechaEntrega: _fechaEntrega,
-      fechaLegalizacion: _fechaLeg,
-      fechaMaxima: _fechaMax,
-      soporte: _soporte,
-    );
+    setState(() => _saving = true);
 
-    Navigator.pop(context, updated);
+    final anticipoId = widget.anticipo?.id ?? '';
+    final isNew = anticipoId.isEmpty;
+
+    Map<String, dynamic> data;
+    if (isNew) {
+      final conductorId = widget.conductorId ?? widget.anticipo?.conductorId ?? '';
+      data = {
+        'idConductor': conductorId,
+        'idRuta': null,
+        'valorAnticipo': double.tryParse(_anticipoCtrl.text) ?? 0,
+        'fechaEntrega': _fechaEntrega,
+      };
+    } else {
+      data = {
+        'valorGastado': double.tryParse(_gastadoCtrl.text) ?? 0,
+        'estado': _mapEstadoToBackend(_estado),
+        'soporte': _soporte,
+      };
+    }
+
+    final result = isNew
+        ? await _anticipoService.crearAnticipo(data)
+        : await _anticipoService.actualizarAnticipo(anticipoId, data);
+
+    setState(() => _saving = false);
+
+    if (result['success'] == true) {
+      final responseData = result['data'] as Map<String, dynamic>?;
+      final newId = isNew ? (responseData?['idAnticipo']?.toString() ?? anticipoId) : anticipoId;
+      
+      final updated = Anticipo(
+        id: newId,
+        tipo: _tipo,
+        conductorNombre: _conductor,
+        conductorId: widget.anticipo?.conductorId ?? '',
+        anticipo: double.tryParse(_anticipoCtrl.text) ?? 0,
+        gastado: double.tryParse(_gastadoCtrl.text) ?? 0,
+        estado: _estado,
+        fechaEntrega: _fechaEntrega,
+        fechaLegalizacion: _fechaLeg,
+        fechaMaxima: _fechaMax,
+        soporte: _soporte,
+      );
+
+      Navigator.pop(context, updated);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result['message'] ?? 'Error al guardar'),
+          backgroundColor: AppColors.red,
+        ),
+      );
+    }
+  }
+
+  String _mapEstadoToBackend(String estado) {
+    switch (estado) {
+      case 'Pendiente': return 'pendiente';
+      case 'Activo': return 'con excedente';
+      case 'Pagado': return 'liquidado';
+      case 'Rechazado': return 'rechazado';
+      default: return 'pendiente';
+    }
   }
 
   @override

@@ -33,10 +33,11 @@ class _DriverHomeState extends State<DriverHome> {
 
   Future<void> _loadAnticipos() async {
     setState(() => _loading = true);
-    final data = await _anticipoService.getAnticipos();
+    final conductorId = widget.user.conductorId;
+    final data = await _anticipoService.getAnticipos(conductorId: conductorId);
     if (mounted) {
       setState(() {
-        _anticipos = data.where((a) => a.conductorId == widget.user.id).toList();
+        _anticipos = data;
         _loading = false;
       });
     }
@@ -306,8 +307,10 @@ class _DriverHomeState extends State<DriverHome> {
                       final nuevo = await Navigator.push<Anticipo>(
                           context,
                           MaterialPageRoute(
-                              builder: (_) =>
-                                  const AnticipoEdit(isAdmin: false)));
+                              builder: (_) => AnticipoEdit(
+                                isAdmin: false,
+                                conductorId: widget.user.conductorId,
+                              )));
                       if (nuevo != null) {
                         setState(() => _anticipos.add(nuevo));
                         ScaffoldMessenger.of(context).showSnackBar(
