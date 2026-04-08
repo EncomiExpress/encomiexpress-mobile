@@ -63,9 +63,7 @@ class _AdminHomeState extends State<AdminHome> {
   }
 
   void _aprobar(Anticipo a) async {
-    final result = await _anticipoService.liquidarAnticipo(a.id, {
-      'estado': 'Pagado',
-    });
+    final result = await _anticipoService.aprobarAnticipo(a.id);
     
     if (!mounted) return;
     
@@ -90,9 +88,7 @@ class _AdminHomeState extends State<AdminHome> {
   }
 
   void _rechazar(Anticipo a) async {
-    final result = await _anticipoService.liquidarAnticipo(a.id, {
-      'estado': 'Rechazado',
-    });
+    final result = await _anticipoService.rechazarAnticipo(a.id);
     
     if (!mounted) return;
     

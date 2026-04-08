@@ -304,21 +304,11 @@ class _DriverHomeState extends State<DriverHome> {
                   const SizedBox(height: 24),
                   GestureDetector(
                     onTap: () async {
-                      final nuevo = await Navigator.push<Anticipo>(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) => AnticipoEdit(
-                                isAdmin: false,
-                                conductorId: widget.user.conductorId,
-                              )));
-                      if (nuevo != null) {
-                        setState(() => _anticipos.add(nuevo));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text('Anticipo solicitado'),
-                              backgroundColor: AppColors.green),
-                        );
-                      }
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content: Text('Solo el administrador puede crear anticipos'),
+                            backgroundColor: AppColors.orange),
+                      );
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(

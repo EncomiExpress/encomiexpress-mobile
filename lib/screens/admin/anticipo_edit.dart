@@ -20,6 +20,20 @@ class _AnticipoEditState extends State<AnticipoEdit> {
   final _formKey = GlobalKey<FormState>();
   final _anticipoService = AnticipoService();
   bool _saving = false;
+  List<Map<String, dynamic>> _conductoresList = [];
+  String _conductorId = '';
+
+  Future<void> _loadConductores() async {
+    final data = await _anticipoService.getConductores();
+    if (mounted) {
+      setState(() {
+        _conductoresList = data;
+        if (_conductor.isEmpty && data.isNotEmpty) {
+          _conductor = data.first['nombre'] ?? '';
+        }
+      });
+    }
+  }
 
   late String _conductor;
   late String _tipo;
@@ -34,7 +48,6 @@ class _AnticipoEditState extends State<AnticipoEdit> {
 
   final _tipos    = ['Combustible', 'Peajes', 'Viáticos', 'Mantenimiento', 'Otro'];
   final _estados  = ['Pendiente', 'Activo', 'Pagado', 'Rechazado'];
-  final _conductores = ['Juan Pérez', 'María García', 'Pedro Ramírez'];
 
   String _normalizeEstado(String? estado) {
     if (estado == null) return 'Pendiente';
@@ -47,12 +60,22 @@ class _AnticipoEditState extends State<AnticipoEdit> {
   }
 
   String _normalizeTipo(String? tipo) {
+    print('DEBUG _normalizeTipo input: "$tipo"');
     if (tipo == null) return 'Combustible';
-    if (_tipos.contains(tipo)) return tipo;
-    return 'Otro';
+    final found = _tipos.firstWhere(
+      (t) => t.toLowerCase() == tipo.toLowerCase(),
+      orElse: () => 'Otro',
+    );
+    print('DEBUG _normalizeTipo output: "$found"');
+    return found;
   }
 
   bool get _isNew => widget.anticipo == null;
+
+  List<String> get _conductorOptions {
+    if (_conductoresList.isEmpty) return ['Cargando...'];
+    return _conductoresList.map((c) => c['nombre'] as String).toList();
+  }
 
   double get _excedente {
     final a = double.tryParse(_anticipoCtrl.text) ?? 0;
@@ -63,8 +86,10 @@ class _AnticipoEditState extends State<AnticipoEdit> {
   @override
   void initState() {
     super.initState();
+    _loadConductores();
     final a = widget.anticipo;
-    _conductor    = a?.conductorNombre ?? _conductores.first;
+    _conductor    = a?.conductorNombre ?? '';
+    _conductorId  = a?.conductorId ?? '';
     _tipo         = _normalizeTipo(a?.tipo);
     _estado       = _normalizeEstado(a?.estado);
     _anticipoCtrl = TextEditingController(text: a != null ? a.anticipo.toStringAsFixed(0) : '');
@@ -126,22 +151,34 @@ class _AnticipoEditState extends State<AnticipoEdit> {
 
     final anticipoId = widget.anticipo?.id ?? '';
     final isNew = anticipoId.isEmpty;
+    print('DEBUG _guardar isNew: $isNew, anticipoId: $anticipoId');
 
     Map<String, dynamic> data;
     if (isNew) {
-      final conductorId = widget.conductorId ?? widget.anticipo?.conductorId ?? '';
+      final selectedConductor = _conductoresList.firstWhere(
+        (c) => c['nombre'] == _conductor,
+        orElse: () => {'idConductor': ''},
+      );
+      final conductorId = selectedConductor['idConductor'] ?? widget.anticipo?.conductorId ?? '';
+      print('DEBUG crear anticipo - conductorId: $conductorId, nombre: $_conductor, tipo: $_tipo');
       data = {
-        'idConductor': conductorId,
+        'idConductor': int.tryParse(conductorId) ?? conductorId,
         'idRuta': null,
         'valorAnticipo': double.tryParse(_anticipoCtrl.text) ?? 0,
+        'tipo': _tipo,
         'fechaEntrega': _fechaEntrega,
+        'fechaMaxima': _fechaMax,
       };
     } else {
+      // Solo enviar fechaLegalizacion si está llena (conductor la pone cuando legaliza)
       data = {
         'valorGastado': double.tryParse(_gastadoCtrl.text) ?? 0,
         'estado': _mapEstadoToBackend(_estado),
         'soporte': _soporte,
       };
+      if (_fechaLeg.isNotEmpty) {
+        data['fechaLegalizacion'] = _fechaLeg;
+      }
     }
 
     final result = isNew
@@ -252,9 +289,11 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                             _label('Conductor *'),
                             const SizedBox(height: 8),
                             _dropdown(
-                              value: _conductor,
-                              items: _conductores,
-                              onChanged: (v) => setState(() => _conductor = v!),
+                              value: _conductor.isEmpty ? _conductorOptions.first : _conductor,
+                              items: _conductorOptions,
+                              onChanged: (v) {
+                                setState(() => _conductor = v!);
+                              },
                             ),
                           ],
                         ),
@@ -296,11 +335,12 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                           const SizedBox(height: 8),
                           _moneyField(_anticipoCtrl,
                               readonly: !widget.isAdmin),
-                          const SizedBox(height: 14),
-                          _label('Gastado'),
-                          const SizedBox(height: 8),
-                          _moneyField(_gastadoCtrl),
-                          const SizedBox(height: 14),
+                          if (!widget.isAdmin || !_isNew) ...[
+                            const SizedBox(height: 14),
+                            _label('Gastado'),
+                            const SizedBox(height: 8),
+                            _moneyField(_gastadoCtrl),
+                          ],
                           Container(
                             width: double.infinity,
                             padding: const EdgeInsets.all(14),
@@ -434,9 +474,9 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                               end: Alignment.centerRight),
                           borderRadius: BorderRadius.circular(14),
                         ),
-                        child: const Center(
-                          child: Text('Actualizar anticipo',
-                              style: TextStyle(
+                        child: Center(
+                          child: Text(_isNew ? 'Crear anticipo' : 'Actualizar',
+                              style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 16,
                                   fontWeight: FontWeight.w700)),

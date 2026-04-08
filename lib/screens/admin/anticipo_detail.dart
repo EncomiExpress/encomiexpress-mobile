@@ -198,7 +198,7 @@ class AnticipoDetail extends StatelessWidget {
                                   decoration: BoxDecoration(
                                       color: isAdmin ? AppColors.purpleBg : AppColors.blueBg,
                                       borderRadius: BorderRadius.circular(10)),
-                                  child: Icon(Icons.description_outlined,
+                                  child: Icon(Icons.attach_file,
                                       color: isAdmin ? AppColors.purple : AppColors.blue,
                                       size: 20),
                                 ),
@@ -206,15 +206,22 @@ class AnticipoDetail extends StatelessWidget {
                                 Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(anticipo.soporte!,
+                                    Text(anticipo.soporte ?? 'Sin archivo',
                                         style: const TextStyle(
                                             color: AppColors.textMain,
                                             fontWeight: FontWeight.w600,
                                             fontSize: 14)),
-                                    const Text('Archivo adjunto',
-                                        style: TextStyle(
-                                            color: AppColors.textSub,
-                                            fontSize: 12)),
+                                    if (anticipo.soporte != null && anticipo.soporte!.isNotEmpty)
+                                      GestureDetector(
+                                        onTap: () {
+                                          // Abrir URL en navegador (simulado)
+                                        },
+                                        child: const Text('Tocar para abrir imagen',
+                                            style: TextStyle(
+                                                color: AppColors.blue,
+                                                fontSize: 12,
+                                                decoration: TextDecoration.underline)),
+                                      ),
                                   ],
                                 ),
                               ],

@@ -4,6 +4,25 @@ import '../models/models.dart';
 class AnticipoService {
   ApiClient get _api => ApiClient();
 
+  Future<List<Map<String, dynamic>>> getConductores() async {
+    try {
+      final response = await _api.get('/api/conductores');
+      
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data['data'] ?? response.data;
+        return data.map((json) => {
+          'idConductor': json['idConductor']?.toString() ?? '',
+          'nombre': json['usuario']?['nombre'] ?? json['nombre'] ?? '',
+          'estado': json['estado'] ?? 'activo',
+        }).toList();
+      }
+      
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
   Future<List<Anticipo>> getAnticipos({String? conductorId}) async {
     try {
       String endpoint = '/api/anticipos';
@@ -80,6 +99,38 @@ class AnticipoService {
     }
   }
 
+  Future<Map<String, dynamic>> aprobarAnticipo(String id) async {
+    try {
+      final response = await _api.put('/api/anticipos/$id', data: {
+        'estado': 'liquidado',
+      });
+      
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': response.data};
+      }
+      
+      return {'success': false, 'message': 'Error al approve anticipo'};
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
+  Future<Map<String, dynamic>> rechazarAnticipo(String id) async {
+    try {
+      final response = await _api.put('/api/anticipos/$id', data: {
+        'estado': 'rechazado',
+      });
+      
+      if (response.statusCode == 200) {
+        return {'success': true, 'data': response.data};
+      }
+      
+      return {'success': false, 'message': 'Error al rechazar anticipo'};
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
+    }
+  }
+
   Anticipo _fromJson(Map<String, dynamic> json) {
     final conductorData = json['conductor'];
     String conductorNombre = '';
@@ -91,7 +142,7 @@ class AnticipoService {
     }
     
     return Anticipo(
-      id: json['idAnticipo']?.toString() ?? json['id']?.toString() ?? '',
+      id: json['idAnticipoExcedente']?.toString() ?? json['idAnticipo']?.toString() ?? json['id']?.toString() ?? '',
       tipo: json['tipo'] ?? 'Anticipo',
       conductorNombre: conductorNombre,
       conductorId: conductorId,
