@@ -4,6 +4,7 @@ import '../models/models.dart';
 import '../services/auth_service.dart';
 import 'admin/admin_home.dart';
 import 'driver/driver_home.dart';
+import 'recover_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -264,7 +265,14 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 16),
                       Center(
                         child: TextButton(
-                          onPressed: () {},
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const RecoverPasswordScreen(),
+                              ),
+                            );
+                          },
                           child: const Text('¿Olvidaste tu contraseña?',
                               style: TextStyle(
                                   color: AppColors.blue,

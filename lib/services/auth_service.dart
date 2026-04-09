@@ -43,6 +43,22 @@ class AuthService {
     }
   }
 
+  Future<Map<String, dynamic>> recoverPassword(String email) async {
+    try {
+      final response = await _api.post('/api/auth/recover-password', data: {
+        'email': email,
+      });
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return {'success': true};
+      }
+      
+      return {'success': false, 'message': 'Error al procesar la solicitud'};
+    } catch (e) {
+      return _handleError(e);
+    }
+  }
+
   Future<void> logout() async {
     _api.clearToken();
     final prefs = await SharedPreferences.getInstance();
