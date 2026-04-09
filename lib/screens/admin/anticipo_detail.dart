@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../models/models.dart';
 import '../../widgets/widgets.dart';
+import '../../widgets/image_viewer.dart';
 
 class AnticipoDetail extends StatelessWidget {
   final Anticipo anticipo;
@@ -185,52 +186,7 @@ class AnticipoDetail extends StatelessWidget {
                                   fontWeight: FontWeight.w700,
                                   fontSize: 16)),
                           const SizedBox(height: 14),
-                          Container(
-                            padding: const EdgeInsets.all(14),
-                            decoration: BoxDecoration(
-                              color: AppColors.bgGray,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AppColors.border),
-                            ),
-                            child: Row(
-                              children: [
-                                Container(
-                                  width: 40, height: 40,
-                                  decoration: BoxDecoration(
-                                      color: isAdmin ? AppColors.purpleBg : AppColors.blueBg,
-                                      borderRadius: BorderRadius.circular(10)),
-                                  child: Icon(Icons.attach_file,
-                                      color: isAdmin ? AppColors.purple : AppColors.blue,
-                                      size: 20),
-                                ),
-                                const SizedBox(width: 12),
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(anticipo.soporte ?? 'Sin archivo',
-                                        style: const TextStyle(
-                                            color: AppColors.textMain,
-                                            fontWeight: FontWeight.w600,
-                                            fontSize: 14)),
-                                    if (anticipo.soporte != null && anticipo.soporte!.isNotEmpty)
-                                      GestureDetector(
-                                        onTap: () async {
-                                          final url = Uri.parse('http://localhost:3000/uploads/${anticipo.soporte}');
-                                          if (await canLaunchUrl(url)) {
-                                            await launchUrl(url);
-                                          }
-                                        },
-                                        child: const Text('Tocar para abrir imagen',
-                                                style: TextStyle(
-                                                    color: AppColors.blue,
-                                                    fontSize: 12,
-                                                    decoration: TextDecoration.underline)),
-                                      ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
+                          _buildSoporteSection(),
                         ],
                       ),
                     ),
@@ -290,6 +246,75 @@ class AnticipoDetail extends StatelessWidget {
                 fontSize: 15,
                 fontWeight: FontWeight.w600)),
       ],
+    );
+  }
+
+  bool _isImage(String? filename) {
+    if (filename == null) return false;
+    final ext = filename.split('.').last.toLowerCase();
+    return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].contains(ext);
+  }
+
+  Future<void> _openFile(String filename) async {
+    final url = Uri.parse('http://localhost:3000/uploads/$filename');
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url);
+    }
+  }
+
+  Widget _buildSoporteSection() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.bgGray,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40, height: 40,
+            decoration: BoxDecoration(
+                color: isAdmin ? AppColors.purpleBg : AppColors.blueBg,
+                borderRadius: BorderRadius.circular(10)),
+            child: Icon(Icons.attach_file,
+                color: isAdmin ? AppColors.purple : AppColors.blue,
+                size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(anticipo.soporte ?? 'Sin archivo',
+                    style: const TextStyle(
+                        color: AppColors.textMain,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14)),
+                if (anticipo.soporte != null && anticipo.soporte!.isNotEmpty)
+                  Builder(
+                    builder: (ctx) => GestureDetector(
+                      onTap: () {
+                        if (_isImage(anticipo.soporte)) {
+                          final url = 'http://localhost:3000/uploads/${anticipo.soporte}';
+                          ImageViewer.show(ctx, [url]);
+                        } else {
+                          _openFile(anticipo.soporte!);
+                        }
+                      },
+                      child: Text(
+                        _isImage(anticipo.soporte) ? 'Tocar para ver imagen' : 'Tocar para abrir archivo',
+                        style: const TextStyle(
+                            color: AppColors.blue,
+                            fontSize: 12,
+                            decoration: TextDecoration.underline)),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

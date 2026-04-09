@@ -23,6 +23,10 @@ class _AnticipoEditState extends State<AnticipoEdit> {
   List<Map<String, dynamic>> _conductoresList = [];
   String _conductorId = '';
 
+  // ── NUEVO: lista de rutas y ruta seleccionada (opcional) ──
+  List<Map<String, dynamic>> _rutasList = [];
+  String? _rutaId;
+
   Future<void> _loadConductores() async {
     final data = await _anticipoService.getConductores();
     if (mounted) {
@@ -32,6 +36,14 @@ class _AnticipoEditState extends State<AnticipoEdit> {
           _conductor = data.first['nombre'] ?? '';
         }
       });
+    }
+  }
+
+  // ── NUEVO: carga las rutas desde el servicio ──
+  Future<void> _loadRutas() async {
+    final data = await _anticipoService.getRutas(); // ajusta según tu servicio
+    if (mounted) {
+      setState(() => _rutasList = data);
     }
   }
 
@@ -87,6 +99,7 @@ class _AnticipoEditState extends State<AnticipoEdit> {
   void initState() {
     super.initState();
     _loadConductores();
+    _loadRutas(); // ── NUEVO ──
     final a = widget.anticipo;
     _conductor    = a?.conductorNombre ?? '';
     _conductorId  = a?.conductorId ?? '';
@@ -160,15 +173,16 @@ class _AnticipoEditState extends State<AnticipoEdit> {
         orElse: () => {'idConductor': ''},
       );
       final conductorId = selectedConductor['idConductor'] ?? widget.anticipo?.conductorId ?? '';
-      print('DEBUG crear anticipo - conductorId: $conductorId, nombre: $_conductor, tipo: $_tipo');
+      print('DEBUG _guardar crear anticipo - conductorId: "$conductorId", nombre: "$_conductor", tipo: "$_tipo", valor: "${_anticipoCtrl.text}"');
       data = {
         'idConductor': int.tryParse(conductorId) ?? conductorId,
-        'idRuta': null,
+        // ── NUEVO: idRuta es opcional, se envía null si no se seleccionó ──
         'valorAnticipo': double.tryParse(_anticipoCtrl.text) ?? 0,
         'tipo': _tipo,
         'fechaEntrega': _fechaEntrega,
         'fechaMaxima': _fechaMax,
       };
+      print('DEBUG _guardar data final: $data');
     } else {
       // Solo enviar fechaLegalizacion si está llena (conductor la pone cuando legaliza)
       data = {
@@ -281,6 +295,7 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                 key: _formKey,
                 child: Column(
                   children: [
+                    // ── Conductor ──
                     if (widget.isAdmin)
                       SectionCard(
                         child: Column(
@@ -298,6 +313,55 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                           ],
                         ),
                       ),
+
+                    // ── NUEVO: Ruta (opcional) ──
+                    if (widget.isAdmin && _isNew)
+                      SectionCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _label('Ruta (opcional)'),
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14),
+                              decoration: BoxDecoration(
+                                color: AppColors.bgGray,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: AppColors.border),
+                              ),
+                              child: DropdownButton<String?>(
+                                value: _rutaId,
+                                isExpanded: true,
+                                underline: const SizedBox(),
+                                hint: const Text(
+                                  'Sin ruta asignada',
+                                  style: TextStyle(color: AppColors.textSub, fontSize: 15),
+                                ),
+                                icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                                    color: AppColors.textSub),
+                                style: const TextStyle(
+                                    color: AppColors.textMain, fontSize: 15),
+                                items: [
+                                  const DropdownMenuItem<String?>(
+                                    value: null,
+                                    child: Text(
+                                      'Sin ruta asignada',
+                                      style: TextStyle(color: AppColors.textSub),
+                                    ),
+                                  ),
+                                  ..._rutasList.map((r) => DropdownMenuItem<String?>(
+                                        value: r['idRuta'].toString(),
+                                        child: Text(r['nombre'] ?? ''),
+                                      )),
+                                ],
+                                onChanged: (v) => setState(() => _rutaId = v),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    // ── Tipo de anticipo ──
                     SectionCard(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -312,6 +376,8 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                         ],
                       ),
                     ),
+
+                    // ── Estado ──
                     if (widget.isAdmin)
                       SectionCard(
                         child: Column(
@@ -327,6 +393,8 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                           ],
                         ),
                       ),
+
+                    // ── Valores ──
                     SectionCard(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -379,6 +447,8 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                         ],
                       ),
                     ),
+
+                    // ── Fechas ──
                     SectionCard(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -410,6 +480,8 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                         ],
                       ),
                     ),
+
+                    // ── Soporte ──
                     SectionCard(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -462,6 +534,8 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                       ),
                     ),
                     const SizedBox(height: 8),
+
+                    // ── Botón guardar ──
                     GestureDetector(
                       onTap: _guardar,
                       child: Container(

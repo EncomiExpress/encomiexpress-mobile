@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'api_client.dart';
 import '../models/models.dart';
 
@@ -6,10 +7,13 @@ class AnticipoService {
 
   Future<List<Map<String, dynamic>>> getConductores() async {
     try {
+      print('DEBUG getConductores - iniciando peticion');
       final response = await _api.get('/api/conductores');
+      print('DEBUG getConductores - response status: ${response.statusCode}, data: ${response.data}');
       
       if (response.statusCode == 200) {
         final List<dynamic> data = response.data['data'] ?? response.data;
+        print('DEBUG getConductores - lista conductores: $data');
         return data.map((json) => {
           'idConductor': json['idConductor']?.toString() ?? '',
           'nombre': json['usuario']?['nombre'] ?? json['nombre'] ?? '',
@@ -19,6 +23,29 @@ class AnticipoService {
       
       return [];
     } catch (e) {
+      print('DEBUG getConductores - error: $e');
+      return [];
+    }
+  }
+
+   Future<List<Map<String, dynamic>>> getRutas() async {  // <-- NUEVO
+    try {
+      print('DEBUG getRutas - iniciando peticion');
+      final response = await _api.get('/api/rutas');
+      print('DEBUG getRutas - response status: ${response.statusCode}, data: ${response.data}');
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data['data'] ?? response.data;
+        print('DEBUG getRutas - lista rutas: $data');
+        return data.map((json) => {
+          'idRuta': json['idRuta']?.toString() ?? '',
+          'nombre': json['nombre'] ?? '',
+        }).toList();
+      }
+
+      return [];
+    } catch (e) {
+      print('DEBUG getRutas - error: $e');
       return [];
     }
   }
@@ -59,14 +86,23 @@ class AnticipoService {
 
   Future<Map<String, dynamic>> crearAnticipo(Map<String, dynamic> data) async {
     try {
+      print('DEBUG crearAnticipo - data a enviar: $data');
       final response = await _api.post('/api/anticipos', data: data);
+      print('DEBUG crearAnticipo - response status: ${response.statusCode}, data: ${response.data}');
       
       if (response.statusCode == 200 || response.statusCode == 201) {
         return {'success': true, 'data': response.data};
       }
       
-      return {'success': false, 'message': 'Error al crear anticipo'};
+      return {'success': false, 'message': 'Error al crear anticipo: ${response.data}'};
     } catch (e) {
+      if (e is DioException && e.response != null) {
+        print('DEBUG crearAnticipo - error response status: ${e.response?.statusCode}');
+        print('DEBUG crearAnticipo - error response data: ${e.response?.data}');
+        print('DEBUG crearAnticipo - error request data: ${e.requestOptions.data}');
+        return {'success': false, 'message': 'Error: ${e.response?.data}'};
+      }
+      print('DEBUG crearAnticipo - error catch: $e');
       return {'success': false, 'message': e.toString()};
     }
   }

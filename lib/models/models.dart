@@ -37,6 +37,15 @@ class UserModel {
   final String telefono;
   final String rol;
   final String? conductorId;
+  final String? documento;
+  final String? fechaNacimiento;
+  final String? direccion;
+  final String? fotoPerfil;
+  final String? placa;
+  final String? marcaVehiculo;
+  final String? modeloVehiculo;
+  final String? anioVehiculo;
+  final String? colorVehiculo;
 
   const UserModel({
     required this.id,
@@ -45,6 +54,15 @@ class UserModel {
     required this.telefono,
     required this.rol,
     this.conductorId,
+    this.documento,
+    this.fechaNacimiento,
+    this.direccion,
+    this.fotoPerfil,
+    this.placa,
+    this.marcaVehiculo,
+    this.modeloVehiculo,
+    this.anioVehiculo,
+    this.colorVehiculo,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -55,6 +73,15 @@ class UserModel {
       telefono: json['telefono'] ?? json['phone'] ?? '',
       rol: json['rol'] ?? json['role'] ?? '',
       conductorId: json['conductorId']?.toString() ?? json['conductor']?['idConductor']?.toString(),
+      documento: json['documento'] ?? json['numeroDocumento'] ?? json['cedula'],
+      fechaNacimiento: json['fechaNacimiento'] ?? json['fecha_nacimiento'] ?? json['birthDate'],
+      direccion: json['direccion'] ?? json['address'] ?? json['direccionResidencia'],
+      fotoPerfil: json['fotoPerfil'] ?? json['foto_perfil'] ?? json['avatar'] ?? json['foto'],
+      placa: json['placa'] ?? json['placaVehiculo'] ?? json['licensePlate'],
+      marcaVehiculo: json['marcaVehiculo'] ?? json['marca'] ?? json['vehicleBrand'],
+      modeloVehiculo: json['modeloVehiculo'] ?? json['modelo'] ?? json['vehicleModel'],
+      anioVehiculo: json['anioVehiculo'] ?? json['anio'] ?? json['vehicleYear']?.toString(),
+      colorVehiculo: json['colorVehiculo'] ?? json['color'] ?? json['vehicleColor'],
     );
   }
 
@@ -66,7 +93,52 @@ class UserModel {
       'telefono': telefono,
       'rol': rol,
       'conductorId': conductorId,
+      'documento': documento,
+      'fechaNacimiento': fechaNacimiento,
+      'direccion': direccion,
+      'fotoPerfil': fotoPerfil,
+      'placa': placa,
+      'marcaVehiculo': marcaVehiculo,
+      'modeloVehiculo': modeloVehiculo,
+      'anioVehiculo': anioVehiculo,
+      'colorVehiculo': colorVehiculo,
     };
+  }
+
+  UserModel copyWith({
+    String? id,
+    String? nombre,
+    String? email,
+    String? telefono,
+    String? rol,
+    String? conductorId,
+    String? documento,
+    String? fechaNacimiento,
+    String? direccion,
+    String? fotoPerfil,
+    String? placa,
+    String? marcaVehiculo,
+    String? modeloVehiculo,
+    String? anioVehiculo,
+    String? colorVehiculo,
+  }) {
+    return UserModel(
+      id: id ?? this.id,
+      nombre: nombre ?? this.nombre,
+      email: email ?? this.email,
+      telefono: telefono ?? this.telefono,
+      rol: rol ?? this.rol,
+      conductorId: conductorId ?? this.conductorId,
+      documento: documento ?? this.documento,
+      fechaNacimiento: fechaNacimiento ?? this.fechaNacimiento,
+      direccion: direccion ?? this.direccion,
+      fotoPerfil: fotoPerfil ?? this.fotoPerfil,
+      placa: placa ?? this.placa,
+      marcaVehiculo: marcaVehiculo ?? this.marcaVehiculo,
+      modeloVehiculo: modeloVehiculo ?? this.modeloVehiculo,
+      anioVehiculo: anioVehiculo ?? this.anioVehiculo,
+      colorVehiculo: colorVehiculo ?? this.colorVehiculo,
+    );
   }
 }
 

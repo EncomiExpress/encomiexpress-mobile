@@ -22,13 +22,21 @@ class _DriverHomeState extends State<DriverHome> {
   final _searchCtrl = TextEditingController();
   bool _showFiltros = false;
   String _filtroEstado = 'Todos';
+  late UserModel _currentUser;
 
   @override
   void initState() {
     super.initState();
     _anticipos = [];
+    _currentUser = widget.user;
     _loadAnticipos();
     _searchCtrl.addListener(() => setState(() {}));
+  }
+
+  void _onUserUpdated(UserModel updatedUser) {
+    setState(() {
+      _currentUser = updatedUser;
+    });
   }
 
   Future<void> _loadAnticipos() async {
@@ -62,7 +70,11 @@ class _DriverHomeState extends State<DriverHome> {
         index: _tab,
         children: [
           _buildMisAnticipos(),
-          DriverProfile(user: widget.user, anticipos: _anticipos),
+          DriverProfile(
+            user: _currentUser, 
+            anticipos: _anticipos,
+            onUserUpdated: _onUserUpdated,
+          ),
           _buildSolicitar(),
         ],
       ),
