@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../models/models.dart';
-import '../services/auth_service.dart';
-import 'admin/admin_home.dart';
-import 'driver/driver_home.dart';
+import 'package:provider/provider.dart';
+import '../features/usuarios/presentation/providers/usuario_provider.dart';
+import '../features/anticipos/presentation/providers/anticipo_provider.dart';
+import '../features/anticipos/presentation/screens/admin_home.dart';
+import '../features/anticipos/presentation/screens/driver_home.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -15,98 +15,46 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
-  final _passCtrl  = TextEditingController();
-  final _authService = AuthService();
+  final _passCtrl = TextEditingController();
 
-  bool _obscure  = true;
-  bool _loading  = false;
-  String? _error;
+  bool _obscure = true;
 
   void _login() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() { _loading = true; _error = null; });
 
-    final result = await _authService.login(
+    final usuarioProvider = context.read<UsuarioProvider>();
+    final success = await usuarioProvider.login(
       _emailCtrl.text.trim(),
       _passCtrl.text,
     );
 
     if (!mounted) return;
 
-    if (result['success'] == true) {
-      final responseData = result['data'];
-      
-      print('DEBUG - responseData: $responseData');
-      
-      String rol = 'conductor';
-      String nombre = '';
-      String email = '';
-      String id = '';
-      String telefono = '';
-      
-      // Buscar en responseData directamente
-      if (responseData['rol'] != null) {
-        rol = responseData['rol'].toString();
-      }
-      // Buscar en responseData.data
-      else if (responseData['data'] != null && responseData['data']['usuario'] != null && responseData['data']['usuario']['rol'] != null) {
-        rol = responseData['data']['usuario']['rol'].toString();
-      }
-      // Buscar en responseData.data.usuario
-      else if (responseData['data'] != null && responseData['data']['rol'] != null) {
-        rol = responseData['data']['rol'].toString();
-      }
-      // Buscar en responseData.usuario
-      else if (responseData['usuario'] != null && responseData['usuario']['rol'] != null) {
-        rol = responseData['usuario']['rol'].toString();
-      }
-      
-      print('DEBUG - rol extraido: $rol');
-      
-      // Extraer datos del usuario - buscar en múltiples ubicaciones
-      Map<String, dynamic>? usuario;
-      if (responseData['data']?['usuario'] != null) {
-        usuario = Map<String, dynamic>.from(responseData['data']['usuario']);
-      } else if (responseData['usuario'] != null) {
-        usuario = Map<String, dynamic>.from(responseData['usuario']);
-      }
-      
-      if (usuario != null) {
-        nombre = usuario['nombre'] ?? usuario['name'] ?? '';
-        email = usuario['email'] ?? _emailCtrl.text.trim();
-        id = usuario['idUsuario']?.toString() ?? usuario['id']?.toString() ?? '';
-        telefono = usuario['telefono'] ?? '';
-      } else {
-        email = _emailCtrl.text.trim();
-      }
-      
-      final user = UserModel(
-        id: id,
-        nombre: nombre,
-        email: email,
-        telefono: telefono,
-        rol: rol,
-      );
+    if (success) {
+      final user = usuarioProvider.currentUser;
+      if (user != null) {
+        Widget dest = user.isAdmin
+            ? AdminHomeScreen(
+                provider: context.read<AnticipoProvider>(),
+                userId: user.id,
+                userName: user.nombre,
+              )
+            : DriverHomeScreen(
+                provider: context.read<AnticipoProvider>(),
+                userId: user.id,
+                userName: user.nombre,
+              );
 
-      print('DEBUG - Usuario creado - rol final: ${user.rol}');
-
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('user_data', user.toJson().toString());
-
-      setState(() => _loading = false);
-
-      final rolLower = user.rol.toLowerCase();
-      Widget dest = rolLower == 'admin' || rolLower == 'administrador'
-          ? AdminHome(user: user)
-          : DriverHome(user: user);
-
-      Navigator.pushReplacement(context,
-          MaterialPageRoute(builder: (_) => dest));
+        Navigator.pushReplacement(context,
+            MaterialPageRoute(builder: (_) => dest));
+      }
     } else {
-      setState(() {
-        _loading = false;
-        _error = result['message'] ?? 'Error al iniciar sesión';
-      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(usuarioProvider.error ?? 'Error al iniciar sesión'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -122,6 +70,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final usuarioProvider = context.watch<UsuarioProvider>();
+
     return Scaffold(
       body: Column(
         children: [
@@ -131,7 +81,7 @@ class _LoginScreenState extends State<LoginScreen> {
               width: double.infinity,
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [AppColors.loginGradStart, AppColors.loginGradEnd],
+                  colors: [Color(0xFF3B5BDB), Color(0xFF9B59B6)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -145,7 +95,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       width: 64,
                       height: 64,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.25),
+                        color: Colors.white.withValues(alpha: 0.25),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(Icons.login_rounded,
@@ -158,9 +108,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             fontSize: 28,
                             fontWeight: FontWeight.w800)),
                     const SizedBox(height: 4),
-                    Text('Inicia sesión para continuar',
+                    const Text('Inicia sesión para continuar',
                         style: TextStyle(
-                            color: Colors.white.withOpacity(0.8),
+                            color: Colors.white70,
                             fontSize: 14)),
                   ],
                 ),
@@ -187,7 +137,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     children: [
                       const Text('Correo electrónico',
                           style: TextStyle(
-                              color: AppColors.textMain,
+                              color: Color(0xFF1E293B),
                               fontSize: 13,
                               fontWeight: FontWeight.w600)),
                       const SizedBox(height: 8),
@@ -204,7 +154,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 16),
                       const Text('Contraseña',
                           style: TextStyle(
-                              color: AppColors.textMain,
+                              color: Color(0xFF1E293B),
                               fontSize: 13,
                               fontWeight: FontWeight.w600)),
                       const SizedBox(height: 8),
@@ -215,7 +165,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         suffix: IconButton(
                           icon: Icon(
                             _obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                            color: AppColors.textSub, size: 20),
+                            color: const Color(0xFF64748B), size: 20),
                           onPressed: () => setState(() => _obscure = !_obscure),
                         ),
                         validator: (v) {
@@ -224,28 +174,22 @@ class _LoginScreenState extends State<LoginScreen> {
                           return null;
                         },
                       ),
-                      if (_error != null) ...[
-                        const SizedBox(height: 10),
-                        Text(_error!,
-                            style: const TextStyle(
-                                color: AppColors.red, fontSize: 13)),
-                      ],
                       const SizedBox(height: 20),
                       GestureDetector(
-                        onTap: _loading ? null : _login,
+                        onTap: usuarioProvider.loading ? null : _login,
                         child: Container(
                           width: double.infinity,
                           height: 52,
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
-                              colors: [AppColors.driverPrimary, AppColors.adminPrimary],
+                              colors: [Color(0xFF2563EB), Color(0xFF7B2FBE)],
                               begin: Alignment.centerLeft,
                               end: Alignment.centerRight,
                             ),
                             borderRadius: BorderRadius.circular(14),
                           ),
                           child: Center(
-                            child: _loading
+                            child: usuarioProvider.loading
                                 ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5)
                                 : const Text('Ingresar',
                                     style: TextStyle(
@@ -255,22 +199,12 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      Center(
-                        child: TextButton(
-                          onPressed: () {},
-                          child: const Text('¿Olvidaste tu contraseña?',
-                              style: TextStyle(
-                                  color: AppColors.blue,
-                                  fontWeight: FontWeight.w600)),
-                        ),
-                      ),
-                      const Divider(color: AppColors.border),
+                      const Divider(color: Color(0xFFE2E8F0)),
                       const SizedBox(height: 10),
-                      Center(
+                      const Center(
                         child: Text('Usuarios de prueba:',
                             style: TextStyle(
-                                color: AppColors.textSub, fontSize: 12)),
+                                color: Color(0xFF64748B), fontSize: 12)),
                       ),
                       const SizedBox(height: 10),
                       _demoTile('Admin:', 'admin@encomiexpress.com',
@@ -302,35 +236,35 @@ class _LoginScreenState extends State<LoginScreen> {
       obscureText: obscure,
       keyboardType: keyboard,
       validator: validator,
-      style: const TextStyle(color: AppColors.textMain, fontSize: 15),
+      style: const TextStyle(color: Color(0xFF1E293B), fontSize: 15),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: AppColors.textSub, fontSize: 14),
+        hintStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 14),
         suffixIcon: suffix,
         filled: true,
-        fillColor: AppColors.bgGray,
+        fillColor: const Color(0xFFF5F6FA),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.border),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.border),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.blue, width: 1.5),
+          borderSide: const BorderSide(color: Color(0xFF3B82F6), width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.red),
+          borderSide: const BorderSide(color: Color(0xFFEF4444)),
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.red, width: 1.5),
+          borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
         ),
-        errorStyle: const TextStyle(color: AppColors.red, fontSize: 11),
+        errorStyle: const TextStyle(color: Color(0xFFEF4444), fontSize: 11),
       ),
     );
   }
@@ -341,20 +275,20 @@ class _LoginScreenState extends State<LoginScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: AppColors.bgGray,
+          color: const Color(0xFFF5F6FA),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
           children: [
             Text(role,
                 style: const TextStyle(
-                    color: AppColors.textMain,
+                    color: Color(0xFF1E293B),
                     fontWeight: FontWeight.w700,
                     fontSize: 13)),
             const SizedBox(width: 6),
             Text(email,
                 style: const TextStyle(
-                    color: AppColors.blue, fontSize: 13)),
+                    color: Color(0xFF3B82F6), fontSize: 13)),
           ],
         ),
       ),
