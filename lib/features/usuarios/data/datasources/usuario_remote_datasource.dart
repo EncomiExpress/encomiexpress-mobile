@@ -1,6 +1,4 @@
-import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../../config/api_config.dart';
 import '../models/usuario_model.dart';
 
 abstract class UsuarioRemoteDataSource {
@@ -10,11 +8,9 @@ abstract class UsuarioRemoteDataSource {
 }
 
 class UsuarioRemoteDataSourceImpl implements UsuarioRemoteDataSource {
-  final Dio dio;
   final SharedPreferences prefs;
 
   UsuarioRemoteDataSourceImpl({
-    required this.dio,
     required this.prefs,
   });
 
@@ -40,26 +36,7 @@ class UsuarioRemoteDataSourceImpl implements UsuarioRemoteDataSource {
       );
     }
 
-    try {
-      final response = await dio.post(
-        '${ApiConfig.baseUrl}/api/auth/login',
-        data: {'email': email, 'password': password},
-      );
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = response.data;
-        final token = data['token'] ?? data['data']?['token'];
-
-        if (token != null) {
-          await prefs.setString('auth_token', token);
-        }
-
-        return _parseUsuario(response.data);
-      }
-      return null;
-    } catch (e) {
-      return null;
-    }
+    return null;
   }
 
   @override
@@ -79,27 +56,6 @@ class UsuarioRemoteDataSourceImpl implements UsuarioRemoteDataSource {
         return null;
       }
     }
-    return null;
-  }
-
-  UsuarioModel? _parseUsuario(Map<String, dynamic> data) {
-    Map<String, dynamic>? usuario;
-
-    if (data['data']?['usuario'] != null) {
-      usuario = Map<String, dynamic>.from(data['data']['usuario']);
-    } else if (data['usuario'] != null) {
-      usuario = Map<String, dynamic>.from(data['usuario']);
-    } else if (data['data'] != null && data['data'] is Map) {
-      final dataMap = Map<String, dynamic>.from(data['data']);
-      if (dataMap['nombre'] != null) {
-        usuario = dataMap;
-      }
-    }
-
-    if (usuario != null) {
-      return UsuarioModel.fromJson(usuario);
-    }
-
     return null;
   }
 

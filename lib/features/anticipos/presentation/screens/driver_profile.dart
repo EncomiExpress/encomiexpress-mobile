@@ -1,183 +1,242 @@
 import 'package:flutter/material.dart';
-import '../../../../core/utils/formatters.dart';
+import '../../../../core/models/models.dart';
+import '../../../../core/widgets/widgets.dart';
 import '../../../usuarios/domain/entities/usuario.dart';
+import '../../../anticipos/domain/entities/anticipo.dart';
+import '../../../../screens/login_screen.dart';
 
-class DriverProfileScreen extends StatelessWidget {
+class DriverProfile extends StatelessWidget {
   final Usuario user;
-  final List<dynamic> anticipos;
-  final VoidCallback onLogout;
+  final List<Anticipo> anticipos;
 
-  const DriverProfileScreen({
-    super.key,
-    required this.user,
-    required this.anticipos,
-    required this.onLogout,
-  });
+  const DriverProfile({super.key, required this.user, required this.anticipos});
 
   @override
   Widget build(BuildContext context) {
-    final misAnticipos = anticipos.where((a) => a.conductorId == user.id).toList();
-    final totalAnticipos = misAnticipos.fold(0.0, (s, a) => s + (a.anticipo as num).toDouble());
-    final totalGastado = misAnticipos.fold(0.0, (s, a) => s + (a.gastado as num).toDouble());
-    final pendientes = misAnticipos.where((a) => a.estado == 'Pendiente').length;
-    final activos = misAnticipos.where((a) => a.estado == 'Activo').length;
+    final activos = anticipos.where((a) => a.estado == 'Activo').length;
+    final pendientes = anticipos.where((a) => a.estado == 'Pendiente').length;
+    final total = anticipos.fold(0.0, (s, a) => s + a.anticipo);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F6FA),
-      body: Column(
-        children: [
-          Container(
-            width: double.infinity,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF2563EB), Color(0xFF3B82F6)],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
+      backgroundColor: AppColors.bgGray,
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            Container(
+              width: double.infinity,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [AppColors.driverGradStart, AppColors.driverGradEnd],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
               ),
-            ),
-            padding: EdgeInsets.fromLTRB(20, MediaQuery.of(context).padding.top + 16, 20, 40),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: const Icon(Icons.arrow_back, color: Colors.white),
-                    ),
-                    GestureDetector(
-                      onTap: onLogout,
-                      child: const Icon(Icons.logout, color: Colors.white),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.person, color: Colors.white, size: 40),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  user.nombre,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  user.email,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.8),
-                    fontSize: 14,
-                  ),
-                ),
-                if (user.telefono.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    user.telefono,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.8),
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Text(
-                    'Conductor',
-                    style: TextStyle(color: Colors.white, fontSize: 12),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.fromLTRB(
+                  20, MediaQuery.of(context).padding.top + 12, 20, 28),
               child: Column(
                 children: [
-                  _buildStatCard('Total anticipos', formatCOP(totalAnticipos), Icons.trending_up_rounded, const Color(0xFF3B82F6)),
-                  const SizedBox(height: 12),
-                  _buildStatCard('Total gastado', formatCOP(totalGastado), Icons.attach_money_rounded, const Color(0xFF22C55E)),
-                  const SizedBox(height: 12),
                   Row(
                     children: [
-                      Expanded(child: _buildMiniStat('Pendientes', '$pendientes', const Color(0xFFF59E0B))),
+                      GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: const Icon(Icons.arrow_back,
+                            color: Colors.white, size: 22),
+                      ),
                       const SizedBox(width: 12),
-                      Expanded(child: _buildMiniStat('Activos', '$activos', const Color(0xFF22C55E))),
+                      const Text('Mi perfil',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700)),
                     ],
                   ),
+                  const SizedBox(height: 24),
+                  Container(
+                    width: 80, height: 80,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withOpacity(0.15),
+                            blurRadius: 12)
+                      ],
+                    ),
+                    child: const Icon(Icons.person_outline_rounded,
+                        color: AppColors.driverPrimary, size: 36),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(user.nombre,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 4),
+                  const Text('Conductor',
+                      style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13)),
                 ],
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatCard(String label, String value, IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8)
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SectionCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Información personal',
+                            style: TextStyle(
+                                color: AppColors.textMain,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 14),
+                        InfoRow(
+                          icon: Icons.person_outline_rounded,
+                          iconColor: AppColors.blue,
+                          iconBg: AppColors.blueBg,
+                          label: 'Nombre completo',
+                          value: user.nombre,
+                        ),
+                        InfoRow(
+                          icon: Icons.email_outlined,
+                          iconColor: AppColors.green,
+                          iconBg: AppColors.greenBg,
+                          label: 'Correo electrónico',
+                          value: user.email,
+                        ),
+                        InfoRow(
+                          icon: Icons.phone_outlined,
+                          iconColor: AppColors.orange,
+                          iconBg: AppColors.orangeBg,
+                          label: 'Teléfono',
+                          value: user.telefono,
+                        ),
+                      ],
+                    ),
+                  ),
+                  SectionCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Mis estadísticas',
+                            style: TextStyle(
+                                color: AppColors.textMain,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 14),
+                        GridView.count(
+                          crossAxisCount: 2,
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 10,
+                          childAspectRatio: 1.8,
+                          children: [
+                            _miniStat('${anticipos.length}', 'Anticipos',
+                                AppColors.blue, AppColors.blueBg),
+                            _miniStat(formatCOP(total), 'Total solicitado',
+                                AppColors.purple, AppColors.purpleBg),
+                            _miniStat('$activos', 'Activos',
+                                AppColors.green, AppColors.greenBg),
+                            _miniStat('$pendientes', 'Pendientes',
+                                AppColors.orange, AppColors.orangeBg),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  SectionCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Consejos',
+                            style: TextStyle(
+                                color: AppColors.textMain,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 14),
+                        ...[
+                          'Adjunta todos los comprobantes de gasto',
+                          'Legaliza tus anticipos dentro del plazo',
+                          'Revisa el estado de tus solicitudes',
+                        ].map((p) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(Icons.check_circle,
+                                  color: AppColors.green, size: 16),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(p,
+                                    style: const TextStyle(
+                                        color: AppColors.textMain,
+                                        fontSize: 14)),
+                              ),
+                            ],
+                          ),
+                        )),
+                      ],
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(builder: (_) => const LoginScreen()),
+                      (r) => false,
+                    ),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF1F2),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.red.withOpacity(0.3)),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.logout_rounded,
+                              color: AppColors.red, size: 18),
+                          SizedBox(width: 8),
+                          Text('Cerrar sesión',
+                              style: TextStyle(
+                                  color: AppColors.red,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 15)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                ],
+              ),
             ),
-            child: Icon(icon, color: color),
-          ),
-          const SizedBox(width: 16),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: const TextStyle(color: Color(0xFF64748B), fontSize: 12)),
-              const SizedBox(height: 4),
-              Text(value, style: TextStyle(color: color, fontSize: 18, fontWeight: FontWeight.w800)),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildMiniStat(String label, String value, Color color) {
+  Widget _miniStat(String value, String label, Color color, Color bg) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8)
-        ],
-      ),
+          color: bg, borderRadius: BorderRadius.circular(12)),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(label, style: const TextStyle(color: Color(0xFF64748B), fontSize: 12)),
-          const SizedBox(height: 4),
-          Text(value, style: TextStyle(color: color, fontSize: 20, fontWeight: FontWeight.w800)),
+          Text(value,
+              style: TextStyle(
+                  color: color, fontSize: 18, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 2),
+          Text(label,
+              style: const TextStyle(
+                  color: AppColors.textSub, fontSize: 11)),
         ],
       ),
     );

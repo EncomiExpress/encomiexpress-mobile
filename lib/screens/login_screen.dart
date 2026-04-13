@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../features/usuarios/presentation/providers/usuario_provider.dart';
-import '../features/anticipos/presentation/providers/anticipo_provider.dart';
+import '../core/models/models.dart';
+import '../features/usuarios/domain/entities/usuario.dart';
 import '../features/anticipos/presentation/screens/admin_home.dart';
 import '../features/anticipos/presentation/screens/driver_home.dart';
 
@@ -15,63 +14,55 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
-  final _passCtrl = TextEditingController();
+  final _passCtrl  = TextEditingController();
 
-  bool _obscure = true;
+  bool _obscure  = true;
+  bool _loading  = false;
+  String? _error;
 
   void _login() async {
     if (!_formKey.currentState!.validate()) return;
+    setState(() { _loading = true; _error = null; });
+    await Future.delayed(const Duration(milliseconds: 400));
 
-    final usuarioProvider = context.read<UsuarioProvider>();
-    final success = await usuarioProvider.login(
-      _emailCtrl.text.trim(),
-      _passCtrl.text,
+    final found = usuariosDemo.firstWhere(
+      (u) => u['email'] == _emailCtrl.text.trim() &&
+             u['password'] == _passCtrl.text,
+      orElse: () => {},
     );
 
     if (!mounted) return;
-
-    if (success) {
-      final user = usuarioProvider.currentUser;
-      if (user != null) {
-        Widget dest = user.isAdmin
-            ? AdminHomeScreen(
-                provider: context.read<AnticipoProvider>(),
-                userId: user.id,
-                userName: user.nombre,
-              )
-            : DriverHomeScreen(
-                provider: context.read<AnticipoProvider>(),
-                userId: user.id,
-                userName: user.nombre,
-              );
-
-        Navigator.pushReplacement(context,
-            MaterialPageRoute(builder: (_) => dest));
-      }
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(usuarioProvider.error ?? 'Error al iniciar sesión'),
-          backgroundColor: Colors.red,
-        ),
-      );
+    if (found.isEmpty) {
+      setState(() { _loading = false; _error = 'Correo o contraseña incorrectos'; });
+      return;
     }
+
+    final user = Usuario(
+      id: found['id']!,
+      nombre: found['nombre']!,
+      email: found['email']!,
+      telefono: found['telefono']!,
+      rol: found['rol']!,
+    );
+
+    setState(() => _loading = false);
+
+    Widget dest = user.rol == 'admin'
+        ? AdminHome(user: user)
+        : DriverHome(user: user);
+
+    Navigator.pushReplacement(context,
+        MaterialPageRoute(builder: (_) => dest));
   }
 
   void _fillDemo(String email) {
     _emailCtrl.text = email;
-    if (email == 'admin@encomiexpress.com') {
-      _passCtrl.text = 'admin123';
-    } else if (email == 'conductor@encomiexpress.com') {
-      _passCtrl.text = 'conductor123';
-    }
+    _passCtrl.text  = '123456';
     setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
-    final usuarioProvider = context.watch<UsuarioProvider>();
-
     return Scaffold(
       body: Column(
         children: [
@@ -81,7 +72,7 @@ class _LoginScreenState extends State<LoginScreen> {
               width: double.infinity,
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Color(0xFF3B5BDB), Color(0xFF9B59B6)],
+                  colors: [AppColors.loginGradStart, AppColors.loginGradEnd],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -95,7 +86,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       width: 64,
                       height: 64,
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.25),
+                        color: Colors.white.withOpacity(0.25),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(Icons.login_rounded,
@@ -108,9 +99,9 @@ class _LoginScreenState extends State<LoginScreen> {
                             fontSize: 28,
                             fontWeight: FontWeight.w800)),
                     const SizedBox(height: 4),
-                    const Text('Inicia sesión para continuar',
+                    Text('Inicia sesión para continuar',
                         style: TextStyle(
-                            color: Colors.white70,
+                            color: Colors.white.withOpacity(0.8),
                             fontSize: 14)),
                   ],
                 ),
@@ -137,7 +128,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     children: [
                       const Text('Correo electrónico',
                           style: TextStyle(
-                              color: Color(0xFF1E293B),
+                              color: AppColors.textMain,
                               fontSize: 13,
                               fontWeight: FontWeight.w600)),
                       const SizedBox(height: 8),
@@ -154,7 +145,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 16),
                       const Text('Contraseña',
                           style: TextStyle(
-                              color: Color(0xFF1E293B),
+                              color: AppColors.textMain,
                               fontSize: 13,
                               fontWeight: FontWeight.w600)),
                       const SizedBox(height: 8),
@@ -165,7 +156,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         suffix: IconButton(
                           icon: Icon(
                             _obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                            color: const Color(0xFF64748B), size: 20),
+                            color: AppColors.textSub, size: 20),
                           onPressed: () => setState(() => _obscure = !_obscure),
                         ),
                         validator: (v) {
@@ -174,22 +165,28 @@ class _LoginScreenState extends State<LoginScreen> {
                           return null;
                         },
                       ),
+                      if (_error != null) ...[
+                        const SizedBox(height: 10),
+                        Text(_error!,
+                            style: const TextStyle(
+                                color: AppColors.red, fontSize: 13)),
+                      ],
                       const SizedBox(height: 20),
                       GestureDetector(
-                        onTap: usuarioProvider.loading ? null : _login,
+                        onTap: _loading ? null : _login,
                         child: Container(
                           width: double.infinity,
                           height: 52,
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
-                              colors: [Color(0xFF2563EB), Color(0xFF7B2FBE)],
+                              colors: [AppColors.driverPrimary, AppColors.adminPrimary],
                               begin: Alignment.centerLeft,
                               end: Alignment.centerRight,
                             ),
                             borderRadius: BorderRadius.circular(14),
                           ),
                           child: Center(
-                            child: usuarioProvider.loading
+                            child: _loading
                                 ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5)
                                 : const Text('Ingresar',
                                     style: TextStyle(
@@ -199,19 +196,29 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                       ),
-                      const Divider(color: Color(0xFFE2E8F0)),
+                      const SizedBox(height: 16),
+                      Center(
+                        child: TextButton(
+                          onPressed: () {},
+                          child: const Text('¿Olvidaste tu contraseña?',
+                              style: TextStyle(
+                                  color: AppColors.blue,
+                                  fontWeight: FontWeight.w600)),
+                        ),
+                      ),
+                      const Divider(color: AppColors.border),
                       const SizedBox(height: 10),
-                      const Center(
+                      Center(
                         child: Text('Usuarios de prueba:',
                             style: TextStyle(
-                                color: Color(0xFF64748B), fontSize: 12)),
+                                color: AppColors.textSub, fontSize: 12)),
                       ),
                       const SizedBox(height: 10),
-                      _demoTile('Admin:', 'admin@encomiexpress.com',
-                          () => _fillDemo('admin@encomiexpress.com')),
+                      _demoTile('Admin:', 'admin@test.com',
+                          () => _fillDemo('admin@test.com')),
                       const SizedBox(height: 6),
-                      _demoTile('Conductor:', 'conductor@encomiexpress.com',
-                          () => _fillDemo('conductor@encomiexpress.com')),
+                      _demoTile('Conductor:', 'conductor@test.com',
+                          () => _fillDemo('conductor@test.com')),
                     ],
                   ),
                 ),
@@ -236,35 +243,35 @@ class _LoginScreenState extends State<LoginScreen> {
       obscureText: obscure,
       keyboardType: keyboard,
       validator: validator,
-      style: const TextStyle(color: Color(0xFF1E293B), fontSize: 15),
+      style: const TextStyle(color: AppColors.textMain, fontSize: 15),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: const TextStyle(color: Color(0xFF64748B), fontSize: 14),
+        hintStyle: const TextStyle(color: AppColors.textSub, fontSize: 14),
         suffixIcon: suffix,
         filled: true,
-        fillColor: const Color(0xFFF5F6FA),
+        fillColor: AppColors.bgGray,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+          borderSide: const BorderSide(color: AppColors.border),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+          borderSide: const BorderSide(color: AppColors.border),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF3B82F6), width: 1.5),
+          borderSide: const BorderSide(color: AppColors.blue, width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFEF4444)),
+          borderSide: const BorderSide(color: AppColors.red),
         ),
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+          borderSide: const BorderSide(color: AppColors.red, width: 1.5),
         ),
-        errorStyle: const TextStyle(color: Color(0xFFEF4444), fontSize: 11),
+        errorStyle: const TextStyle(color: AppColors.red, fontSize: 11),
       ),
     );
   }
@@ -275,20 +282,20 @@ class _LoginScreenState extends State<LoginScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: const Color(0xFFF5F6FA),
+          color: AppColors.bgGray,
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(
           children: [
             Text(role,
                 style: const TextStyle(
-                    color: Color(0xFF1E293B),
+                    color: AppColors.textMain,
                     fontWeight: FontWeight.w700,
                     fontSize: 13)),
             const SizedBox(width: 6),
             Text(email,
                 style: const TextStyle(
-                    color: Color(0xFF3B82F6), fontSize: 13)),
+                    color: AppColors.blue, fontSize: 13)),
           ],
         ),
       ),

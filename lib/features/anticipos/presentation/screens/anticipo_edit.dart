@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../../anticipos/domain/entities/anticipo.dart';
 
-class AnticipoEditScreen extends StatefulWidget {
+class AnticipoEdit extends StatefulWidget {
   final Anticipo? anticipo;
   final bool isAdmin;
   final Function(Anticipo)? onSave;
 
-  const AnticipoEditScreen({
+  const AnticipoEdit({
     super.key,
     this.anticipo,
     this.isAdmin = false,
@@ -14,10 +14,10 @@ class AnticipoEditScreen extends StatefulWidget {
   });
 
   @override
-  State<AnticipoEditScreen> createState() => _AnticipoEditScreenState();
+  State<AnticipoEdit> createState() => _AnticipoEditState();
 }
 
-class _AnticipoEditScreenState extends State<AnticipoEditScreen> {
+class _AnticipoEditState extends State<AnticipoEdit> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _tipoCtrl;
   late TextEditingController _conductorCtrl;

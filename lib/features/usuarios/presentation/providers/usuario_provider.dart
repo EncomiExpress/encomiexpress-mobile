@@ -1,14 +1,8 @@
-import 'package:flutter/foundation.dart';
-import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/entities/usuario.dart';
-import '../../domain/usecases/login.dart';
-import '../../data/datasources/usuario_remote_datasource.dart';
-import '../../data/repositories/usuario_repository_impl.dart';
 
 class UsuarioProvider extends ChangeNotifier {
-  late final Login _login;
-  late final Dio _dio;
   final SharedPreferences _prefs;
 
   Usuario? _currentUser;
@@ -16,14 +10,12 @@ class UsuarioProvider extends ChangeNotifier {
   String? _error;
   bool _isLoggedIn = false;
 
-  UsuarioProvider({required SharedPreferences prefs, required Dio dio}) : _prefs = prefs, _dio = dio {
-    final dataSource = UsuarioRemoteDataSourceImpl(
-      dio: dio,
-      prefs: prefs,
-    );
-    final repository = UsuarioRepositoryImpl(remoteDataSource: dataSource);
-    _login = Login(repository);
-  }
+  static final List<Map<String, String>> usuariosDemo = [
+    {'id': '1', 'nombre': 'Administrador', 'email': 'admin@test.com', 'telefono': '+57 300 000 0001', 'password': '123456', 'rol': 'admin'},
+    {'id': '2', 'nombre': 'Juan Pérez', 'email': 'conductor@test.com', 'telefono': '+57 300 123 4567', 'password': '123456', 'rol': 'conductor'},
+  ];
+
+  UsuarioProvider({required SharedPreferences prefs}) : _prefs = prefs;
 
   Usuario? get currentUser => _currentUser;
   bool get loading => _loading;
@@ -37,27 +29,32 @@ class UsuarioProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
 
-    try {
-      final user = await _login.call(email, password);
-      if (user != null) {
-        _currentUser = user;
-        _isLoggedIn = true;
-        await _prefs.setString('user_data', user.toJson().toString());
-        _loading = false;
-        notifyListeners();
-        return true;
-      } else {
-        _error = 'Credenciales incorrectas';
-        _loading = false;
-        notifyListeners();
-        return false;
-      }
-    } catch (e) {
-      _error = e.toString();
+    await Future.delayed(const Duration(milliseconds: 400));
+
+    final found = usuariosDemo.firstWhere(
+      (u) => u['email'] == email.trim() && u['password'] == password,
+      orElse: () => {},
+    );
+
+    if (found.isEmpty) {
+      _error = 'Correo o contraseña incorrectos';
       _loading = false;
       notifyListeners();
       return false;
     }
+
+    _currentUser = Usuario(
+      id: found['id']!,
+      nombre: found['nombre']!,
+      email: found['email']!,
+      telefono: found['telefono']!,
+      rol: found['rol']!,
+    );
+    _isLoggedIn = true;
+    
+    _loading = false;
+    notifyListeners();
+    return true;
   }
 
   Future<void> logout() async {

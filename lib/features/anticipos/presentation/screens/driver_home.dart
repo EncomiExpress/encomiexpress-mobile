@@ -1,31 +1,23 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../../../../features/usuarios/presentation/providers/usuario_provider.dart';
-import '../../domain/entities/anticipo.dart';
-import '../../presentation/providers/anticipo_provider.dart';
-import '../../presentation/widgets/anticipo_card.dart';
+import '../../../../core/models/models.dart';
+import '../../../../core/widgets/widgets.dart';
+import '../../../anticipos/domain/entities/anticipo.dart';
+import '../../../usuarios/domain/entities/usuario.dart';
 import 'anticipo_detail.dart';
 import 'anticipo_edit.dart';
 import 'driver_profile.dart';
 
-class DriverHomeScreen extends StatefulWidget {
-  final AnticipoProvider provider;
-  final String userId;
-  final String userName;
-
-  const DriverHomeScreen({
-    super.key,
-    required this.provider,
-    required this.userId,
-    required this.userName,
-  });
+class DriverHome extends StatefulWidget {
+  final Usuario user;
+  const DriverHome({super.key, required this.user});
 
   @override
-  State<DriverHomeScreen> createState() => _DriverHomeScreenState();
+  State<DriverHome> createState() => _DriverHomeState();
 }
 
-class _DriverHomeScreenState extends State<DriverHomeScreen> {
+class _DriverHomeState extends State<DriverHome> {
   int _tab = 0;
+  late List<Anticipo> _anticipos;
   final _searchCtrl = TextEditingController();
   bool _showFiltros = false;
   String _filtroEstado = 'Todos';
@@ -33,18 +25,19 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   @override
   void initState() {
     super.initState();
-    widget.provider.loadAnticipos();
+    _anticipos = anticiposDemo
+        .where((a) => a.conductorId == widget.user.id)
+        .toList();
     _searchCtrl.addListener(() => setState(() {}));
   }
 
-  List<Anticipo> get _misAnticipos =>
-      widget.provider.anticipos.where((a) => a.conductorId == widget.userId).toList();
-
   List<Anticipo> get _filtrados {
-    return _misAnticipos.where((a) {
+    return _anticipos.where((a) {
       final query = _searchCtrl.text.toLowerCase();
-      final matchSearch = query.isEmpty || a.tipo.toLowerCase().contains(query);
-      final matchEstado = _filtroEstado == 'Todos' || a.estado == _filtroEstado;
+      final matchSearch = query.isEmpty ||
+          a.tipo.toLowerCase().contains(query);
+      final matchEstado = _filtroEstado == 'Todos' ||
+          a.estado == _filtroEstado;
       return matchSearch && matchEstado;
     }).toList();
   }
@@ -52,20 +45,13 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F6FA),
+      backgroundColor: AppColors.bgGray,
       body: IndexedStack(
         index: _tab,
         children: [
           _buildMisAnticipos(),
+          DriverProfile(user: widget.user, anticipos: _anticipos),
           _buildSolicitar(),
-          DriverProfileScreen(
-            user: context.read<UsuarioProvider>().currentUser!,
-            anticipos: widget.provider.anticipos,
-            onLogout: () {
-              context.read<UsuarioProvider>().logout();
-              Navigator.pushReplacementNamed(context, '/login');
-            },
-          ),
         ],
       ),
       bottomNavigationBar: _buildBottomNav(),
@@ -75,38 +61,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   Widget _buildMisAnticipos() {
     return Column(
       children: [
-        Container(
-          width: double.infinity,
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF2563EB), Color(0xFF3B82F6)],
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-            ),
-          ),
-          padding: EdgeInsets.fromLTRB(
-              20, MediaQuery.of(context).padding.top + 16, 20, 20),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Mis anticipos',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.w800)),
-                  const Text('Gestiona tus anticipos y excedentes',
-                      style: TextStyle(color: Colors.white70, fontSize: 13)),
-                ],
-              ),
-              GestureDetector(
-                onTap: widget.provider.loading ? null : () => widget.provider.loadAnticipos(),
-                child: const Icon(Icons.refresh, color: Colors.white, size: 26),
-              ),
-            ],
-          ),
+        GradientHeader(
+          title: 'Mis anticipos',
+          subtitle: 'Gestiona tus anticipos y excedentes',
+          gradStart: AppColors.driverGradStart,
+          gradEnd: AppColors.driverGradEnd,
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
@@ -116,16 +75,18 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  border: Border.all(color: AppColors.border),
                 ),
                 child: TextField(
                   controller: _searchCtrl,
-                  style: const TextStyle(color: Color(0xFF1E293B), fontSize: 14),
+                  style: const TextStyle(
+                      color: AppColors.textMain, fontSize: 14),
                   decoration: const InputDecoration(
                     hintText: 'Buscar por tipo de anticipo...',
-                    hintStyle: TextStyle(color: Color(0xFF64748B), fontSize: 14),
+                    hintStyle:
+                        TextStyle(color: AppColors.textSub, fontSize: 14),
                     prefixIcon: Icon(Icons.search_rounded,
-                        color: Color(0xFF64748B), size: 20),
+                        color: AppColors.textSub, size: 20),
                     border: InputBorder.none,
                     contentPadding: EdgeInsets.symmetric(vertical: 12),
                   ),
@@ -135,21 +96,25 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
               Align(
                 alignment: Alignment.centerLeft,
                 child: GestureDetector(
-                  onTap: () => setState(() => _showFiltros = !_showFiltros),
+                  onTap: () =>
+                      setState(() => _showFiltros = !_showFiltros),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      border: Border.all(color: AppColors.border),
                     ),
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.filter_alt_outlined, size: 16, color: Color(0xFF64748B)),
+                        Icon(Icons.filter_alt_outlined,
+                            size: 16, color: AppColors.textSub),
                         SizedBox(width: 6),
                         Text('Filtros',
-                            style: TextStyle(color: Color(0xFF1E293B), fontSize: 13)),
+                            style: TextStyle(
+                                color: AppColors.textMain, fontSize: 13)),
                       ],
                     ),
                   ),
@@ -162,13 +127,13 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    border: Border.all(color: AppColors.border),
                   ),
                   child: Row(
                     children: [
                       const Text('Estado:',
                           style: TextStyle(
-                              color: Color(0xFF1E293B),
+                              color: AppColors.textMain,
                               fontSize: 13,
                               fontWeight: FontWeight.w600)),
                       const SizedBox(width: 12),
@@ -178,9 +143,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                           isExpanded: true,
                           underline: const SizedBox(),
                           items: ['Todos', 'Activo', 'Pendiente', 'Pagado']
-                              .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                              .map((e) => DropdownMenuItem(
+                                  value: e, child: Text(e)))
                               .toList(),
-                          onChanged: (v) => setState(() => _filtroEstado = v!),
+                          onChanged: (v) =>
+                              setState(() => _filtroEstado = v!),
                         ),
                       ),
                     ],
@@ -192,34 +159,41 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         ),
         const SizedBox(height: 10),
         Expanded(
-          child: widget.provider.loading
-              ? const Center(child: CircularProgressIndicator())
-              : _filtrados.isEmpty
-                  ? const Center(
-                      child: Text('Sin anticipos',
-                          style: TextStyle(color: Color(0xFF64748B), fontSize: 14)))
-                  : RefreshIndicator(
-                      onRefresh: () => widget.provider.loadAnticipos(),
-                      child: ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
-                        itemCount: _filtrados.length,
-                        itemBuilder: (_, i) => AnticipoCard(
-                          anticipo: _filtrados[i],
-                          isAdmin: false,
-                          onVer: () => Navigator.push(context,
-                              MaterialPageRoute(builder: (_) => 
-                                  AnticipoDetailScreen(anticipo: _filtrados[i], isAdmin: false))),
-                          onEditar: () async {
-                            final updated = await Navigator.push<Anticipo>(context,
-                                MaterialPageRoute(builder: (_) => 
-                                    AnticipoEditScreen(anticipo: _filtrados[i], isAdmin: false)));
-                            if (updated != null) {
-                              await widget.provider.loadAnticipos();
-                            }
-                          },
-                        ),
-                      ),
-                    ),
+          child: _filtrados.isEmpty
+              ? Center(
+                  child: Text('Sin anticipos',
+                      style: TextStyle(
+                          color: AppColors.textSub, fontSize: 14)))
+              : ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
+                  itemCount: _filtrados.length,
+                  itemBuilder: (_, i) => AnticipoCard(
+                    anticipo: _filtrados[i],
+                    isAdmin: false,
+                    onVer: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => AnticipoDetail(
+                                anticipo: _filtrados[i],
+                                isAdmin: false))),
+                    onEditar: () async {
+                      final updated =
+                          await Navigator.push<Anticipo>(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => AnticipoEdit(
+                                      anticipo: _filtrados[i],
+                                      isAdmin: false)));
+                      if (updated != null) {
+                        setState(() {
+                          final idx = _anticipos
+                              .indexWhere((x) => x.id == updated.id);
+                          if (idx != -1) _anticipos[idx] = updated;
+                        });
+                      }
+                    },
+                  ),
+                ),
         ),
       ],
     );
@@ -228,29 +202,11 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   Widget _buildSolicitar() {
     return Column(
       children: [
-        Container(
-          width: double.infinity,
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF2563EB), Color(0xFF3B82F6)],
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-            ),
-          ),
-          padding: EdgeInsets.fromLTRB(
-              20, MediaQuery.of(context).padding.top + 16, 20, 20),
-          child: const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Solicitar anticipo',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800)),
-              Text('Crea una nueva solicitud',
-                  style: TextStyle(color: Colors.white, fontSize: 13)),
-            ],
-          ),
+        GradientHeader(
+          title: 'Solicitar anticipo',
+          subtitle: 'Crea una nueva solicitud',
+          gradStart: AppColors.driverGradStart,
+          gradEnd: AppColors.driverGradEnd,
         ),
         Expanded(
           child: Center(
@@ -262,33 +218,38 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                   Container(
                     width: 80, height: 80,
                     decoration: BoxDecoration(
-                        color: const Color(0xFFEFF6FF),
+                        color: AppColors.blueBg,
                         borderRadius: BorderRadius.circular(20)),
                     child: const Icon(Icons.add_circle_outline_rounded,
-                        color: Color(0xFF2563EB), size: 40),
+                        color: AppColors.driverPrimary, size: 40),
                   ),
                   const SizedBox(height: 16),
                   const Text('Nueva solicitud',
                       style: TextStyle(
-                          color: Color(0xFF1E293B),
+                          color: AppColors.textMain,
                           fontSize: 18,
                           fontWeight: FontWeight.w700)),
                   const SizedBox(height: 8),
                   const Text(
                       'Registra un nuevo anticipo para tus gastos de ruta.',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: Color(0xFF64748B), fontSize: 14)),
+                      style: TextStyle(
+                          color: AppColors.textSub, fontSize: 14)),
                   const SizedBox(height: 24),
                   GestureDetector(
                     onTap: () async {
-                      final nuevo = await Navigator.push<Anticipo>(context,
-                          MaterialPageRoute(builder: (_) => const AnticipoEditScreen(isAdmin: false)));
+                      final nuevo = await Navigator.push<Anticipo>(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) =>
+                                  const AnticipoEdit(isAdmin: false)));
                       if (nuevo != null) {
-                        await widget.provider.loadAnticipos();
+                        setState(() => _anticipos.add(nuevo));
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
                               content: Text('Anticipo solicitado'),
-                              backgroundColor: Color(0xFF22C55E)));
+                              backgroundColor: AppColors.green),
+                        );
                       }
                     },
                     child: Container(
@@ -296,7 +257,10 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                           horizontal: 32, vertical: 14),
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [Color(0xFF2563EB), Color(0xFF3B82F6)],
+                          colors: [
+                            AppColors.driverGradStart,
+                            AppColors.driverGradEnd
+                          ],
                         ),
                         borderRadius: BorderRadius.circular(14),
                       ),
@@ -319,8 +283,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
   Widget _buildBottomNav() {
     final items = [
       {'icon': Icons.grid_view_rounded, 'label': 'Inicio'},
-      {'icon': Icons.add_circle_outline_rounded, 'label': 'Solicitar'},
       {'icon': Icons.person_outline_rounded, 'label': 'Perfil'},
+      {'icon': Icons.add_circle_outline_rounded, 'label': 'Solicitar'},
     ];
 
     return Container(
@@ -328,7 +292,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withValues(alpha: 0.07),
+              color: Colors.black.withOpacity(0.07),
               blurRadius: 12,
               offset: const Offset(0, -2))
         ],
@@ -349,8 +313,8 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                       Icon(
                         items[i]['icon'] as IconData,
                         color: _tab == i
-                            ? const Color(0xFF2563EB)
-                            : const Color(0xFF64748B),
+                            ? AppColors.driverPrimary
+                            : AppColors.textSub,
                         size: 24,
                       ),
                       const SizedBox(height: 4),
@@ -358,10 +322,12 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                         items[i]['label'] as String,
                         style: TextStyle(
                           color: _tab == i
-                              ? const Color(0xFF2563EB)
-                              : const Color(0xFF64748B),
+                              ? AppColors.driverPrimary
+                              : AppColors.textSub,
                           fontSize: 11,
-                          fontWeight: _tab == i ? FontWeight.w700 : FontWeight.w400,
+                          fontWeight: _tab == i
+                              ? FontWeight.w700
+                              : FontWeight.w400,
                         ),
                       ),
                     ],

@@ -1,145 +1,239 @@
 import 'package:flutter/material.dart';
-import '../../../../core/utils/formatters.dart';
+import '../../../../core/models/models.dart';
+import '../../../../core/widgets/widgets.dart';
 import '../../../usuarios/domain/entities/usuario.dart';
+import '../../../anticipos/domain/entities/anticipo.dart';
+import '../../../../screens/login_screen.dart';
 
-class AdminProfileScreen extends StatelessWidget {
+class AdminProfile extends StatelessWidget {
   final Usuario user;
-  final List<dynamic> anticipos;
-  final VoidCallback onLogout;
+  final List<Anticipo> anticipos;
 
-  const AdminProfileScreen({
-    super.key,
-    required this.user,
-    required this.anticipos,
-    required this.onLogout,
-  });
+  const AdminProfile({super.key, required this.user, required this.anticipos});
 
   @override
   Widget build(BuildContext context) {
-    final totalAnticipos = anticipos.fold(0.0, (s, a) => s + (a.anticipo as num).toDouble());
-    final totalGastado = anticipos.fold(0.0, (s, a) => s + (a.gastado as num).toDouble());
     final pendientes = anticipos.where((a) => a.estado == 'Pendiente').length;
+    final aprobados  = anticipos.where((a) => a.estado == 'Pagado').length;
+    final conductores = anticipos.map((a) => a.conductorId).toSet().length;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F6FA),
-      body: Column(
-        children: [
-          Container(
-            width: double.infinity,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF7B2FBE), Color(0xFF9B59B6)],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
+      backgroundColor: AppColors.bgGray,
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            Container(
+              width: double.infinity,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [AppColors.adminGradStart, AppColors.adminGradEnd],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
               ),
-            ),
-            padding: EdgeInsets.fromLTRB(20, MediaQuery.of(context).padding.top + 16, 20, 40),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: const Icon(Icons.arrow_back, color: Colors.white),
-                    ),
-                    GestureDetector(
-                      onTap: onLogout,
-                      child: const Icon(Icons.logout, color: Colors.white),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.person, color: Colors.white, size: 40),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  user.nombre,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  user.email,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.8),
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Text(
-                    'Administrador',
-                    style: TextStyle(color: Colors.white, fontSize: 12),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.fromLTRB(
+                  20, MediaQuery.of(context).padding.top + 12, 20, 28),
               child: Column(
                 children: [
-                  _buildStatCard('Total anticipos', formatCOP(totalAnticipos), Icons.trending_up_rounded, const Color(0xFF3B82F6)),
+                  Row(
+                    children: [
+                      GestureDetector(
+                        onTap: () => Navigator.pop(context),
+                        child: const Icon(Icons.arrow_back,
+                            color: Colors.white, size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text('Perfil de administrador',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  Container(
+                    width: 80, height: 80,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withOpacity(0.15),
+                            blurRadius: 12)
+                      ],
+                    ),
+                    child: const Icon(Icons.shield_outlined,
+                        color: AppColors.adminPrimary, size: 36),
+                  ),
                   const SizedBox(height: 12),
-                  _buildStatCard('Total gastado', formatCOP(totalGastado), Icons.attach_money_rounded, const Color(0xFF22C55E)),
-                  const SizedBox(height: 12),
-                  _buildStatCard('Pendientes', '$pendientes', Icons.filter_alt_outlined, const Color(0xFFF59E0B)),
+                  Text(user.nombre,
+                      style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 4),
+                  const Text('Admin',
+                      style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 13)),
                 ],
               ),
             ),
-          ),
-        ],
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SectionCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Información personal',
+                            style: TextStyle(
+                                color: AppColors.textMain,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 14),
+                        InfoRow(
+                          icon: Icons.person_outline_rounded,
+                          iconColor: AppColors.purple,
+                          iconBg: AppColors.purpleBg,
+                          label: 'Nombre completo',
+                          value: user.nombre,
+                        ),
+                        InfoRow(
+                          icon: Icons.email_outlined,
+                          iconColor: AppColors.green,
+                          iconBg: AppColors.greenBg,
+                          label: 'Correo electrónico',
+                          value: user.email,
+                        ),
+                        InfoRow(
+                          icon: Icons.shield_outlined,
+                          iconColor: AppColors.purple,
+                          iconBg: AppColors.purpleBg,
+                          label: 'Rol',
+                          value: 'Admin',
+                        ),
+                      ],
+                    ),
+                  ),
+                  SectionCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Estadísticas del sistema',
+                            style: TextStyle(
+                                color: AppColors.textMain,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 14),
+                        GridView.count(
+                          crossAxisCount: 2,
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          crossAxisSpacing: 10,
+                          mainAxisSpacing: 10,
+                          childAspectRatio: 1.8,
+                          children: [
+                            _miniStat('${anticipos.length}', 'Anticipos totales',
+                                AppColors.purple, AppColors.purpleBg),
+                            _miniStat('$conductores', 'Conductores',
+                                AppColors.blue, AppColors.blueBg),
+                            _miniStat('$pendientes', 'Pendientes',
+                                AppColors.orange, AppColors.orangeBg),
+                            _miniStat('$aprobados', 'Aprobados',
+                                AppColors.green, AppColors.greenBg),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  SectionCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Privilegios de administrador',
+                            style: TextStyle(
+                                color: AppColors.textMain,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 14),
+                        ...[
+                          'Crear y editar anticipos',
+                          'Aprobar y rechazar legalizaciones',
+                          'Ver todos los conductores',
+                          'Gestión completa del sistema',
+                        ].map((p) => Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.circle,
+                                  color: AppColors.purple, size: 8),
+                              const SizedBox(width: 10),
+                              Text(p,
+                                  style: const TextStyle(
+                                      color: AppColors.textMain,
+                                      fontSize: 14)),
+                            ],
+                          ),
+                        )),
+                      ],
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(builder: (_) => const LoginScreen()),
+                      (r) => false,
+                    ),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF1F2),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.red.withOpacity(0.3)),
+                      ),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.logout_rounded,
+                              color: AppColors.red, size: 18),
+                          SizedBox(width: 8),
+                          Text('Cerrar sesión',
+                              style: TextStyle(
+                                  color: AppColors.red,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 15)),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildStatCard(String label, String value, IconData icon, Color color) {
+  Widget _miniStat(String value, String label, Color color, Color bg) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 8)
-        ],
-      ),
-      child: Row(
+          color: bg, borderRadius: BorderRadius.circular(12)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: color),
-          ),
-          const SizedBox(width: 16),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: const TextStyle(color: Color(0xFF64748B), fontSize: 12)),
-              const SizedBox(height: 4),
-              Text(value, style: TextStyle(color: color, fontSize: 18, fontWeight: FontWeight.w800)),
-            ],
-          ),
+          Text(value,
+              style: TextStyle(
+                  color: color, fontSize: 22, fontWeight: FontWeight.w800)),
+          Text(label,
+              style: const TextStyle(
+                  color: AppColors.textSub, fontSize: 11)),
         ],
       ),
     );

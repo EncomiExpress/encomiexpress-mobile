@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
-import '../../../../core/utils/formatters.dart';
+import '../../../../core/models/models.dart';
 import '../../../anticipos/domain/entities/anticipo.dart';
 
-class AnticipoDetailScreen extends StatelessWidget {
+class AnticipoDetail extends StatelessWidget {
   final Anticipo anticipo;
   final bool isAdmin;
   final VoidCallback? onAprobar;
   final VoidCallback? onRechazar;
 
-  const AnticipoDetailScreen({
+  const AnticipoDetail({
     super.key,
     required this.anticipo,
-    this.isAdmin = false,
+    required this.isAdmin,
     this.onAprobar,
     this.onRechazar,
   });
