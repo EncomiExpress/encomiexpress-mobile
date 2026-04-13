@@ -277,20 +277,6 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
                 iconColor: AppColors.orange,
                 keyboardType: TextInputType.number,
               ),
-              _buildDateField(
-                label: 'Fecha de nacimiento',
-                value: _fechaNacimiento,
-                icon: Icons.cake_outlined,
-                iconColor: AppColors.red,
-                onTap: _selectFechaNacimiento,
-              ),
-              _buildTextField(
-                controller: _direccionCtrl,
-                label: 'Dirección',
-                icon: Icons.location_on_outlined,
-                iconColor: AppColors.blue,
-                textCapitalization: TextCapitalization.sentences,
-              ),
             ]),
             const SizedBox(height: 16),
             _buildSection('Vehículo', [

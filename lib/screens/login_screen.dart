@@ -39,27 +39,38 @@ class _LoginScreenState extends State<LoginScreen> {
       
       print('DEBUG - responseData: $responseData');
       
-      String rol = 'conductor';
+      String rol = '';
       String nombre = '';
       String email = '';
       String id = '';
       String telefono = '';
       
-      // Buscar en responseData directamente
-      if (responseData['rol'] != null) {
-        rol = responseData['rol'].toString();
-      }
-      // Buscar en responseData.data
-      else if (responseData['data'] != null && responseData['data']['usuario'] != null && responseData['data']['usuario']['rol'] != null) {
-        rol = responseData['data']['usuario']['rol'].toString();
-      }
-      // Buscar en responseData.data.usuario
-      else if (responseData['data'] != null && responseData['data']['rol'] != null) {
+// Buscar en responseData.data (como viene del backend)
+      if (responseData['data'] != null && responseData['data']['rol'] != null) {
         rol = responseData['data']['rol'].toString();
+        print('DEBUG - rol encontrado en data.rol: $rol');
       }
-      // Buscar en responseData.usuario
-      else if (responseData['usuario'] != null && responseData['usuario']['rol'] != null) {
-        rol = responseData['usuario']['rol'].toString();
+      else if (responseData['data'] != null && responseData['data']['role'] != null) {
+        rol = responseData['data']['role'].toString();
+        print('DEBUG - rol encontrado en data.role: $rol');
+      }
+      // Buscar en responseData directamente
+      else if (responseData['rol'] != null) {
+        rol = responseData['rol'].toString();
+        print('DEBUG - rol encontrado en responseData.rol: $rol');
+      }
+      else if (responseData['role'] != null) {
+        rol = responseData['role'].toString();
+        print('DEBUG - rol encontrado en responseData.role: $rol');
+      }
+      // Por email como fallback (si el backend no devuelve el rol directamente)
+      else {
+        final emailInput = _emailCtrl.text.trim().toLowerCase();
+        print('DEBUG - email para fallback: $emailInput');
+        if (emailInput.contains('admin')) {
+          rol = 'admin';
+          print('DEBUG - rol asignado por email: $rol');
+        }
       }
       
       print('DEBUG - rol extraido: $rol');

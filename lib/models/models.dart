@@ -70,7 +70,7 @@ class UserModel {
       id: json['id']?.toString() ?? '',
       nombre: json['nombre'] ?? json['name'] ?? '',
       email: json['email'] ?? '',
-      telefono: json['telefono'] ?? json['phone'] ?? '',
+      telefono: json['telefono'] ?? json['phone'] ?? json['celular'] ?? json['numeroTelefono'] ?? json['numeroCelular'] ?? json['mobile'] ?? '',
       rol: json['rol'] ?? json['role'] ?? '',
       conductorId: json['conductorId']?.toString() ?? json['conductor']?['idConductor']?.toString(),
       documento: json['documento'] ?? json['numeroDocumento'] ?? json['cedula'],

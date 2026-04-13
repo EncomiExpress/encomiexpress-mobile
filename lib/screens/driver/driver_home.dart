@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/models.dart';
 import '../../services/anticipo_service.dart';
+import '../../services/conductor_service.dart';
 import '../../widgets/widgets.dart';
 import '../admin/anticipo_detail.dart';
 import '../admin/anticipo_edit.dart';
@@ -16,6 +17,7 @@ class DriverHome extends StatefulWidget {
 
 class _DriverHomeState extends State<DriverHome> {
   final _anticipoService = AnticipoService();
+  final _conductorService = ConductorService();
   int _tab = 0;
   late List<Anticipo> _anticipos;
   bool _loading = true;
@@ -29,8 +31,18 @@ class _DriverHomeState extends State<DriverHome> {
     super.initState();
     _anticipos = [];
     _currentUser = widget.user;
+    _loadPerfil();
     _loadAnticipos();
     _searchCtrl.addListener(() => setState(() {}));
+  }
+
+  Future<void> _loadPerfil() async {
+    final perfil = await _conductorService.getPerfil();
+    if (perfil != null && mounted) {
+      setState(() {
+        _currentUser = perfil;
+      });
+    }
   }
 
   void _onUserUpdated(UserModel updatedUser) {

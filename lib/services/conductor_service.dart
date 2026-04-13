@@ -23,7 +23,10 @@ class ConductorService {
     try {
       final Map<String, dynamic> data = {};
       if (nombre != null) data['nombre'] = nombre;
-      if (telefono != null) data['telefono'] = telefono;
+      if (telefono != null) {
+        data['telefono'] = telefono;
+        data['phone'] = telefono;
+      }
       if (email != null) data['email'] = email;
       if (documento != null) data['numeroIdentificacion'] = documento;  // ← cambiado
       if (fechaNacimiento != null) data['fechaNacimiento'] = fechaNacimiento;
@@ -81,12 +84,15 @@ class ConductorService {
     try {
       final response = await _api.get('/api/conductores/perfil');
       
+      print('DEBUG getPerfil - response: ${response.data}');
+      
       if (response.statusCode == 200) {
         return UserModel.fromJson(response.data['data'] ?? response.data);
       }
       
       return null;
     } catch (e) {
+      print('DEBUG getPerfil - error: $e');
       return null;
     }
   }

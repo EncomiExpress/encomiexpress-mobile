@@ -130,11 +130,73 @@ class _DriverProfileState extends State<DriverProfile> {
                         iconColor: AppColors.purple,
                         iconBg: AppColors.purpleBg,
                         label: 'Teléfono',
-                        value: _localUser.telefono,
+                        value: _localUser.telefono.isNotEmpty ? _localUser.telefono : 'No registrado',
                       ),
+                      if (_localUser.documento != null && _localUser.documento!.isNotEmpty)
+                        InfoRow(
+                          icon: Icons.badge_outlined,
+                          iconColor: AppColors.orange,
+                          iconBg: AppColors.orangeBg,
+                          label: 'Número de identificación',
+                          value: _localUser.documento!,
+                        ),
                     ],
                   ),
                 ),
+                if (_localUser.placa != null || _localUser.marcaVehiculo != null)
+                  SectionCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Información del vehículo',
+                            style: TextStyle(
+                                color: AppColors.textMain,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 14),
+                        if (_localUser.placa != null && _localUser.placa!.isNotEmpty)
+                          InfoRow(
+                            icon: Icons.directions_car_outlined,
+                            iconColor: AppColors.blue,
+                            iconBg: AppColors.blueBg,
+                            label: 'Placa',
+                            value: _localUser.placa!,
+                          ),
+                        if (_localUser.marcaVehiculo != null && _localUser.marcaVehiculo!.isNotEmpty)
+                          InfoRow(
+                            icon: Icons.factory_outlined,
+                            iconColor: AppColors.green,
+                            iconBg: AppColors.greenBg,
+                            label: 'Marca',
+                            value: _localUser.marcaVehiculo!,
+                          ),
+                        if (_localUser.modeloVehiculo != null && _localUser.modeloVehiculo!.isNotEmpty)
+                          InfoRow(
+                            icon: Icons.time_to_leave_outlined,
+                            iconColor: AppColors.purple,
+                            iconBg: AppColors.purpleBg,
+                            label: 'Modelo',
+                            value: _localUser.modeloVehiculo!,
+                          ),
+                        if (_localUser.anioVehiculo != null && _localUser.anioVehiculo!.isNotEmpty)
+                          InfoRow(
+                            icon: Icons.calendar_today_outlined,
+                            iconColor: AppColors.orange,
+                            iconBg: AppColors.orangeBg,
+                            label: 'Año',
+                            value: _localUser.anioVehiculo!,
+                          ),
+                        if (_localUser.colorVehiculo != null && _localUser.colorVehiculo!.isNotEmpty)
+                          InfoRow(
+                            icon: Icons.palette_outlined,
+                            iconColor: AppColors.blue,
+                            iconBg: AppColors.blueBg,
+                            label: 'Color',
+                            value: _localUser.colorVehiculo!,
+                          ),
+                      ],
+                    ),
+                  ),
                 SectionCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
