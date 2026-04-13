@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../models/models.dart';
+import 'models.dart';
 
 class GradientHeader extends StatelessWidget {
   final String title;
@@ -61,7 +61,7 @@ class GradientHeader extends StatelessWidget {
               ],
             ),
           ),
-          ?trailing,
+          if (trailing != null) trailing!,
         ],
       ),
     );
@@ -84,7 +84,7 @@ class EstadoBadge extends StatelessWidget {
           style: TextStyle(
               color: estadoColor(estado),
               fontSize: 12,
-              fontWeight: FontWeight.w600)),
+              fontWeight: FontWeight.w600))
     );
   }
 }

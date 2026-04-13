@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../models/models.dart';
-import '../../services/anticipo_service.dart';
-import '../../widgets/widgets.dart';
+import '../../../../core/models.dart';
+import '../../../../core/services/anticipo_service.dart';
+import '../../../../core/widgets.dart';
 import 'admin_profile.dart';
 import 'anticipo_detail.dart';
 import 'anticipo_edit.dart';

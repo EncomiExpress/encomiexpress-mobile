@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models/models.dart';
-import '../services/auth_service.dart';
-import 'admin/admin_home.dart';
-import 'driver/driver_home.dart';
+import '../../../core/models.dart';
+import '../../../core/services/auth_service.dart';
+import '../../admin/screens/admin_home.dart';
+import '../../driver/screens/driver_home.dart';
 import 'recover_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -45,7 +45,6 @@ class _LoginScreenState extends State<LoginScreen> {
       String id = '';
       String telefono = '';
       
-// Buscar en responseData.data (como viene del backend)
       if (responseData['data'] != null && responseData['data']['rol'] != null) {
         rol = responseData['data']['rol'].toString();
         print('DEBUG - rol encontrado en data.rol: $rol');
@@ -54,7 +53,6 @@ class _LoginScreenState extends State<LoginScreen> {
         rol = responseData['data']['role'].toString();
         print('DEBUG - rol encontrado en data.role: $rol');
       }
-      // Buscar en responseData directamente
       else if (responseData['rol'] != null) {
         rol = responseData['rol'].toString();
         print('DEBUG - rol encontrado en responseData.rol: $rol');
@@ -63,7 +61,6 @@ class _LoginScreenState extends State<LoginScreen> {
         rol = responseData['role'].toString();
         print('DEBUG - rol encontrado en responseData.role: $rol');
       }
-      // Por email como fallback (si el backend no devuelve el rol directamente)
       else {
         final emailInput = _emailCtrl.text.trim().toLowerCase();
         print('DEBUG - email para fallback: $emailInput');
@@ -75,7 +72,6 @@ class _LoginScreenState extends State<LoginScreen> {
       
       print('DEBUG - rol extraido: $rol');
       
-      // Extraer datos del usuario - buscar en múltiples ubicaciones
       Map<String, dynamic>? usuario;
       if (responseData['data']?['usuario'] != null) {
         usuario = Map<String, dynamic>.from(responseData['data']['usuario']);

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../../models/models.dart';
-import '../../widgets/widgets.dart';
-import '../../widgets/image_viewer.dart';
+import '../../../../core/models.dart';
+import '../../../../core/widgets.dart';
+import '../../../../core/image_viewer.dart';
 
 class AnticipoDetail extends StatelessWidget {
   final Anticipo anticipo;

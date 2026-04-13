@@ -2,9 +2,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
-import '../../models/models.dart';
-import '../../services/conductor_service.dart';
-import '../../widgets/widgets.dart';
+import '../../../../core/models.dart';
+import '../../../../core/services/conductor_service.dart';
+import '../../../../core/widgets.dart';
 
 class DriverProfileEdit extends StatefulWidget {
   final UserModel user;

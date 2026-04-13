@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../models/models.dart';
-import '../../widgets/widgets.dart';
+import 'models.dart';
 
 class ImageViewer extends StatefulWidget {
   final List<String> imageUrls;

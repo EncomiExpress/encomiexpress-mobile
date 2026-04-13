@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import '../../models/models.dart';
-import '../../services/anticipo_service.dart';
-import '../../services/conductor_service.dart';
-import '../../widgets/widgets.dart';
-import '../admin/anticipo_detail.dart';
-import '../admin/anticipo_edit.dart';
+import '../../../../core/models.dart';
+import '../../../../core/services/anticipo_service.dart';
+import '../../../../core/services/conductor_service.dart';
+import '../../../../core/widgets.dart';
+import '../../admin/screens/anticipo_detail.dart';
+import '../../admin/screens/anticipo_edit.dart';
 import 'driver_profile.dart';
 
 class DriverHome extends StatefulWidget {

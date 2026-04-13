@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../models/models.dart';
-import '../../widgets/widgets.dart';
-import '../login_screen.dart';
+import '../../../../core/models.dart';
+import '../../../../core/widgets.dart';
+import '../../auth/screens/login_screen.dart';
 
 class AdminProfile extends StatelessWidget {
   final UserModel user;

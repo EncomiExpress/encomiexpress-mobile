@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
 import 'api_client.dart';
-import '../models/models.dart';
+import '../models.dart';
 
 class AnticipoService {
   ApiClient get _api => ApiClient();
@@ -28,7 +28,7 @@ class AnticipoService {
     }
   }
 
-   Future<List<Map<String, dynamic>>> getRutas() async {  // <-- NUEVO
+  Future<List<Map<String, dynamic>>> getRutas() async {
     try {
       print('DEBUG getRutas - iniciando peticion');
       final response = await _api.get('/api/rutas');

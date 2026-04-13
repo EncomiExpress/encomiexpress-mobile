@@ -154,7 +154,7 @@ class Anticipo {
   final String fechaLegalizacion;
   final String fechaMaxima;
   final String? soporte;
-
+ 
   const Anticipo({
     required this.id,
     required this.tipo,
@@ -220,7 +220,7 @@ const List<Map<String, String>> usuariosDemo = [
     'telefono': '+57 300 123 4567',
     'rol': 'conductor',
   },
-];
+ ];
 
 final List<Anticipo> anticiposDemo = [
   const Anticipo(

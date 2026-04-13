@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
-import '../../models/models.dart';
-import '../../services/anticipo_service.dart';
-import '../../widgets/widgets.dart';
+import '../../../../core/models.dart';
+import '../../../../core/services/anticipo_service.dart';
+import '../../../../core/widgets.dart';
 
 class AnticipoEdit extends StatefulWidget {
   final Anticipo? anticipo;
@@ -23,7 +23,6 @@ class _AnticipoEditState extends State<AnticipoEdit> {
   List<Map<String, dynamic>> _conductoresList = [];
   String _conductorId = '';
 
-  // ── NUEVO: lista de rutas y ruta seleccionada (opcional) ──
   List<Map<String, dynamic>> _rutasList = [];
   String? _rutaId;
 
@@ -39,9 +38,8 @@ class _AnticipoEditState extends State<AnticipoEdit> {
     }
   }
 
-  // ── NUEVO: carga las rutas desde el servicio ──
   Future<void> _loadRutas() async {
-    final data = await _anticipoService.getRutas(); // ajusta según tu servicio
+    final data = await _anticipoService.getRutas();
     if (mounted) {
       setState(() => _rutasList = data);
     }
@@ -99,7 +97,7 @@ class _AnticipoEditState extends State<AnticipoEdit> {
   void initState() {
     super.initState();
     _loadConductores();
-    _loadRutas(); // ── NUEVO ──
+    _loadRutas();
     final a = widget.anticipo;
     _conductor    = a?.conductorNombre ?? '';
     _conductorId  = a?.conductorId ?? '';
@@ -176,7 +174,6 @@ class _AnticipoEditState extends State<AnticipoEdit> {
       print('DEBUG _guardar crear anticipo - conductorId: "$conductorId", nombre: "$_conductor", tipo: "$_tipo", valor: "${_anticipoCtrl.text}"');
       data = {
         'idConductor': int.tryParse(conductorId) ?? conductorId,
-        // ── NUEVO: idRuta es opcional, se envía null si no se seleccionó ──
         'valorAnticipo': double.tryParse(_anticipoCtrl.text) ?? 0,
         'tipo': _tipo,
         'fechaEntrega': _fechaEntrega,
@@ -184,7 +181,6 @@ class _AnticipoEditState extends State<AnticipoEdit> {
       };
       print('DEBUG _guardar data final: $data');
     } else {
-      // Solo enviar fechaLegalizacion si está llena (conductor la pone cuando legaliza)
       data = {
         'valorGastado': double.tryParse(_gastadoCtrl.text) ?? 0,
         'estado': _mapEstadoToBackend(_estado),
@@ -295,7 +291,6 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                 key: _formKey,
                 child: Column(
                   children: [
-                    // ── Conductor ──
                     if (widget.isAdmin)
                       SectionCard(
                         child: Column(
@@ -314,7 +309,6 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                         ),
                       ),
 
-                    // ── NUEVO: Ruta (opcional) ──
                     if (widget.isAdmin && _isNew)
                       SectionCard(
                         child: Column(
@@ -361,7 +355,6 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                         ),
                       ),
 
-                    // ── Tipo de anticipo ──
                     SectionCard(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -377,7 +370,6 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                       ),
                     ),
 
-                    // ── Estado ──
                     if (widget.isAdmin)
                       SectionCard(
                         child: Column(
@@ -394,7 +386,6 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                         ),
                       ),
 
-                    // ── Valores ──
                     SectionCard(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -448,7 +439,6 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                       ),
                     ),
 
-                    // ── Fechas ──
                     SectionCard(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -481,7 +471,6 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                       ),
                     ),
 
-                    // ── Soporte ──
                     SectionCard(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -535,7 +524,6 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                     ),
                     const SizedBox(height: 8),
 
-                    // ── Botón guardar ──
                     GestureDetector(
                       onTap: _guardar,
                       child: Container(

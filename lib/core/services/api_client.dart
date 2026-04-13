@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../config/api_config.dart';
+import '../../config/api_config.dart';
 
 class ApiClient {
   static final ApiClient _instance = ApiClient._internal();

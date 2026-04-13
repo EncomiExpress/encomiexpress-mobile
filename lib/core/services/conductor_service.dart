@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'api_client.dart';
-import '../models/models.dart';
+import '../models.dart';
 
 class ConductorService {
   ApiClient get _api => ApiClient();
@@ -28,15 +28,15 @@ class ConductorService {
         data['phone'] = telefono;
       }
       if (email != null) data['email'] = email;
-      if (documento != null) data['numeroIdentificacion'] = documento;  // ← cambiado
+      if (documento != null) data['numeroIdentificacion'] = documento;
       if (fechaNacimiento != null) data['fechaNacimiento'] = fechaNacimiento;
       if (direccion != null) data['direccion'] = direccion;
       if (fotoPerfil != null) data['fotoPerfil'] = fotoPerfil;
       if (placa != null) data['placa'] = placa;
-      if (marcaVehiculo != null) data['marca'] = marcaVehiculo;         // ← cambiado
-      if (modeloVehiculo != null) data['modelo'] = modeloVehiculo;      // ← cambiado
-      if (anioVehiculo != null) data['anio'] = anioVehiculo;            // ← cambiado
-      if (colorVehiculo != null) data['color'] = colorVehiculo;         // ← cambiado
+      if (marcaVehiculo != null) data['marca'] = marcaVehiculo;
+      if (modeloVehiculo != null) data['modelo'] = modeloVehiculo;
+      if (anioVehiculo != null) data['anio'] = anioVehiculo;
+      if (colorVehiculo != null) data['color'] = colorVehiculo;
 
       print('DEBUG updatePerfil - data: $data');
       final response = await _api.put('/api/conductores/perfil', data: data);
