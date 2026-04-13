@@ -1,21 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:dio/dio.dart';
+import '../../../../config/api_config.dart';
 import '../../domain/entities/usuario.dart';
 
 class UsuarioProvider extends ChangeNotifier {
   final SharedPreferences _prefs;
+  final Dio? _dio;
 
   Usuario? _currentUser;
   bool _loading = false;
   String? _error;
   bool _isLoggedIn = false;
 
-  static final List<Map<String, String>> usuariosDemo = [
+  static final List<Map<String, String>> _usuariosDemo = [
     {'id': '1', 'nombre': 'Administrador', 'email': 'admin@test.com', 'telefono': '+57 300 000 0001', 'password': '123456', 'rol': 'admin'},
     {'id': '2', 'nombre': 'Juan Pérez', 'email': 'conductor@test.com', 'telefono': '+57 300 123 4567', 'password': '123456', 'rol': 'conductor'},
   ];
 
-  UsuarioProvider({required SharedPreferences prefs}) : _prefs = prefs;
+  UsuarioProvider({required SharedPreferences prefs, Dio? dio}) : _prefs = prefs, _dio = dio;
 
   Usuario? get currentUser => _currentUser;
   bool get loading => _loading;
@@ -29,32 +32,58 @@ class UsuarioProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
 
-    await Future.delayed(const Duration(milliseconds: 400));
+    bool loginExitoso = false;
 
-    final found = usuariosDemo.firstWhere(
-      (u) => u['email'] == email.trim() && u['password'] == password,
-      orElse: () => {},
-    );
-
-    if (found.isEmpty) {
-      _error = 'Correo o contraseña incorrectos';
-      _loading = false;
-      notifyListeners();
-      return false;
+    try {
+      if (_dio != null) {
+        final response = await _dio!.post(
+          ApiConfig.loginEndpoint,
+          data: {'email': email, 'password': password},
+        );
+        
+        if (response.statusCode == 200 || response.statusCode == 201) {
+          final data = response.data['data'] ?? response.data;
+          _currentUser = Usuario(
+            id: data['id']?.toString() ?? '',
+            nombre: data['nombre']?.toString() ?? '',
+            email: data['email']?.toString() ?? '',
+            telefono: data['telefono']?.toString() ?? '',
+            rol: data['rol']?.toString() ?? 'conductor',
+          );
+          loginExitoso = true;
+          await _prefs.setString('auth_token', data['token']?.toString() ?? '');
+        }
+      }
+    } catch (e) {
+      debugPrint('Error login API: $e');
     }
 
-    _currentUser = Usuario(
-      id: found['id']!,
-      nombre: found['nombre']!,
-      email: found['email']!,
-      telefono: found['telefono']!,
-      rol: found['rol']!,
-    );
-    _isLoggedIn = true;
-    
+    if (!loginExitoso && _dio != null) {
+      final found = _usuariosDemo.firstWhere(
+        (u) => u['email'] == email.trim() && u['password'] == password,
+        orElse: () => {},
+      );
+
+      if (found.isNotEmpty) {
+        _currentUser = Usuario(
+          id: found['id']!,
+          nombre: found['nombre']!,
+          email: found['email']!,
+          telefono: found['telefono']!,
+          rol: found['rol']!,
+        );
+        loginExitoso = true;
+      }
+    }
+
+    if (!loginExitoso) {
+      _error = 'Correo o contraseña incorrectos';
+    }
+
+    _isLoggedIn = loginExitoso;
     _loading = false;
     notifyListeners();
-    return true;
+    return loginExitoso;
   }
 
   Future<void> logout() async {

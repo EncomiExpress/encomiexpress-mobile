@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dio/dio.dart';
+import 'config/api_config.dart';
 import 'features/usuarios/presentation/providers/usuario_provider.dart';
 import 'features/anticipos/presentation/providers/anticipo_provider.dart';
 import 'screens/login_screen.dart';
@@ -16,7 +17,12 @@ void main() async {
   ));
   
   final prefs = await SharedPreferences.getInstance();
-  final dio = Dio();
+  final dio = Dio(BaseOptions(
+    baseUrl: ApiConfig.baseUrl,
+    connectTimeout: const Duration(seconds: 10),
+    receiveTimeout: const Duration(seconds: 10),
+    headers: {'Content-Type': 'application/json'},
+  ));
   
   runApp(EncomiExpressApp(prefs: prefs, dio: dio));
 }
@@ -36,7 +42,7 @@ class EncomiExpressApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(
-          create: (_) => UsuarioProvider(prefs: prefs),
+          create: (_) => UsuarioProvider(prefs: prefs, dio: dio),
         ),
         ChangeNotifierProvider(
           create: (_) => AnticipoProvider(dio: dio),

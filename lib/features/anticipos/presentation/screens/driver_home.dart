@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../../core/models/models.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../anticipos/domain/entities/anticipo.dart';
 import '../../../usuarios/domain/entities/usuario.dart';
+import '../providers/anticipo_provider.dart';
 import 'anticipo_detail.dart';
 import 'anticipo_edit.dart';
 import 'driver_profile.dart';
@@ -17,7 +19,6 @@ class DriverHome extends StatefulWidget {
 
 class _DriverHomeState extends State<DriverHome> {
   int _tab = 0;
-  late List<Anticipo> _anticipos;
   final _searchCtrl = TextEditingController();
   bool _showFiltros = false;
   String _filtroEstado = 'Todos';
@@ -25,40 +26,40 @@ class _DriverHomeState extends State<DriverHome> {
   @override
   void initState() {
     super.initState();
-    _anticipos = anticiposDemo
-        .where((a) => a.conductorId == widget.user.id)
-        .toList();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AnticipoProvider>().loadAnticipos();
+    });
     _searchCtrl.addListener(() => setState(() {}));
-  }
-
-  List<Anticipo> get _filtrados {
-    return _anticipos.where((a) {
-      final query = _searchCtrl.text.toLowerCase();
-      final matchSearch = query.isEmpty ||
-          a.tipo.toLowerCase().contains(query);
-      final matchEstado = _filtroEstado == 'Todos' ||
-          a.estado == _filtroEstado;
-      return matchSearch && matchEstado;
-    }).toList();
   }
 
   @override
   Widget build(BuildContext context) {
+    final provider = context.watch<AnticipoProvider>();
+    final todosAnticipos = provider.anticipos;
+    final misAnticipos = todosAnticipos.where((a) => a.conductorId == widget.user.id).toList();
+
+    final filtrados = misAnticipos.where((a) {
+      final query = _searchCtrl.text.toLowerCase();
+      final matchSearch = query.isEmpty || a.tipo.toLowerCase().contains(query);
+      final matchEstado = _filtroEstado == 'Todos' || a.estado == _filtroEstado;
+      return matchSearch && matchEstado;
+    }).toList();
+
     return Scaffold(
       backgroundColor: AppColors.bgGray,
       body: IndexedStack(
         index: _tab,
         children: [
-          _buildMisAnticipos(),
-          DriverProfile(user: widget.user, anticipos: _anticipos),
-          _buildSolicitar(),
+          _buildMisAnticipos(provider, filtrados),
+          DriverProfile(user: widget.user, anticipos: misAnticipos),
+          _buildSolicitar(provider),
         ],
       ),
       bottomNavigationBar: _buildBottomNav(),
     );
   }
 
-  Widget _buildMisAnticipos() {
+  Widget _buildMisAnticipos(AnticipoProvider provider, List<Anticipo> filtrados) {
     return Column(
       children: [
         GradientHeader(
@@ -72,21 +73,14 @@ class _DriverHomeState extends State<DriverHome> {
           child: Column(
             children: [
               Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.border),
-                ),
+                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.border)),
                 child: TextField(
                   controller: _searchCtrl,
-                  style: const TextStyle(
-                      color: AppColors.textMain, fontSize: 14),
+                  style: const TextStyle(color: AppColors.textMain, fontSize: 14),
                   decoration: const InputDecoration(
                     hintText: 'Buscar por tipo de anticipo...',
-                    hintStyle:
-                        TextStyle(color: AppColors.textSub, fontSize: 14),
-                    prefixIcon: Icon(Icons.search_rounded,
-                        color: AppColors.textSub, size: 20),
+                    hintStyle: TextStyle(color: AppColors.textSub, fontSize: 14),
+                    prefixIcon: Icon(Icons.search_rounded, color: AppColors.textSub, size: 20),
                     border: InputBorder.none,
                     contentPadding: EdgeInsets.symmetric(vertical: 12),
                   ),
@@ -96,25 +90,16 @@ class _DriverHomeState extends State<DriverHome> {
               Align(
                 alignment: Alignment.centerLeft,
                 child: GestureDetector(
-                  onTap: () =>
-                      setState(() => _showFiltros = !_showFiltros),
+                  onTap: () => setState(() => _showFiltros = !_showFiltros),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: AppColors.border),
-                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10), border: Border.all(color: AppColors.border)),
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.filter_alt_outlined,
-                            size: 16, color: AppColors.textSub),
+                        Icon(Icons.filter_alt_outlined, size: 16, color: AppColors.textSub),
                         SizedBox(width: 6),
-                        Text('Filtros',
-                            style: TextStyle(
-                                color: AppColors.textMain, fontSize: 13)),
+                        Text('Filtros', style: TextStyle(color: AppColors.textMain, fontSize: 13)),
                       ],
                     ),
                   ),
@@ -124,30 +109,18 @@ class _DriverHomeState extends State<DriverHome> {
                 const SizedBox(height: 10),
                 Container(
                   padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.border),
-                  ),
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.border)),
                   child: Row(
                     children: [
-                      const Text('Estado:',
-                          style: TextStyle(
-                              color: AppColors.textMain,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600)),
+                      const Text('Estado:', style: TextStyle(color: AppColors.textMain, fontSize: 13, fontWeight: FontWeight.w600)),
                       const SizedBox(width: 12),
                       Expanded(
                         child: DropdownButton<String>(
                           value: _filtroEstado,
                           isExpanded: true,
                           underline: const SizedBox(),
-                          items: ['Todos', 'Activo', 'Pendiente', 'Pagado']
-                              .map((e) => DropdownMenuItem(
-                                  value: e, child: Text(e)))
-                              .toList(),
-                          onChanged: (v) =>
-                              setState(() => _filtroEstado = v!),
+                          items: ['Todos', 'Activo', 'Pendiente', 'Pagado'].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+                          onChanged: (v) => setState(() => _filtroEstado = v!),
                         ),
                       ),
                     ],
@@ -159,47 +132,32 @@ class _DriverHomeState extends State<DriverHome> {
         ),
         const SizedBox(height: 10),
         Expanded(
-          child: _filtrados.isEmpty
-              ? Center(
-                  child: Text('Sin anticipos',
-                      style: TextStyle(
-                          color: AppColors.textSub, fontSize: 14)))
-              : ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
-                  itemCount: _filtrados.length,
-                  itemBuilder: (_, i) => AnticipoCard(
-                    anticipo: _filtrados[i],
-                    isAdmin: false,
-                    onVer: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => AnticipoDetail(
-                                anticipo: _filtrados[i],
-                                isAdmin: false))),
-                    onEditar: () async {
-                      final updated =
-                          await Navigator.push<Anticipo>(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => AnticipoEdit(
-                                      anticipo: _filtrados[i],
-                                      isAdmin: false)));
-                      if (updated != null) {
-                        setState(() {
-                          final idx = _anticipos
-                              .indexWhere((x) => x.id == updated.id);
-                          if (idx != -1) _anticipos[idx] = updated;
-                        });
-                      }
-                    },
-                  ),
-                ),
+          child: provider.loading
+              ? const Center(child: CircularProgressIndicator())
+              : filtrados.isEmpty
+                  ? const Center(child: Text('Sin anticipos', style: TextStyle(color: AppColors.textSub, fontSize: 14)))
+                  : RefreshIndicator(
+                      onRefresh: () => provider.loadAnticipos(),
+                      child: ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
+                        itemCount: filtrados.length,
+                        itemBuilder: (_, i) => AnticipoCard(
+                          anticipo: filtrados[i],
+                          isAdmin: false,
+                          onVer: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AnticipoDetail(anticipo: filtrados[i], isAdmin: false))),
+                          onEditar: () async {
+                            final updated = await Navigator.push<Anticipo>(context, MaterialPageRoute(builder: (_) => AnticipoEdit(anticipo: filtrados[i], isAdmin: false)));
+                            if (updated != null) await provider.loadAnticipos();
+                          },
+                        ),
+                      ),
+                    ),
         ),
       ],
     );
   }
 
-  Widget _buildSolicitar() {
+  Widget _buildSolicitar(AnticipoProvider provider) {
     return Column(
       children: [
         GradientHeader(
@@ -217,58 +175,26 @@ class _DriverHomeState extends State<DriverHome> {
                 children: [
                   Container(
                     width: 80, height: 80,
-                    decoration: BoxDecoration(
-                        color: AppColors.blueBg,
-                        borderRadius: BorderRadius.circular(20)),
-                    child: const Icon(Icons.add_circle_outline_rounded,
-                        color: AppColors.driverPrimary, size: 40),
+                    decoration: BoxDecoration(color: AppColors.blueBg, borderRadius: BorderRadius.circular(20)),
+                    child: const Icon(Icons.add_circle_outline_rounded, color: AppColors.driverPrimary, size: 40),
                   ),
                   const SizedBox(height: 16),
-                  const Text('Nueva solicitud',
-                      style: TextStyle(
-                          color: AppColors.textMain,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700)),
+                  const Text('Nueva solicitud', style: TextStyle(color: AppColors.textMain, fontSize: 18, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 8),
-                  const Text(
-                      'Registra un nuevo anticipo para tus gastos de ruta.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                          color: AppColors.textSub, fontSize: 14)),
+                  const Text('Registra un nuevo anticipo para tus gastos de ruta.', textAlign: TextAlign.center, style: TextStyle(color: AppColors.textSub, fontSize: 14)),
                   const SizedBox(height: 24),
                   GestureDetector(
                     onTap: () async {
-                      final nuevo = await Navigator.push<Anticipo>(
-                          context,
-                          MaterialPageRoute(
-                              builder: (_) =>
-                                  const AnticipoEdit(isAdmin: false)));
+                      final nuevo = await Navigator.push<Anticipo>(context, MaterialPageRoute(builder: (_) => const AnticipoEdit(isAdmin: false)));
                       if (nuevo != null) {
-                        setState(() => _anticipos.add(nuevo));
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text('Anticipo solicitado'),
-                              backgroundColor: AppColors.green),
-                        );
+                        await provider.crearAnticipo(nuevo);
+                        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Anticipo solicitado'), backgroundColor: AppColors.green));
                       }
                     },
                     child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 32, vertical: 14),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [
-                            AppColors.driverGradStart,
-                            AppColors.driverGradEnd
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: const Text('Crear solicitud',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 15)),
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                      decoration: BoxDecoration(gradient: const LinearGradient(colors: [AppColors.driverGradStart, AppColors.driverGradEnd]), borderRadius: BorderRadius.circular(14)),
+                      child: const Text('Crear solicitud', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15)),
                     ),
                   ),
                 ],
@@ -290,51 +216,26 @@ class _DriverHomeState extends State<DriverHome> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.07),
-              blurRadius: 12,
-              offset: const Offset(0, -2))
-        ],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.07), blurRadius: 12, offset: const Offset(0, -2))],
       ),
       child: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
           child: Row(
-            children: List.generate(
-              items.length,
-              (i) => Expanded(
-                child: GestureDetector(
-                  onTap: () => setState(() => _tab = i),
-                  behavior: HitTestBehavior.opaque,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        items[i]['icon'] as IconData,
-                        color: _tab == i
-                            ? AppColors.driverPrimary
-                            : AppColors.textSub,
-                        size: 24,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        items[i]['label'] as String,
-                        style: TextStyle(
-                          color: _tab == i
-                              ? AppColors.driverPrimary
-                              : AppColors.textSub,
-                          fontSize: 11,
-                          fontWeight: _tab == i
-                              ? FontWeight.w700
-                              : FontWeight.w400,
-                        ),
-                      ),
-                    ],
-                  ),
+            children: List.generate(items.length, (i) => Expanded(
+              child: GestureDetector(
+                onTap: () => setState(() => _tab = i),
+                behavior: HitTestBehavior.opaque,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(items[i]['icon'] as IconData, color: _tab == i ? AppColors.driverPrimary : AppColors.textSub, size: 24),
+                    const SizedBox(height: 4),
+                    Text(items[i]['label'] as String, style: TextStyle(color: _tab == i ? AppColors.driverPrimary : AppColors.textSub, fontSize: 11, fontWeight: _tab == i ? FontWeight.w700 : FontWeight.w400)),
+                  ],
                 ),
               ),
-            ),
+            )),
           ),
         ),
       ),
