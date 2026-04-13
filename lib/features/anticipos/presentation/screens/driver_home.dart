@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../../../features/usuarios/presentation/providers/usuario_provider.dart';
 import '../../domain/entities/anticipo.dart';
 import '../../presentation/providers/anticipo_provider.dart';
 import '../../presentation/widgets/anticipo_card.dart';
+import 'anticipo_detail.dart';
+import 'anticipo_edit.dart';
+import 'driver_profile.dart';
 
 class DriverHomeScreen extends StatefulWidget {
   final AnticipoProvider provider;
@@ -53,6 +58,14 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
         children: [
           _buildMisAnticipos(),
           _buildSolicitar(),
+          DriverProfileScreen(
+            user: context.read<UsuarioProvider>().currentUser!,
+            anticipos: widget.provider.anticipos,
+            onLogout: () {
+              context.read<UsuarioProvider>().logout();
+              Navigator.pushReplacementNamed(context, '/login');
+            },
+          ),
         ],
       ),
       bottomNavigationBar: _buildBottomNav(),
@@ -193,8 +206,17 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                         itemBuilder: (_, i) => AnticipoCard(
                           anticipo: _filtrados[i],
                           isAdmin: false,
-                          onVer: () {},
-                          onEditar: () {},
+                          onVer: () => Navigator.push(context,
+                              MaterialPageRoute(builder: (_) => 
+                                  AnticipoDetailScreen(anticipo: _filtrados[i], isAdmin: false))),
+                          onEditar: () async {
+                            final updated = await Navigator.push<Anticipo>(context,
+                                MaterialPageRoute(builder: (_) => 
+                                    AnticipoEditScreen(anticipo: _filtrados[i], isAdmin: false)));
+                            if (updated != null) {
+                              await widget.provider.loadAnticipos();
+                            }
+                          },
                         ),
                       ),
                     ),
@@ -258,7 +280,17 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
                       style: TextStyle(color: Color(0xFF64748B), fontSize: 14)),
                   const SizedBox(height: 24),
                   GestureDetector(
-                    onTap: () {},
+                    onTap: () async {
+                      final nuevo = await Navigator.push<Anticipo>(context,
+                          MaterialPageRoute(builder: (_) => const AnticipoEditScreen(isAdmin: false)));
+                      if (nuevo != null) {
+                        await widget.provider.loadAnticipos();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text('Anticipo solicitado'),
+                              backgroundColor: Color(0xFF22C55E)));
+                      }
+                    },
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 32, vertical: 14),
@@ -288,6 +320,7 @@ class _DriverHomeScreenState extends State<DriverHomeScreen> {
     final items = [
       {'icon': Icons.grid_view_rounded, 'label': 'Inicio'},
       {'icon': Icons.add_circle_outline_rounded, 'label': 'Solicitar'},
+      {'icon': Icons.person_outline_rounded, 'label': 'Perfil'},
     ];
 
     return Container(

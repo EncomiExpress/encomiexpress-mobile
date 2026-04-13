@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../../features/usuarios/presentation/providers/usuario_provider.dart';
 import '../../domain/entities/anticipo.dart';
 import '../../presentation/providers/anticipo_provider.dart';
 import '../../presentation/widgets/anticipo_card.dart';
+import 'admin_profile.dart';
+import 'anticipo_detail.dart';
+import 'anticipo_edit.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   final AnticipoProvider provider;
@@ -105,10 +110,31 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                             color: Colors.white70, fontSize: 13)),
                   ],
                 ),
-                GestureDetector(
-                  onTap: () => widget.provider.loadAnticipos(),
-                  child: const Icon(Icons.refresh,
-                      color: Colors.white, size: 26),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    GestureDetector(
+                      onTap: () => widget.provider.loadAnticipos(),
+                      child: const Icon(Icons.refresh,
+                          color: Colors.white, size: 26),
+                    ),
+                    const SizedBox(width: 12),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(context,
+                            MaterialPageRoute(builder: (_) => 
+                                AdminProfileScreen(
+                                    user: context.read<UsuarioProvider>().currentUser!,
+                                    anticipos: widget.provider.anticipos,
+                                    onLogout: () {
+                                      context.read<UsuarioProvider>().logout();
+                                      Navigator.pushReplacementNamed(context, '/login');
+                                    })));
+                      },
+                      child: const Icon(Icons.person_outline_rounded,
+                          color: Colors.white, size: 26),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -145,8 +171,17 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                           ..._filtrados.map((a) => AnticipoCard(
                             anticipo: a,
                             isAdmin: true,
-                            onVer: () {},
-                            onEditar: () {},
+                            onVer: () => Navigator.push(context,
+                                MaterialPageRoute(builder: (_) => 
+                                    AnticipoDetailScreen(anticipo: a, isAdmin: true))),
+                            onEditar: () async {
+                              final updated = await Navigator.push<Anticipo>(context,
+                                  MaterialPageRoute(builder: (_) => 
+                                      AnticipoEditScreen(anticipo: a, isAdmin: true)));
+                              if (updated != null) {
+                                await widget.provider.loadAnticipos();
+                              }
+                            },
                             onAprobar: () => _aprobar(a),
                             onRechazar: () => _rechazar(a),
                           )),
@@ -157,6 +192,17 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   ),
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          final nuevo = await Navigator.push<Anticipo>(context,
+              MaterialPageRoute(builder: (_) => const AnticipoEditScreen(isAdmin: true)));
+          if (nuevo != null) {
+            await widget.provider.loadAnticipos();
+          }
+        },
+        backgroundColor: const Color(0xFF7B2FBE),
+        child: const Icon(Icons.add, color: Colors.white),
       ),
     );
   }

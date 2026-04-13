@@ -20,6 +20,26 @@ class UsuarioRemoteDataSourceImpl implements UsuarioRemoteDataSource {
 
   @override
   Future<UsuarioModel?> login(String email, String password) async {
+    // Demo users for testing
+    if (email == 'admin@encomiexpress.com' && password == 'admin123') {
+      return UsuarioModel(
+        id: '1',
+        nombre: 'Administrador',
+        email: 'admin@encomiexpress.com',
+        telefono: '+57 300 000 0001',
+        rol: 'admin',
+      );
+    }
+    if (email == 'conductor@encomiexpress.com' && password == 'conductor123') {
+      return UsuarioModel(
+        id: '2',
+        nombre: 'Juan Pérez',
+        email: 'conductor@encomiexpress.com',
+        telefono: '+57 300 123 4567',
+        rol: 'conductor',
+      );
+    }
+
     try {
       final response = await dio.post(
         '${ApiConfig.baseUrl}/api/auth/login',

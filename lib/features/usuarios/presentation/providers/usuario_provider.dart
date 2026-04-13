@@ -8,6 +8,7 @@ import '../../data/repositories/usuario_repository_impl.dart';
 
 class UsuarioProvider extends ChangeNotifier {
   late final Login _login;
+  late final Dio _dio;
   final SharedPreferences _prefs;
 
   Usuario? _currentUser;
@@ -15,9 +16,9 @@ class UsuarioProvider extends ChangeNotifier {
   String? _error;
   bool _isLoggedIn = false;
 
-  UsuarioProvider({required SharedPreferences prefs}) : _prefs = prefs {
+  UsuarioProvider({required SharedPreferences prefs, required Dio dio}) : _prefs = prefs, _dio = dio {
     final dataSource = UsuarioRemoteDataSourceImpl(
-      dio: Dio(),
+      dio: dio,
       prefs: prefs,
     );
     final repository = UsuarioRepositoryImpl(remoteDataSource: dataSource);

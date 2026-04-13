@@ -36,7 +36,7 @@ class EncomiExpressApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(
-          create: (_) => UsuarioProvider(prefs: prefs),
+          create: (_) => UsuarioProvider(prefs: prefs, dio: dio),
         ),
         ChangeNotifierProvider(
           create: (_) => AnticipoProvider(dio: dio),
