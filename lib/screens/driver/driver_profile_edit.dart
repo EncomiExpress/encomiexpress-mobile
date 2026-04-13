@@ -25,11 +25,6 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
   late TextEditingController _emailCtrl;
   late TextEditingController _documentoCtrl;
   late TextEditingController _direccionCtrl;
-  late TextEditingController _placaCtrl;
-  late TextEditingController _marcaVehiculoCtrl;
-  late TextEditingController _modeloVehiculoCtrl;
-  late TextEditingController _anioVehiculoCtrl;
-  late TextEditingController _colorVehiculoCtrl;
   
   String? _fechaNacimiento;
   PlatformFile? _nuevaFoto;
@@ -44,11 +39,6 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
     _emailCtrl = TextEditingController(text: widget.user.email);
     _documentoCtrl = TextEditingController(text: widget.user.documento ?? '');
     _direccionCtrl = TextEditingController(text: widget.user.direccion ?? '');
-    _placaCtrl = TextEditingController(text: widget.user.placa ?? '');
-    _marcaVehiculoCtrl = TextEditingController(text: widget.user.marcaVehiculo ?? '');
-    _modeloVehiculoCtrl = TextEditingController(text: widget.user.modeloVehiculo ?? '');
-    _anioVehiculoCtrl = TextEditingController(text: widget.user.anioVehiculo ?? '');
-    _colorVehiculoCtrl = TextEditingController(text: widget.user.colorVehiculo ?? '');
     _fechaNacimiento = widget.user.fechaNacimiento;
   }
 
@@ -59,11 +49,6 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
     _emailCtrl.dispose();
     _documentoCtrl.dispose();
     _direccionCtrl.dispose();
-    _placaCtrl.dispose();
-    _marcaVehiculoCtrl.dispose();
-    _modeloVehiculoCtrl.dispose();
-    _anioVehiculoCtrl.dispose();
-    _colorVehiculoCtrl.dispose();
     super.dispose();
   }
 
@@ -91,18 +76,6 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
     }
     if (value.length < 10) {
       return 'El teléfono debe tener al menos 10 dígitos';
-    }
-    return null;
-  }
-
-  String? _validateAnio(String? value) {
-    if (value == null || value.isEmpty) return null;
-    final anio = int.tryParse(value);
-    if (anio == null) {
-      return 'Ingresa un año válido';
-    }
-    if (anio < 1900 || anio > DateTime.now().year + 1) {
-      return 'El año debe estar entre 1900 y ${DateTime.now().year + 1}';
     }
     return null;
   }
@@ -187,11 +160,6 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
       fechaNacimiento: _fechaNacimiento,
       direccion: _direccionCtrl.text.trim().isNotEmpty ? _direccionCtrl.text.trim() : null,
       fotoPerfil: fotoUrl,
-      placa: _placaCtrl.text.trim().isNotEmpty ? _placaCtrl.text.trim().toUpperCase() : null,
-      marcaVehiculo: _marcaVehiculoCtrl.text.trim().isNotEmpty ? _marcaVehiculoCtrl.text.trim() : null,
-      modeloVehiculo: _modeloVehiculoCtrl.text.trim().isNotEmpty ? _modeloVehiculoCtrl.text.trim() : null,
-      anioVehiculo: _anioVehiculoCtrl.text.trim().isNotEmpty ? _anioVehiculoCtrl.text.trim() : null,
-      colorVehiculo: _colorVehiculoCtrl.text.trim().isNotEmpty ? _colorVehiculoCtrl.text.trim() : null,
     );
 
     setState(() => _saving = false);
@@ -205,11 +173,6 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
         fechaNacimiento: _fechaNacimiento,
         direccion: _direccionCtrl.text.trim().isNotEmpty ? _direccionCtrl.text.trim() : null,
         fotoPerfil: fotoUrl ?? widget.user.fotoPerfil,
-        placa: _placaCtrl.text.trim().isNotEmpty ? _placaCtrl.text.trim().toUpperCase() : null,
-        marcaVehiculo: _marcaVehiculoCtrl.text.trim().isNotEmpty ? _marcaVehiculoCtrl.text.trim() : null,
-        modeloVehiculo: _modeloVehiculoCtrl.text.trim().isNotEmpty ? _modeloVehiculoCtrl.text.trim() : null,
-        anioVehiculo: _anioVehiculoCtrl.text.trim().isNotEmpty ? _anioVehiculoCtrl.text.trim() : null,
-        colorVehiculo: _colorVehiculoCtrl.text.trim().isNotEmpty ? _colorVehiculoCtrl.text.trim() : null,
       );
       widget.onSave(updatedUser);
       if (mounted) {
@@ -276,47 +239,6 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
                 icon: Icons.badge_outlined,
                 iconColor: AppColors.orange,
                 keyboardType: TextInputType.number,
-              ),
-            ]),
-            const SizedBox(height: 16),
-            _buildSection('Vehículo', [
-              _buildTextField(
-                controller: _placaCtrl,
-                label: 'Placa',
-                icon: Icons.directions_car_outlined,
-                iconColor: AppColors.blue,
-                textCapitalization: TextCapitalization.characters,
-                inputFormatters: [UpperCaseTextFormatter()],
-              ),
-              _buildTextField(
-                controller: _marcaVehiculoCtrl,
-                label: 'Marca del vehículo',
-                icon: Icons.car_rental_outlined,
-                iconColor: AppColors.green,
-                textCapitalization: TextCapitalization.words,
-              ),
-              _buildTextField(
-                controller: _modeloVehiculoCtrl,
-                label: 'Modelo del vehículo',
-                icon: Icons.car_repair_outlined,
-                iconColor: AppColors.purple,
-                textCapitalization: TextCapitalization.words,
-              ),
-              _buildTextField(
-                controller: _anioVehiculoCtrl,
-                label: 'Año del vehículo',
-                icon: Icons.calendar_today_outlined,
-                iconColor: AppColors.orange,
-                keyboardType: TextInputType.number,
-                validator: _validateAnio,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(4)],
-              ),
-              _buildTextField(
-                controller: _colorVehiculoCtrl,
-                label: 'Color del vehículo',
-                icon: Icons.palette_outlined,
-                iconColor: AppColors.red,
-                textCapitalization: TextCapitalization.words,
               ),
             ]),
             if (_errorMessage != null) ...[
@@ -544,19 +466,6 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
           ),
         ),
       ),
-    );
-  }
-}
-
-class UpperCaseTextFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    return TextEditingValue(
-      text: newValue.text.toUpperCase(),
-      selection: newValue.selection,
     );
   }
 }
