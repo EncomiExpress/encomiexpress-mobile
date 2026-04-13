@@ -25,15 +25,15 @@ class ConductorService {
       if (nombre != null) data['nombre'] = nombre;
       if (telefono != null) data['telefono'] = telefono;
       if (email != null) data['email'] = email;
-      if (documento != null) data['documento'] = documento;
+      if (documento != null) data['numeroIdentificacion'] = documento;  // ← cambiado
       if (fechaNacimiento != null) data['fechaNacimiento'] = fechaNacimiento;
       if (direccion != null) data['direccion'] = direccion;
       if (fotoPerfil != null) data['fotoPerfil'] = fotoPerfil;
       if (placa != null) data['placa'] = placa;
-      if (marcaVehiculo != null) data['marcaVehiculo'] = marcaVehiculo;
-      if (modeloVehiculo != null) data['modeloVehiculo'] = modeloVehiculo;
-      if (anioVehiculo != null) data['anioVehiculo'] = anioVehiculo;
-      if (colorVehiculo != null) data['colorVehiculo'] = colorVehiculo;
+      if (marcaVehiculo != null) data['marca'] = marcaVehiculo;         // ← cambiado
+      if (modeloVehiculo != null) data['modelo'] = modeloVehiculo;      // ← cambiado
+      if (anioVehiculo != null) data['anio'] = anioVehiculo;            // ← cambiado
+      if (colorVehiculo != null) data['color'] = colorVehiculo;         // ← cambiado
 
       print('DEBUG updatePerfil - data: $data');
       final response = await _api.put('/api/conductores/perfil', data: data);
