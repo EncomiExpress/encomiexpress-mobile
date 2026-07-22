@@ -4,13 +4,22 @@ Aplicación móvil para la gestión de anticipos de conductores de OsvaldoC Mens
 
 ---
 
+## Integrantes del Equipo
+
+- Valeria Paz Arana
+- Santiago Suárez Durán
+- Sebastián Valencia Pérez
+- Yeferson Andrés Moreno Granda
+
+---
+
 ## Características Implementadas
 
 | Rol | Funcionalidades |
 |------|----------------|
-| **Conductor** | - Consulta de anticipos asignados <br> - Actualización de estado <br> - Consulta y edición de perfil |
-| **Administrador** | - Creación de anticipos <br> - Edición de información <br> - Aprobación y rechazo de anticipos |
-| **General** | - Inicio de sesión <br> - Cierre de sesión <br> - Navegación basada en roles |
+| **Conductor** | - Ver "Mis anticipos" con búsqueda y filtro por estado <br> - Legalizar anticipos: registrar el valor gastado y cargar los comprobantes (fotos/documentos) — el excedente se calcula automáticamente <br> - Consulta y edición de perfil propio (datos personales y foto) <br> - Recuperar contraseña |
+| **Administrador** | - Dashboard: anticipos totales, gastado, excedentes pendientes y por confirmar <br> - Listado de anticipos con filtros por Estado, Año y Mes <br> - Registrar anticipo (la ruta autocompleta el conductor, nunca se elige aparte) <br> - Editar anticipo (solo mientras sigue "Entregado") <br> - Confirmar devolución de excedente, con diálogo de confirmación previo <br> - Ver detalle de cualquier anticipo <br> - Perfil propio (solo lectura) |
+| **General** | - Inicio y cierre de sesión <br> - Recuperar contraseña <br> - Navegación basada en el rol devuelto por el backend <br> - Modo oscuro / modo claro <br> - Paleta de colores personalizable (rojo / azul), misma paleta que el panel web |
 
 ---
 
@@ -18,10 +27,10 @@ Aplicación móvil para la gestión de anticipos de conductores de OsvaldoC Mens
 
 - Flutter + Dart
 - dio — Consumo de API REST (`^5.4.0`)
-- shared_preferences — Persistencia de datos de usuario (`^2.2.2`)
+- shared_preferences — Persistencia de datos de usuario y preferencia de tema (`^2.2.2`)
 - file_picker — Selección de archivos y fotos de perfil (`^6.1.1`)
 - url_launcher — Apertura de enlaces externos (`^6.3.2`)
-- Estado gestionado con `setState` y `StatefulWidget`
+- Estado gestionado con `setState`/`StatefulWidget`, y `ChangeNotifier` para el tema (`ThemeController`)
 
 ---
 
@@ -31,22 +40,28 @@ El proyecto está estructurado siguiendo principios de arquitectura limpia y sep
 
 ```bash
 lib/
-├── main.dart              # Punto de entrada de la aplicación
-├── core/                  # Servicios y modelos centrales
-│   ├── models.dart        # Modelos de datos y AppColors
-│   └── services/          # Servicios API y autenticación
-└── features/              # Funcionalidades específicas por rol
-    ├── auth/              # Autenticación y login
-    ├── admin/             # Funcionalidades de administrador
-    └── driver/            # Funcionalidades de conductor
+├── main.dart                  # Punto de entrada — inicializa ApiClient y ThemeController
+├── config/
+│   └── api_config.dart        # baseUrl configurable por --dart-define
+├── core/                      # Servicios, modelos y componentes centrales
+│   ├── models.dart            # UserModel, Anticipo, AppColors
+│   ├── widgets.dart           # Componentes reutilizables (SectionCard, StatCard, FilterSelect, ...)
+│   ├── image_viewer.dart      # Visor de imágenes a pantalla completa (comprobantes)
+│   ├── theme/                 # Modo claro/oscuro + paleta rojo/azul
+│   └── services/               # ApiClient, AuthService, AnticipoService, ConductorService
+└── features/                  # Funcionalidades específicas por rol
+    ├── auth/screens/           # Login, recuperar contraseña
+    ├── admin/screens/          # Dashboard, listado, detalle, crear/editar anticipo, perfil
+    └── driver/screens/         # Mis anticipos, perfil, edición de perfil
 ```
 
 ### Principios de Arquitectura Implementados
 
 - **Separación de responsabilidades**: Cada capa tiene un propósito bien definido
-- **Inyección de dependencias**: Servicios como `ApiClient` y `AuthService` se inicializan desde `main.dart`
+- **Inyección de dependencias**: Servicios como `ApiClient` y `ThemeController` se inicializan desde `main.dart`
 - **Modelos consistentes**: `UserModel` y `Anticipo` definidos en `core/models.dart`
-- **Navegación basada en roles**: Redirección automática según el rol autenticado
+- **Navegación basada en roles**: Redirección automática según el rol que devuelve el backend en el login
+- **Pantallas compartidas**: el detalle y el formulario de anticipo son la misma pantalla para admin y conductor (ajustada por un flag), no una copia por rol
 
 ---
 
@@ -56,30 +71,28 @@ La aplicación utiliza un patrón de navegación basado en roles que determina l
 
 1. **Pantalla de Login (`LoginScreen`)**
    - Punto de entrada para todos los usuarios
+   - El rol se obtiene directo de la respuesta de `POST /api/auth/login`, no se adivina
 
 2. **Redirección basada en rol**
-   - `administrador` → `AdminHome`
    - `conductor` → `DriverHome`
+   - cualquier otro rol → `AdminHome`
 
 3. **Navegación interna**
-   - `AdminHome`: Gestión de anticipos (crear, visualizar, actualizar, aprobar/rechazar)
-   - `DriverHome`: Visualización y gestión de anticipos asignados (actualización de estado y cargue de soportes)
-   - Ambas pantallas incluyen funcionalidad de cierre de sesión
+   - `AdminHome`: dashboard, listado y gestión de anticipos
+   - `DriverHome`: "Mis anticipos" del conductor autenticado
+   - Ambas pantallas incluyen cierre de sesión
 
-La navegación se implementa utilizando `flutter/material.dart` mediante rutas programáticas con `Navigator.pushReplacement`.
+La navegación se implementa con `Navigator.pushReplacement` tras un login exitoso.
 
 ---
 
-## Paleta de Colores
+## Sistema de Tema
 
-| Nombre | Color | Uso |
-|---|---|---|
-| `adminGradStart` | `#7B2FBE` | Morado principal |
-| `adminGradEnd` | `#9B59B6` | Morado complementario |
-| `driverGradStart` | `#2563EB` | Azul de acciones y navegación |
-| `bgGray` | `#F5F6FA` | Fondo general |
-| `cardBg` | `#FFFFFF` | Tarjetas y superficies |
-| `textMain` | `#1E293B` | Texto principal |
+- **`ThemeController`** (`core/theme/theme_controller.dart`) — `ChangeNotifier` singleton con `darkMode` y `paletteKey` (`'red'` | `'blue'`), persistidos en `shared_preferences`
+- **`theme_tokens.dart`** — cuatro paletas (rojo/azul × claro/oscuro), mismos valores hex que `shared/styles/theme.js` del panel web
+- **`AppColors`** (`core/models.dart`) — colores estáticos que `ThemeController` actualiza en cada cambio; los widgets los leen directo en cada build
+
+El selector vive en el bottom sheet "Personalizar" (ícono de paleta en el header).
 
 ---
 
@@ -90,30 +103,40 @@ La navegación se implementa utilizando `flutter/material.dart` mediante rutas p
 git clone https://github.com/EncomiExpress/encomiexpress-mobile.git
 cd encomiexpress-mobile
 
-# 2. Instalar dependencias
+# 2. Cambiar a la rama activa de desarrollo (main está desactualizada)
+git checkout apk-flutter
+
+# 3. Instalar dependencias
 flutter pub get
 
-# 3. Ejecutar la aplicación
+# 4. Ejecutar la aplicación (por defecto apunta a http://localhost:3000)
 flutter run
 ```
 
----
+Si el backend no corre en la misma máquina (emulador Android, dispositivo físico o producción), sobreescribe la URL en tiempo de compilación:
 
-## Credenciales de Prueba
+```bash
+# Emulador Android
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3000
 
-| Rol | Email | Contraseña |
-|---|---|---|
-| Administrador | `admin@encomiexpress.com` | `admin123` |
-| Conductor | `conductor@encomiexpress.com` | `conductor123` |
+# Dispositivo físico (misma red local)
+flutter run --dart-define=API_BASE_URL=http://<IP-LAN-de-tu-máquina>:3000
+
+# Backend de producción
+flutter run --dart-define=API_BASE_URL=https://encomiexpress-backend.onrender.com
+```
 
 ---
 
 ## Rutas de la API
 
-- Backend: `http://localhost:3000`
 - Login: `POST /api/auth/login`
-- Anticipos: `GET/POST /api/anticipos`, `PUT /api/anticipos/:id`
+- Recuperar contraseña: `POST /api/auth/recuperar-password`, `POST /api/auth/cambiar-password`
+- Anticipos (admin): `GET/POST /api/anticipos`, `PUT /api/anticipos/:id`, `GET /api/anticipos/anios-disponibles`
+- Anticipos (conductor): `GET /api/conductores/mis-anticipos`
+- Confirmar devolución de excedente: `PATCH /api/anticipos/:id/entregar-excedente`
 - Soporte de anticipo: `POST /api/anticipos/:id/soporte`
+- Rutas (para el formulario de crear/editar anticipo): `GET /api/rutas`
 - Perfil del conductor: `GET/PUT /api/conductores/perfil`
 
 ---
@@ -124,6 +147,12 @@ flutter run
 |---|---|---|
 | [encomiexpress-backend](https://github.com/EncomiExpress/encomiexpress-backend) | API REST del sistema | Node.js · Express · PostgreSQL · Sequelize |
 | [encomiexpress-frontend](https://github.com/EncomiExpress/encomiexpress-frontend) | Panel web administrativo | React · Vite · Material UI |
+
+---
+
+## Licencia
+
+Este proyecto está bajo la licencia MIT — ver el archivo [LICENSE](./LICENSE) para más detalles.
 
 ---
 
