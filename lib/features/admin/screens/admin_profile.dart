@@ -11,9 +11,9 @@ class AdminProfile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final pendientes = anticipos.where((a) => a.estado == 'Pendiente').length;
-    final aprobados  = anticipos.where((a) => a.estado == 'Pagado').length;
-    final conductores = anticipos.map((a) => a.conductorId).toSet().length;
+    final pendientes = anticipos.where((a) => a.estado == EstadoAnticipo.excedentePendiente).length;
+    final aprobados  = anticipos.where((a) => a.estado == EstadoAnticipo.completado).length;
+    final conductores = anticipos.map((a) => a.idConductor).toSet().length;
 
     return Scaffold(
       backgroundColor: AppColors.bgGray,
@@ -22,7 +22,7 @@ class AdminProfile extends StatelessWidget {
           children: [
             Container(
               width: double.infinity,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [AppColors.adminGradStart, AppColors.adminGradEnd],
                   begin: Alignment.centerLeft,
@@ -35,7 +35,7 @@ class AdminProfile extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      GestureDetector(
+                      TapArea(
                         onTap: () => Navigator.pop(context),
                         child: const Icon(Icons.arrow_back,
                             color: Colors.white, size: 22),
@@ -59,7 +59,7 @@ class AdminProfile extends StatelessWidget {
                             blurRadius: 12)
                       ],
                     ),
-                    child: const Icon(Icons.shield_outlined,
+                    child: Icon(Icons.shield_outlined,
                         color: AppColors.adminPrimary, size: 36),
                   ),
                   const SizedBox(height: 12),
@@ -86,7 +86,7 @@ class AdminProfile extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Información personal',
+                        Text('Información personal',
                             style: TextStyle(
                                 color: AppColors.textMain,
                                 fontSize: 16,
@@ -128,7 +128,7 @@ class AdminProfile extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Estadísticas del sistema',
+                        Text('Estadísticas del sistema',
                             style: TextStyle(
                                 color: AppColors.textMain,
                                 fontSize: 16,
@@ -146,9 +146,9 @@ class AdminProfile extends StatelessWidget {
                                 AppColors.purple, AppColors.purpleBg),
                             _miniStat('$conductores', 'Conductores',
                                 AppColors.blue, AppColors.blueBg),
-                            _miniStat('$pendientes', 'Pendientes',
+                            _miniStat('$pendientes', 'Excedente pendiente',
                                 AppColors.orange, AppColors.orangeBg),
-                            _miniStat('$aprobados', 'Aprobados',
+                            _miniStat('$aprobados', 'Completados',
                                 AppColors.green, AppColors.greenBg),
                           ],
                         ),
@@ -159,7 +159,7 @@ class AdminProfile extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Privilegios de administrador',
+                        Text('Privilegios de administrador',
                             style: TextStyle(
                                 color: AppColors.textMain,
                                 fontSize: 16,
@@ -174,11 +174,11 @@ class AdminProfile extends StatelessWidget {
                           padding: const EdgeInsets.only(bottom: 8),
                           child: Row(
                             children: [
-                              const Icon(Icons.circle,
+                              Icon(Icons.circle,
                                   color: AppColors.purple, size: 8),
                               const SizedBox(width: 10),
                               Text(p,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                       color: AppColors.textMain,
                                       fontSize: 14)),
                             ],
@@ -187,7 +187,7 @@ class AdminProfile extends StatelessWidget {
                       ],
                     ),
                   ),
-                  GestureDetector(
+                  TapArea(
                     onTap: () => Navigator.pushAndRemoveUntil(
                       context,
                       MaterialPageRoute(builder: (_) => const LoginScreen()),
@@ -197,16 +197,16 @@ class AdminProfile extends StatelessWidget {
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFFF1F2),
+                        color: AppColors.redBg,
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(color: AppColors.red.withOpacity(0.3)),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Icon(Icons.logout_rounded,
                               color: AppColors.red, size: 18),
-                          SizedBox(width: 8),
+                          const SizedBox(width: 8),
                           Text('Cerrar sesión',
                               style: TextStyle(
                                   color: AppColors.red,
@@ -239,7 +239,7 @@ class AdminProfile extends StatelessWidget {
               style: TextStyle(
                   color: color, fontSize: 22, fontWeight: FontWeight.w800)),
           Text(label,
-              style: const TextStyle(
+              style: TextStyle(
                   color: AppColors.textSub, fontSize: 11)),
         ],
       ),

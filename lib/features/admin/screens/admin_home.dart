@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/models.dart';
 import '../../../../core/services/anticipo_service.dart';
+import '../../../../core/theme/theme_controller.dart';
 import '../../../../core/widgets.dart';
 import 'admin_profile.dart';
 import 'anticipo_detail.dart';
@@ -14,101 +15,102 @@ class AdminHome extends StatefulWidget {
   State<AdminHome> createState() => _AdminHomeState();
 }
 
+// Mismos 12 meses que usa el filtro Año/Mes en ListarAnticipoExcedente.jsx
+// (web) — value es lo que se manda al backend, label es lo que se muestra.
+const _meses = [
+  {'value': '1', 'label': 'Enero'}, {'value': '2', 'label': 'Febrero'},
+  {'value': '3', 'label': 'Marzo'}, {'value': '4', 'label': 'Abril'},
+  {'value': '5', 'label': 'Mayo'}, {'value': '6', 'label': 'Junio'},
+  {'value': '7', 'label': 'Julio'}, {'value': '8', 'label': 'Agosto'},
+  {'value': '9', 'label': 'Septiembre'}, {'value': '10', 'label': 'Octubre'},
+  {'value': '11', 'label': 'Noviembre'}, {'value': '12', 'label': 'Diciembre'},
+];
+
 class _AdminHomeState extends State<AdminHome> {
   final _anticipoService = AnticipoService();
   late List<Anticipo> _anticipos;
   bool _loading = true;
-  String _filtroEstado = 'Todos';
-  String _filtroConductor = 'Todos';
+  String _filtroEstado = 'Estado';
+  String _filtroAnio = 'Año';
+  // Guarda el número de mes ('1'..'12') que espera el backend, no el label.
+  String _filtroMes = '';
+  List<String> _aniosDisponibles = [];
 
   @override
   void initState() {
     super.initState();
     _anticipos = [];
     _loadAnticipos();
+    _loadAniosDisponibles();
+    ThemeController().addListener(_onThemeChanged);
   }
 
+  void _onThemeChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    ThemeController().removeListener(_onThemeChanged);
+    super.dispose();
+  }
+
+  // Filtrado server-side (estado/año/mes) — mismo mecanismo que
+  // ListarAnticipoExcedente.jsx (web): cada cambio de filtro vuelve a pedirle
+  // al backend, en vez de filtrar solo entre los últimos 100 ya cargados.
+  // Nota: sigue sin paginación real — se trae un límite alto en cada consulta.
   Future<void> _loadAnticipos() async {
     setState(() => _loading = true);
-    final data = await _anticipoService.getAnticipos();
+    final result = await _anticipoService.getAnticipos(
+      limit: 100,
+      estado: _filtroEstado == 'Estado' ? null : _filtroEstado,
+      anio: _filtroAnio == 'Año' ? null : _filtroAnio,
+      mes: _filtroMes.isEmpty ? null : _filtroMes,
+    );
     if (mounted) {
       setState(() {
-        _anticipos = data;
+        _anticipos = result['data'] as List<Anticipo>;
         _loading = false;
       });
     }
   }
 
-  List<Anticipo> get _filtrados {
-    return _anticipos.where((a) {
-      final okEstado = _filtroEstado == 'Todos' || a.estado == _filtroEstado;
-      final okCond = _filtroConductor == 'Todos' ||
-          a.conductorNombre == _filtroConductor;
-      return okEstado && okCond;
-    }).toList();
+  Future<void> _loadAniosDisponibles() async {
+    final anios = await _anticipoService.getAniosDisponibles();
+    if (mounted) setState(() => _aniosDisponibles = anios);
   }
 
   double get _totalAnticipos =>
-      _anticipos.fold(0, (s, a) => s + a.anticipo);
+      _anticipos.fold(0, (s, a) => s + a.valorAnticipo);
   double get _totalGastado =>
-      _anticipos.fold(0, (s, a) => s + a.gastado);
-  double get _totalExcedentes =>
-      _anticipos.where((a) => a.excedente > 0).fold(0, (s, a) => s + a.excedente);
-  int get _pendientes =>
-      _anticipos.where((a) => a.estado == 'Pendiente').length;
+      _anticipos.fold(0, (s, a) => s + a.valorGastado);
+  double get _totalExcedentes => _anticipos
+      .where((a) => a.estado == EstadoAnticipo.excedentePendiente)
+      .fold(0, (s, a) => s + a.excedente);
+  int get _porConfirmar =>
+      _anticipos.where((a) => a.estado == EstadoAnticipo.excedentePendiente).length;
 
-  List<String> get _conductores {
-    final names = _anticipos.map((a) => a.conductorNombre).toSet().toList();
-    return ['Todos', ...names];
-  }
+  Future<void> _confirmarDevolucion(Anticipo a) async {
+    final confirmado = await confirmarDialog(
+      context,
+      titulo: 'Confirmar devolución',
+      mensaje: '¿El conductor devolvió el excedente? El anticipo pasará a Completado '
+          'y la fecha de entrega del excedente quedará registrada a la de hoy.',
+      textoConfirmar: 'Confirmar',
+    );
+    if (!confirmado || !mounted) return;
 
-  void _aprobar(Anticipo a) async {
-    final result = await _anticipoService.aprobarAnticipo(a.id);
-    
+    final result = await _anticipoService.entregarExcedente(a.id);
     if (!mounted) return;
-    
+
     if (result['success'] == true) {
       setState(() {
         final idx = _anticipos.indexWhere((x) => x.id == a.id);
-        if (idx != -1) {
-          _anticipos[idx] = Anticipo(
-            id: a.id, tipo: a.tipo,
-            conductorNombre: a.conductorNombre, conductorId: a.conductorId,
-            anticipo: a.anticipo, gastado: a.gastado,
-            estado: 'Pagado',
-            fechaEntrega: a.fechaEntrega, fechaLegalizacion: a.fechaLegalizacion,
-            fechaMaxima: a.fechaMaxima, soporte: a.soporte,
-          );
-        }
+        if (idx != -1) _anticipos[idx] = result['anticipo'] as Anticipo;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Anticipo ${a.id} aprobado'),
-            backgroundColor: AppColors.green));
-    }
-  }
-
-  void _rechazar(Anticipo a) async {
-    final result = await _anticipoService.rechazarAnticipo(a.id);
-    
-    if (!mounted) return;
-    
-    if (result['success'] == true) {
-      setState(() {
-        final idx = _anticipos.indexWhere((x) => x.id == a.id);
-        if (idx != -1) {
-          _anticipos[idx] = Anticipo(
-            id: a.id, tipo: a.tipo,
-            conductorNombre: a.conductorNombre, conductorId: a.conductorId,
-            anticipo: a.anticipo, gastado: a.gastado,
-            estado: 'Rechazado',
-            fechaEntrega: a.fechaEntrega, fechaLegalizacion: a.fechaLegalizacion,
-            fechaMaxima: a.fechaMaxima, soporte: a.soporte,
-          );
-        }
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Anticipo ${a.id} rechazado'),
-            backgroundColor: AppColors.red));
+      showAppSnackBar(context, 'Devolución confirmada');
+    } else {
+      showAppSnackBar(context, result['message'] ?? 'Error al confirmar la devolución', severity: 'error');
     }
   }
 
@@ -118,27 +120,45 @@ class _AdminHomeState extends State<AdminHome> {
       backgroundColor: AppColors.bgGray,
       body: Column(
         children: [
+          Container(
+            height: 4,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: AppColors.gradientNavbar,
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+            ),
+          ),
           GradientHeader(
-            title: 'Panel Administrador',
-            subtitle: 'Gestión completa de anticipos',
-            gradStart: AppColors.adminGradStart,
-            gradEnd: AppColors.adminGradEnd,
+            title: '${greeting()} ${widget.user.nombre}',
+            subtitleWidget: LiveDateTime(
+              style: TextStyle(color: AppColors.textSub, fontSize: 13),
+            ),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                GestureDetector(
+                // El toggle de claro/oscuro ya vive dentro de PersonalizarSheet
+                // (ícono de paleta) — igual que en driver_home.dart, sin ícono
+                // de luna suelto aparte.
+                AnimatedPaletteIcon(
+                  color: AppColors.textSub,
+                  size: 24,
+                  onTap: () => PersonalizarSheet.show(context),
+                ),
+                const SizedBox(width: 14),
+                TapArea(
                   onTap: _loadAnticipos,
-                  child: const Icon(Icons.refresh,
-                      color: Colors.white, size: 26),
+                  child: Icon(Icons.refresh_outlined,
+                      color: AppColors.textSub, size: 26),
                 ),
                 const SizedBox(width: 12),
-                GestureDetector(
+                TapArea(
                   onTap: () => Navigator.push(context,
                       MaterialPageRoute(
                           builder: (_) => AdminProfile(user: widget.user,
                               anticipos: _anticipos))),
-                  child: const Icon(Icons.person_outline_rounded,
-                      color: Colors.white, size: 26),
+                  child: UserAvatar(nombre: widget.user.nombreCompleto),
                 ),
               ],
             ),
@@ -175,15 +195,15 @@ class _AdminHomeState extends State<AdminHome> {
                                 iconBg: AppColors.greenBg,
                               ),
                               StatCard(
-                                label: 'Excedentes',
+                                label: 'Excedentes pendientes',
                                 value: formatCOP(_totalExcedentes),
                                 icon: Icons.access_time_rounded,
                                 iconColor: AppColors.orange,
                                 iconBg: AppColors.orangeBg,
                               ),
                               StatCard(
-                                label: 'Pendientes',
-                                value: '$_pendientes',
+                                label: 'Por confirmar',
+                                value: '$_porConfirmar',
                                 icon: Icons.filter_alt_outlined,
                                 iconColor: AppColors.orange,
                                 iconBg: AppColors.orangeBg,
@@ -195,11 +215,11 @@ class _AdminHomeState extends State<AdminHome> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Row(
+                                Row(
                                   children: [
                                     Icon(Icons.filter_alt_outlined,
                                         size: 18, color: AppColors.textSub),
-                                    SizedBox(width: 6),
+                                    const SizedBox(width: 6),
                                     Text('Filtros',
                                         style: TextStyle(
                                             color: AppColors.textMain,
@@ -208,70 +228,97 @@ class _AdminHomeState extends State<AdminHome> {
                                   ],
                                 ),
                                 const SizedBox(height: 14),
-                                Row(
+                                // Mismo componente y estilo (con "chulito" de
+                                // seleccionado) que el filtro de Estado del
+                                // conductor (driver_home.dart) — Año/Mes con el
+                                // mismo funcionamiento que ListarAnticipoExcedente.jsx
+                                // (web): elegir Año resetea Mes, y Mes queda
+                                // deshabilitado hasta que haya un Año elegido.
+                                Wrap(
+                                  spacing: 10,
+                                  runSpacing: 10,
                                   children: [
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          const Text('Estado',
-                                              style: TextStyle(
-                                                  color: AppColors.textSub,
-                                                  fontSize: 12)),
-                                          const SizedBox(height: 6),
-                                          _dropdownField(
-                                            value: _filtroEstado,
-                                            items: const ['Todos', 'Activo', 'Pendiente', 'Pagado', 'Rechazado'],
-                                            onChanged: (v) => setState(() => _filtroEstado = v!),
-                                          ),
-                                        ],
-                                      ),
+                                    FilterSelect(
+                                      label: 'Estado',
+                                      value: _filtroEstado,
+                                      items: ['Estado', ...EstadoAnticipo.todos],
+                                      alignLeft: true,
+                                      onChanged: (v) {
+                                        setState(() => _filtroEstado = v);
+                                        _loadAnticipos();
+                                      },
                                     ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          const Text('Conductor',
-                                              style: TextStyle(
-                                                  color: AppColors.textSub,
-                                                  fontSize: 12)),
-                                          const SizedBox(height: 6),
-                                          _dropdownField(
-                                            value: _filtroConductor,
-                                            items: _conductores,
-                                            onChanged: (v) => setState(() => _filtroConductor = v!),
-                                          ),
-                                        ],
-                                      ),
+                                    FilterSelect(
+                                      label: 'Año',
+                                      value: _filtroAnio,
+                                      items: ['Año', ..._aniosDisponibles],
+                                      alignLeft: true,
+                                      onChanged: (v) {
+                                        setState(() {
+                                          _filtroAnio = v;
+                                          _filtroMes = '';
+                                        });
+                                        _loadAnticipos();
+                                      },
                                     ),
+                                    Builder(builder: (_) {
+                                      final mesSentinel = _filtroAnio == 'Año' ? 'Mes' : 'Todos';
+                                      final mesValue = _filtroMes.isEmpty
+                                          ? mesSentinel
+                                          : _meses.firstWhere((m) => m['value'] == _filtroMes)['label']!;
+                                      return IgnorePointer(
+                                        ignoring: _filtroAnio == 'Año',
+                                        child: Opacity(
+                                          opacity: _filtroAnio == 'Año' ? 0.5 : 1,
+                                          child: FilterSelect(
+                                            label: mesSentinel,
+                                            value: mesValue,
+                                            items: [mesSentinel, ..._meses.map((m) => m['label']!)],
+                                            onChanged: (v) {
+                                              setState(() {
+                                                _filtroMes = v == mesSentinel
+                                                    ? ''
+                                                    : _meses.firstWhere((m) => m['label'] == v)['value']!;
+                                              });
+                                              _loadAnticipos();
+                                            },
+                                          ),
+                                        ),
+                                      );
+                                    }),
                                   ],
                                 ),
                               ],
                             ),
                           ),
-                          ..._filtrados.map((a) => AnticipoCard(
-                            anticipo: a,
-                            isAdmin: true,
-                            onVer: () => Navigator.push(context,
-                                MaterialPageRoute(
-                                    builder: (_) => AnticipoDetail(
-                                        anticipo: a, isAdmin: true))),
-                            onEditar: () async {
-                              final updated = await Navigator.push<Anticipo>(context,
-                                  MaterialPageRoute(
-                                      builder: (_) => AnticipoEdit(
-                                          anticipo: a, isAdmin: true)));
-                              if (updated != null) {
-                                setState(() {
-                                  final idx = _anticipos.indexWhere((x) => x.id == updated.id);
-                                  if (idx != -1) _anticipos[idx] = updated;
-                                });
-                              }
-                            },
-                            onAprobar: () => _aprobar(a),
-                            onRechazar: () => _rechazar(a),
-                          )),
+                          if (_anticipos.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 24),
+                              child: Text('Sin anticipos',
+                                  style: TextStyle(color: AppColors.textSub, fontSize: 14)),
+                            )
+                          else
+                            ..._anticipos.map((a) => AnticipoCard(
+                              anticipo: a,
+                              isAdmin: true,
+                              onVer: () async {
+                                final updated = await Navigator.push<Anticipo>(context,
+                                    MaterialPageRoute(
+                                        builder: (_) => AnticipoDetail(
+                                            anticipo: a, isAdmin: true)));
+                                if (updated != null) _reemplazar(updated);
+                              },
+                              onEditar: a.esEditable
+                                  ? () async {
+                                      final updated = await Navigator.push<Anticipo>(context,
+                                          MaterialPageRoute(
+                                              builder: (_) => AnticipoEdit(
+                                                  anticipo: a, isAdmin: true)));
+                                      if (updated != null) _reemplazar(updated);
+                                    }
+                                  : null,
+                              onConfirmarDevolucion: () => _confirmarDevolucion(a),
+                            )),
                           const SizedBox(height: 80),
                         ],
                       ),
@@ -284,8 +331,8 @@ class _AdminHomeState extends State<AdminHome> {
         onPressed: () async {
           final nuevo = await Navigator.push<Anticipo>(context,
               MaterialPageRoute(
-                  builder: (_) => AnticipoEdit(isAdmin: true)));
-          if (nuevo != null) setState(() => _anticipos.add(nuevo));
+                  builder: (_) => const AnticipoEdit(isAdmin: true)));
+          if (nuevo != null) setState(() => _anticipos.insert(0, nuevo));
         },
         backgroundColor: AppColors.adminPrimary,
         child: const Icon(Icons.add, color: Colors.white),
@@ -293,31 +340,10 @@ class _AdminHomeState extends State<AdminHome> {
     );
   }
 
-  Widget _dropdownField({
-    required String value,
-    required List<String> items,
-    required ValueChanged<String?> onChanged,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: AppColors.bgGray,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: DropdownButton<String>(
-        value: value,
-        isExpanded: true,
-        underline: const SizedBox(),
-        icon: const Icon(Icons.keyboard_arrow_down_rounded,
-            color: AppColors.textSub),
-        style: const TextStyle(
-            color: AppColors.textMain, fontSize: 14),
-        items: items
-            .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-            .toList(),
-        onChanged: onChanged,
-      ),
-    );
+  void _reemplazar(Anticipo updated) {
+    setState(() {
+      final idx = _anticipos.indexWhere((x) => x.id == updated.id);
+      if (idx != -1) _anticipos[idx] = updated;
+    });
   }
 }

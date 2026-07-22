@@ -1,221 +1,205 @@
 import 'package:dio/dio.dart';
+import 'package:file_picker/file_picker.dart';
 import 'api_client.dart';
 import '../models.dart';
 
 class AnticipoService {
   ApiClient get _api => ApiClient();
 
-  Future<List<Map<String, dynamic>>> getConductores() async {
-    try {
-      print('DEBUG getConductores - iniciando peticion');
-      final response = await _api.get('/api/conductores');
-      print('DEBUG getConductores - response status: ${response.statusCode}, data: ${response.data}');
-      
-      if (response.statusCode == 200) {
-        final List<dynamic> data = response.data['data'] ?? response.data;
-        print('DEBUG getConductores - lista conductores: $data');
-        return data.map((json) => {
-          'idConductor': json['idConductor']?.toString() ?? '',
-          'nombre': json['usuario']?['nombre'] ?? json['nombre'] ?? '',
-          'estado': json['estado'] ?? 'activo',
-        }).toList();
-      }
-      
-      return [];
-    } catch (e) {
-      print('DEBUG getConductores - error: $e');
-      return [];
-    }
-  }
-
+  // Solo rutas donde tendría sentido asignar un anticipo — el backend igual
+  // rechaza con 409 si la ruta elegida ya tiene un anticipo activo.
+  //
+  // Trae también el conductor de cada ruta (idConductor/conductorNombre) —
+  // igual que `rutasNormalizadas` en el frontend web (AnticipoExcedenteContext.jsx).
+  // El conductor de un anticipo nunca se elige aparte: sale siempre de la ruta
+  // elegida, para que nunca queden desincronizados (mismo criterio que aplica
+  // el backend en anticipoService.update()).
   Future<List<Map<String, dynamic>>> getRutas() async {
     try {
-      print('DEBUG getRutas - iniciando peticion');
-      final response = await _api.get('/api/rutas');
-      print('DEBUG getRutas - response status: ${response.statusCode}, data: ${response.data}');
-
+      final response = await _api.get('/api/rutas', queryParams: {'limit': 1000, 'habilitado': true});
       if (response.statusCode == 200) {
-        final List<dynamic> data = response.data['data'] ?? response.data;
-        print('DEBUG getRutas - lista rutas: $data');
-        return data.map((json) => {
-          'idRuta': json['idRuta']?.toString() ?? '',
-          'nombre': json['nombre'] ?? '',
-        }).toList();
+        final List<dynamic> data = response.data['data'] ?? [];
+        return data
+            .where((json) => json['estado'] != 'Cancelada' && json['estado'] != 'Completada')
+            .map((json) {
+              final conductorJson = json['conductor'] as Map<String, dynamic>?;
+              final usuarioJson = conductorJson?['usuario'] as Map<String, dynamic>?;
+              final conductorNombre = usuarioJson != null
+                  ? '${usuarioJson['nombre'] ?? ''} ${usuarioJson['apellido'] ?? ''}'.trim()
+                  : '';
+              return {
+                'idRuta': json['idRuta']?.toString() ?? '',
+                'nombre': json['nombreRuta'] ?? 'Ruta #${json['idRuta']}',
+                'idConductor': json['idConductor']?.toString() ?? '',
+                'conductorNombre': conductorNombre,
+              };
+            })
+            .toList();
       }
-
       return [];
     } catch (e) {
-      print('DEBUG getRutas - error: $e');
       return [];
     }
   }
 
-  Future<List<Anticipo>> getAnticipos({String? conductorId}) async {
+  // GET /api/anticipos — listado general, solo para el panel admin
+  // (exige el permiso 'listar_anticipo', que el rol conductor no tiene).
+  Future<Map<String, dynamic>> getAnticipos({
+    int page = 1,
+    int limit = 10,
+    String? estado,
+    String? idConductor,
+    String? anio,
+    String? mes,
+    String? q,
+  }) async {
     try {
-      String endpoint = '/api/anticipos';
-      if (conductorId != null && conductorId.isNotEmpty) {
-        endpoint = '/api/anticipos?idConductor=$conductorId';
-      }
-      
-      final response = await _api.get(endpoint);
-      
+      final response = await _api.get('/api/anticipos', queryParams: {
+        'page': page,
+        'limit': limit,
+        if (estado != null && estado.isNotEmpty) 'estado': estado,
+        if (idConductor != null && idConductor.isNotEmpty) 'idConductor': idConductor,
+        if (anio != null && anio.isNotEmpty) 'anio': anio,
+        if (mes != null && mes.isNotEmpty) 'mes': mes,
+        if (q != null && q.isNotEmpty) 'q': q,
+      });
       if (response.statusCode == 200) {
-        final List<dynamic> data = response.data['data'] ?? response.data;
-        return data.map((json) => _fromJson(json)).toList();
+        final List<dynamic> data = response.data['data'] ?? [];
+        return {
+          'data': data.map((json) => Anticipo.fromJson(json)).toList(),
+          'total': response.data['total'] ?? data.length,
+        };
       }
-      
+      return {'data': <Anticipo>[], 'total': 0};
+    } catch (e) {
+      return {'data': <Anticipo>[], 'total': 0};
+    }
+  }
+
+  // GET /api/anticipos/anios-disponibles — años (descendente) en que hay
+  // anticipos con fecha de entrega, para poblar el filtro "Año" — mismo
+  // endpoint que usa el filtro de años en ListarAnticipoExcedente.jsx (web).
+  Future<List<String>> getAniosDisponibles() async {
+    try {
+      final response = await _api.get('/api/anticipos/anios-disponibles');
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data['data'] ?? [];
+        return data.map((e) => e.toString()).toList();
+      }
       return [];
     } catch (e) {
       return [];
     }
   }
 
-  Future<Anticipo?> getAnticipoById(String id) async {
+  // GET /api/conductores/mis-anticipos — lo que debe usar el conductor
+  // autenticado para ver los suyos (el idConductor sale del token, no se manda).
+  Future<List<Anticipo>> getMisAnticipos() async {
+    try {
+      final response = await _api.get('/api/conductores/mis-anticipos');
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data['data'] ?? [];
+        return data.map((json) => Anticipo.fromJson(json)).toList();
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  Future<Anticipo?> getAnticipoById(int id) async {
     try {
       final response = await _api.get('/api/anticipos/$id');
-      
       if (response.statusCode == 200) {
-        return _fromJson(response.data['data'] ?? response.data);
+        return Anticipo.fromJson(response.data['data']);
       }
-      
       return null;
     } catch (e) {
       return null;
     }
   }
 
-  Future<Map<String, dynamic>> crearAnticipo(Map<String, dynamic> data) async {
+  // Solo admin — POST /api/anticipos exige idRuta e idConductor.
+  Future<Map<String, dynamic>> crearAnticipo({
+    required String idConductor,
+    required String idRuta,
+    required double valorAnticipo,
+    String? fechaEntrega,
+  }) async {
     try {
-      print('DEBUG crearAnticipo - data a enviar: $data');
-      final response = await _api.post('/api/anticipos', data: data);
-      print('DEBUG crearAnticipo - response status: ${response.statusCode}, data: ${response.data}');
-      
+      final response = await _api.post('/api/anticipos', data: {
+        'idConductor': int.tryParse(idConductor),
+        'idRuta': int.tryParse(idRuta),
+        'valorAnticipo': valorAnticipo,
+        if (fechaEntrega != null) 'fechaEntrega': fechaEntrega,
+      });
       if (response.statusCode == 200 || response.statusCode == 201) {
-        return {'success': true, 'data': response.data};
+        return {'success': true, 'anticipo': Anticipo.fromJson(response.data['data'])};
       }
-      
-      return {'success': false, 'message': 'Error al crear anticipo: ${response.data}'};
+      return {'success': false, 'message': 'Error al crear anticipo'};
     } catch (e) {
-      if (e is DioException && e.response != null) {
-        print('DEBUG crearAnticipo - error response status: ${e.response?.statusCode}');
-        print('DEBUG crearAnticipo - error response data: ${e.response?.data}');
-        print('DEBUG crearAnticipo - error request data: ${e.requestOptions.data}');
-        return {'success': false, 'message': 'Error: ${e.response?.data}'};
-      }
-      print('DEBUG crearAnticipo - error catch: $e');
-      return {'success': false, 'message': e.toString()};
+      return {'success': false, 'message': _mensajeError(e)};
     }
   }
 
-  Future<Map<String, dynamic>> actualizarAnticipo(String id, Map<String, dynamic> data) async {
+  // PUT /api/anticipos/:id — qué campos se aceptan depende del estado actual
+  // (ver anticipoService.update() en el backend):
+  //   Entregado        -> idRuta / valorAnticipo / fechaEntrega / soporte
+  //   En Legalización   -> solo valorGastado (obligatorio) / soporte
+  // El caller decide qué mandar; este método no filtra nada por su cuenta.
+  Future<Map<String, dynamic>> actualizarAnticipo(int id, Map<String, dynamic> data) async {
     try {
       final response = await _api.put('/api/anticipos/$id', data: data);
-      
       if (response.statusCode == 200) {
-        return {'success': true, 'data': response.data};
+        return {'success': true, 'anticipo': Anticipo.fromJson(response.data['data'])};
       }
-      
       return {'success': false, 'message': 'Error al actualizar anticipo'};
     } catch (e) {
-      return {'success': false, 'message': e.toString()};
+      return {'success': false, 'message': _mensajeError(e)};
     }
   }
 
-  Future<Map<String, dynamic>> liquidarAnticipo(String id, Map<String, dynamic> data) async {
+  // PATCH /api/anticipos/:id/entregar-excedente — solo admin, solo tiene
+  // efecto cuando estado == 'Excedente pendiente' (excedente > 0).
+  Future<Map<String, dynamic>> entregarExcedente(int id, {String? soporte}) async {
     try {
-      final response = await _api.post('/api/anticipos/liquidar/$id', data: data);
-      
-      if (response.statusCode == 200) {
-        return {'success': true, 'data': response.data};
-      }
-      
-      return {'success': false, 'message': 'Error al liquidar anticipo'};
-    } catch (e) {
-      return {'success': false, 'message': e.toString()};
-    }
-  }
-
-  Future<Map<String, dynamic>> aprobarAnticipo(String id) async {
-    try {
-      final response = await _api.put('/api/anticipos/$id', data: {
-        'estado': 'liquidado',
+      final response = await _api.patch('/api/anticipos/$id/entregar-excedente', data: {
+        if (soporte != null) 'soporte': soporte,
       });
-      
       if (response.statusCode == 200) {
-        return {'success': true, 'data': response.data};
+        return {'success': true, 'anticipo': Anticipo.fromJson(response.data['data'])};
       }
-      
-      return {'success': false, 'message': 'Error al approve anticipo'};
+      return {'success': false, 'message': 'Error al confirmar la devolución'};
     } catch (e) {
-      return {'success': false, 'message': e.toString()};
+      return {'success': false, 'message': _mensajeError(e)};
     }
   }
 
-  Future<Map<String, dynamic>> rechazarAnticipo(String id) async {
+  // POST /api/anticipos/:id/soporte — sube uno o varios comprobantes a
+  // Cloudinary; el backend los agrega al array `soporte` que ya tenía el
+  // anticipo (nunca los reemplaza). Paso aparte de crear/editar porque ese
+  // endpoint espera archivos multipart, no URLs de texto.
+  Future<Map<String, dynamic>> subirSoporte(int id, List<PlatformFile> files) async {
     try {
-      final response = await _api.put('/api/anticipos/$id', data: {
-        'estado': 'rechazado',
+      final formData = FormData.fromMap({
+        'soporte': await Future.wait(
+            files.map((f) => MultipartFile.fromFile(f.path!, filename: f.name))),
       });
-      
+      final response = await _api.post('/api/anticipos/$id/soporte', data: formData);
       if (response.statusCode == 200) {
-        return {'success': true, 'data': response.data};
+        final soporte = (response.data['data']?['soporte'] as List?)?.map((e) => e.toString()).toList();
+        return {'success': true, 'soporte': soporte ?? const <String>[]};
       }
-      
-      return {'success': false, 'message': 'Error al rechazar anticipo'};
+      return {'success': false, 'message': 'Error al subir el soporte'};
     } catch (e) {
-      return {'success': false, 'message': e.toString()};
+      return {'success': false, 'message': _mensajeError(e)};
     }
   }
 
-  Anticipo _fromJson(Map<String, dynamic> json) {
-    final conductorData = json['conductor'];
-    String conductorNombre = '';
-    String conductorId = '';
-    if (conductorData != null) {
-      final usuarioData = conductorData['usuario'];
-      conductorNombre = conductorData['nombre'] ?? conductorData['usuario']?['nombre'] ?? usuarioData?['nombre'] ?? '';
-      conductorId = conductorData['idConductor']?.toString() ?? conductorData['id']?.toString() ?? '';
+  String _mensajeError(dynamic e) {
+    if (e is DioException && e.response?.data is Map) {
+      return e.response?.data['message'] ?? 'Error de conexión';
     }
-    
-    return Anticipo(
-      id: json['idAnticipoExcedente']?.toString() ?? json['idAnticipo']?.toString() ?? json['id']?.toString() ?? '',
-      tipo: json['tipo'] ?? 'Anticipo',
-      conductorNombre: conductorNombre,
-      conductorId: conductorId,
-      anticipo: _parseDouble(json['valorAnticipo'] ?? json['anticipo'] ?? json['monto']),
-      gastado: _parseDouble(json['valorGastado'] ?? json['gastado'] ?? json['montoGastado']),
-      estado: _mapEstado(json['estado'] ?? ''),
-      fechaEntrega: _formatDate(json['fechaEntrega'] ?? json['fecha']),
-      fechaLegalizacion: _formatDate(json['fechaLegalizacion']),
-      fechaMaxima: _formatDate(json['fechaMaxima']),
-      soporte: json['soporte'] ?? json['documento'],
-    );
-  }
-  
-  String _mapEstado(String estado) {
-    switch (estado.toLowerCase()) {
-      case 'pendiente': return 'Pendiente';
-      case 'liquidado': return 'Pagado';
-      case 'con excedente': return 'Activo';
-      case 'excedente entregado': return 'Pagado';
-      default: return estado.isEmpty ? 'Pendiente' : estado;
-    }
-  }
-
-  double _parseDouble(dynamic value) {
-    if (value == null) return 0.0;
-    if (value is double) return value;
-    if (value is int) return value.toDouble();
-    if (value is String) return double.tryParse(value) ?? 0.0;
-    return 0.0;
-  }
-
-  String _formatDate(dynamic date) {
-    if (date == null) return '';
-    if (date is String) return date;
-    if (date is Map) {
-      return date['date'] ?? date.toString();
-    }
-    return date.toString();
+    return 'Error de conexión';
   }
 }
