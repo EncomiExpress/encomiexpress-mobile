@@ -1,123 +1,159 @@
-# EncomiExpress - App Flutter
+# EncomiExpress - App Móvil
 
-Aplicación móvil para gestión de anticipos de conductores.
+Aplicación móvil para la gestión de anticipos de conductores de OsvaldoC Mensajería y Logística S.A.S., empresa especializada en el transporte de encomiendas. Diseñada como una herramienta de acceso rápido para conductores y administradores, que permite consultar, gestionar y legalizar anticipos desde el dispositivo móvil, complementando el panel web encargado de la administración y validación de la información del sistema.
 
-## Requisitos Previos
+---
 
-- Flutter SDK 3.11.0+
-- Node.js 14+ (para el backend)
-- PostgreSQL 12+
+## Integrantes del Equipo
+
+- Valeria Paz Arana
+- Santiago Suárez Durán
+- Sebastián Valencia Pérez
+- Yeferson Andrés Moreno Granda
+
+---
+
+## Características Implementadas
+
+| Rol | Funcionalidades |
+|------|----------------|
+| **Conductor** | - Ver "Mis anticipos" con búsqueda y filtro por estado <br> - Legalizar anticipos: registrar el valor gastado y cargar los comprobantes (fotos/documentos) — el excedente se calcula automáticamente <br> - Consulta y edición de perfil propio (datos personales y foto) <br> - Recuperar contraseña |
+| **Administrador** | - Dashboard: anticipos totales, gastado, excedentes pendientes y por confirmar <br> - Listado de anticipos con filtros por Estado, Año y Mes <br> - Registrar anticipo (la ruta autocompleta el conductor, nunca se elige aparte) <br> - Editar anticipo (solo mientras sigue "Entregado") <br> - Confirmar devolución de excedente, con diálogo de confirmación previo <br> - Ver detalle de cualquier anticipo <br> - Perfil propio (solo lectura) |
+| **General** | - Inicio y cierre de sesión <br> - Recuperar contraseña <br> - Navegación basada en el rol devuelto por el backend <br> - Modo oscuro / modo claro <br> - Paleta de colores personalizable (rojo / azul), misma paleta que el panel web |
+
+---
+
+## Stack Tecnológico
+
+- Flutter + Dart
+- dio — Consumo de API REST (`^5.4.0`)
+- shared_preferences — Persistencia de datos de usuario y preferencia de tema (`^2.2.2`)
+- file_picker — Selección de archivos y fotos de perfil (`^6.1.1`)
+- url_launcher — Apertura de enlaces externos (`^6.3.2`)
+- Estado gestionado con `setState`/`StatefulWidget`, y `ChangeNotifier` para el tema (`ThemeController`)
+
+---
+
+## Arquitectura Limpia
+
+El proyecto está estructurado siguiendo principios de arquitectura limpia y separación de responsabilidades:
+
+```bash
+lib/
+├── main.dart                  # Punto de entrada — inicializa ApiClient y ThemeController
+├── config/
+│   └── api_config.dart        # baseUrl configurable por --dart-define
+├── core/                      # Servicios, modelos y componentes centrales
+│   ├── models.dart            # UserModel, Anticipo, AppColors
+│   ├── widgets.dart           # Componentes reutilizables (SectionCard, StatCard, FilterSelect, ...)
+│   ├── image_viewer.dart      # Visor de imágenes a pantalla completa (comprobantes)
+│   ├── theme/                 # Modo claro/oscuro + paleta rojo/azul
+│   └── services/               # ApiClient, AuthService, AnticipoService, ConductorService
+└── features/                  # Funcionalidades específicas por rol
+    ├── auth/screens/           # Login, recuperar contraseña
+    ├── admin/screens/          # Dashboard, listado, detalle, crear/editar anticipo, perfil
+    └── driver/screens/         # Mis anticipos, perfil, edición de perfil
+```
+
+### Principios de Arquitectura Implementados
+
+- **Separación de responsabilidades**: Cada capa tiene un propósito bien definido
+- **Inyección de dependencias**: Servicios como `ApiClient` y `ThemeController` se inicializan desde `main.dart`
+- **Modelos consistentes**: `UserModel` y `Anticipo` definidos en `core/models.dart`
+- **Navegación basada en roles**: Redirección automática según el rol que devuelve el backend en el login
+- **Pantallas compartidas**: el detalle y el formulario de anticipo son la misma pantalla para admin y conductor (ajustada por un flag), no una copia por rol
+
+---
+
+## Sistema de Navegación
+
+La aplicación utiliza un patrón de navegación basado en roles que determina la pantalla inicial después de la autenticación:
+
+1. **Pantalla de Login (`LoginScreen`)**
+   - Punto de entrada para todos los usuarios
+   - El rol se obtiene directo de la respuesta de `POST /api/auth/login`, no se adivina
+
+2. **Redirección basada en rol**
+   - `conductor` → `DriverHome`
+   - cualquier otro rol → `AdminHome`
+
+3. **Navegación interna**
+   - `AdminHome`: dashboard, listado y gestión de anticipos
+   - `DriverHome`: "Mis anticipos" del conductor autenticado
+   - Ambas pantallas incluyen cierre de sesión
+
+La navegación se implementa con `Navigator.pushReplacement` tras un login exitoso.
+
+---
+
+## Sistema de Tema
+
+- **`ThemeController`** (`core/theme/theme_controller.dart`) — `ChangeNotifier` singleton con `darkMode` y `paletteKey` (`'red'` | `'blue'`), persistidos en `shared_preferences`
+- **`theme_tokens.dart`** — cuatro paletas (rojo/azul × claro/oscuro), mismos valores hex que `shared/styles/theme.js` del panel web
+- **`AppColors`** (`core/models.dart`) — colores estáticos que `ThemeController` actualiza en cada cambio; los widgets los leen directo en cada build
+
+El selector vive en el bottom sheet "Personalizar" (ícono de paleta en el header).
+
+---
 
 ## Instalación
 
 ```bash
-# 1. Instalar dependencias Flutter
-cd EncomiExpress_Movil-Flutter
+# 1. Clonar el repositorio
+git clone https://github.com/EncomiExpress/encomiexpress-mobile.git
+cd encomiexpress-mobile
+
+# 2. Cambiar a la rama activa de desarrollo (main está desactualizada)
+git checkout apk-flutter
+
+# 3. Instalar dependencias
 flutter pub get
 
-# 2. Ejecutar la app
+# 4. Ejecutar la aplicación (por defecto apunta a http://localhost:3000)
 flutter run
 ```
 
-## Configuración del Backend
+Si el backend no corre en la misma máquina (emulador Android, dispositivo físico o producción), sobreescribe la URL en tiempo de compilación:
 
-El backend debe estar corriendo en `http://localhost:3000`
-
-### Cambios en la Base de Datos (PostgreSQL)
-
-**1. Permitir idRuta nulo en anticipoExcedente:**
-```sql
-ALTER TABLE "anticipoExcedente" ALTER COLUMN "idRuta" DROP NOT NULL;
-```
-
-**2. Permitir idRuta nulo en encomiendaVenta:**
-```sql
-ALTER TABLE "encomiendaVenta" ALTER COLUMN "idRuta" DROP NOT NULL;
-```
-
-**3. Crear usuario conductor (desde psql o pgAdmin):**
-
-```sql
--- Insertar usuario
-INSERT INTO usuario ("idRol", "tipoIdentificacion", "numeroIdentificacion", nombre, apellido, telefono, email, password, habilitado)
-VALUES (
-    3, 
-    'CC', 
-    '87654321', 
-    'Conductor', 
-    'Demo', 
-    '3001234567', 
-    'conductor@encomiexpress.com',
-    '$2a$10$XveXAx1WR0eRp27VE0OXE.r3l8Sa3Kud1gMuOTrm8QvDIxN8KSxaa', 
-    true
-);
-
--- Insertar conductor (referenciando al usuario)
-INSERT INTO conductor ("idUsuario", "categoriaLicencia", "numeroLicencia", "vencimientoLicencia", "estado", "habilitado")
-VALUES (
-    (SELECT "idUsuario" FROM usuario WHERE email = 'conductor@encomiexpress.com'),
-    'B1',
-    '87654321',
-    '2027-12-31',
-    'activo',
-    true
-);
-```
-
-**Nota:** La contraseña encriptada `'$2a$10$XveXAx1WR0eRp27VE0OXE.r3l8Sa3Kud1gMuOTrm8QvDIxN8KSxaa'` corresponde a `conductor123`
-
-Para generar una nueva contraseña:
 ```bash
-# En la terminal del backend
-node -e "const bcrypt = require('bcryptjs'); bcrypt.hash('tuPassword', 10).then(h => console.log(h))"
+# Emulador Android
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3000
+
+# Dispositivo físico (misma red local)
+flutter run --dart-define=API_BASE_URL=http://<IP-LAN-de-tu-máquina>:3000
+
+# Backend de producción
+flutter run --dart-define=API_BASE_URL=https://encomiexpress-backend.onrender.com
 ```
 
-## Credenciales de Prueba
-
-| Rol | Email | Contraseña |
-|-----|-------|-----------|
-| Administrador | admin@encomiexpress.com | admin123 |
-| Conductor | conductor@encomiexpress.com | conductor123 |
+---
 
 ## Rutas de la API
 
-- Backend: `http://localhost:3000`
 - Login: `POST /api/auth/login`
-- Anticipos: `GET/POST /api/anticipos`
+- Recuperar contraseña: `POST /api/auth/recuperar-password`, `POST /api/auth/cambiar-password`
+- Anticipos (admin): `GET/POST /api/anticipos`, `PUT /api/anticipos/:id`, `GET /api/anticipos/anios-disponibles`
+- Anticipos (conductor): `GET /api/conductores/mis-anticipos`
+- Confirmar devolución de excedente: `PATCH /api/anticipos/:id/entregar-excedente`
+- Soporte de anticipo: `POST /api/anticipos/:id/soporte`
+- Rutas (para el formulario de crear/editar anticipo): `GET /api/rutas`
+- Perfil del conductor: `GET/PUT /api/conductores/perfil`
 
-## Estructura del Proyecto
+---
 
-```
-lib/
-├── config/           # Configuración (API, etc.)
-├── models/          # Modelos de datos
-├── screens/        # Pantallas UI
-│   ├── admin/      # Vistas de administrador
-│   └── driver/     # Vistas de conductor
-├── services/       # Servicios API
-└── widgets/        # Componentes reutilizables
-```
+## Repositorios relacionados
 
-## Estado de Implementación
+| Repositorio | Descripción | Stack |
+|---|---|---|
+| [encomiexpress-backend](https://github.com/EncomiExpress/encomiexpress-backend) | API REST del sistema | Node.js · Express · PostgreSQL · Sequelize |
+| [encomiexpress-frontend](https://github.com/EncomiExpress/encomiexpress-frontend) | Panel web administrativo | React · Vite · Material UI |
 
-### Conductor ✅
-- Login
-- Ver anticicipos asignados
-- Actualizar anticipo (gasto, soporte, fecha legalización)
-- Cerrar sesión
+---
 
-### Administrador ✅
-- Login
-- Crear anticipo
-- Ver lista de anticipos
-- Aprobar/Rechazar anticipos
-- Editar anticipo
+## Licencia
 
-### Pendiente
-- Subir archivos al servidor (manual por ahora)
-- Ver imagen del soporte en la app
+Este proyecto está bajo la licencia MIT — ver el archivo [LICENSE](./LICENSE) para más detalles.
 
-## Notas
+---
 
-- El campo `soporte` guarda solo el nombre del archivo. Los archivos deben copiarse manualmente a la carpeta `uploads/` del backend.
-- Para ver el soporte: `http://localhost:3000/uploads/nombre_archivo`
+Desarrollado con apoyo de herramientas de inteligencia artificial Claude (Anthropic) y Kilo Code.
