@@ -1,7 +1,9 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/models.dart';
 import '../../../core/services/auth_service.dart';
+import '../../../core/widgets.dart';
 import '../../admin/screens/admin_home.dart';
 import '../../driver/screens/driver_home.dart';
 import 'recover_password_screen.dart';
@@ -14,17 +16,66 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
   final _passCtrl  = TextEditingController();
+  final _emailFocus = FocusNode();
+  final _passFocus  = FocusNode();
   final _authService = AuthService();
 
   bool _obscure  = true;
   bool _loading  = false;
   String? _error;
+  // Como en Login.jsx (frontend web): nada se valida hasta el primer submit.
+  // Después, cada error se limpia solo cuando el usuario vuelve a escribir
+  // en SU campo — no en cualquier campo del formulario.
+  String? _emailError;
+  String? _passwordError;
+
+  @override
+  void initState() {
+    super.initState();
+    _emailCtrl.addListener(() {
+      _clearError();
+      if (_emailError != null) setState(() => _emailError = null);
+    });
+    _passCtrl.addListener(() {
+      _clearError();
+      if (_passwordError != null) setState(() => _passwordError = null);
+    });
+    // El halo de foco (boxShadow) depende de qué campo tiene el foco —
+    // hay que reconstruir cuando eso cambia.
+    _emailFocus.addListener(() => setState(() {}));
+    _passFocus.addListener(() => setState(() {}));
+  }
+
+  void _clearError() {
+    if (_error != null) setState(() => _error = null);
+  }
+
+  String? _validateEmail(String v) {
+    if (v.trim().isEmpty) return 'El correo es obligatorio';
+    // Misma regex que validarFormulario() en Login.jsx (frontend web).
+    if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(v.trim())) {
+      return 'Ingresa un correo válido (ejemplo@dominio.com)';
+    }
+    return null;
+  }
+
+  String? _validatePassword(String v) {
+    if (v.isEmpty) return 'La contraseña es obligatoria';
+    return null;
+  }
 
   void _login() async {
-    if (!_formKey.currentState!.validate()) return;
+    final emailError = _validateEmail(_emailCtrl.text);
+    final passwordError = _validatePassword(_passCtrl.text);
+    if (emailError != null || passwordError != null) {
+      setState(() {
+        _emailError = emailError;
+        _passwordError = passwordError;
+      });
+      return;
+    }
     setState(() { _loading = true; _error = null; });
 
     final result = await _authService.login(
@@ -35,84 +86,38 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
 
     if (result['success'] == true) {
-      final responseData = result['data'];
-      
-      print('DEBUG - responseData: $responseData');
-      
-      String rol = '';
-      String nombre = '';
-      String email = '';
-      String id = '';
-      String telefono = '';
-      
-      if (responseData['data'] != null && responseData['data']['rol'] != null) {
-        rol = responseData['data']['rol'].toString();
-        print('DEBUG - rol encontrado en data.rol: $rol');
-      }
-      else if (responseData['data'] != null && responseData['data']['role'] != null) {
-        rol = responseData['data']['role'].toString();
-        print('DEBUG - rol encontrado en data.role: $rol');
-      }
-      else if (responseData['rol'] != null) {
-        rol = responseData['rol'].toString();
-        print('DEBUG - rol encontrado en responseData.rol: $rol');
-      }
-      else if (responseData['role'] != null) {
-        rol = responseData['role'].toString();
-        print('DEBUG - rol encontrado en responseData.role: $rol');
-      }
-      else {
-        final emailInput = _emailCtrl.text.trim().toLowerCase();
-        print('DEBUG - email para fallback: $emailInput');
-        if (emailInput.contains('admin')) {
-          rol = 'admin';
-          print('DEBUG - rol asignado por email: $rol');
-        }
-      }
-      
-      print('DEBUG - rol extraido: $rol');
-      
-      Map<String, dynamic>? usuario;
-      if (responseData['data']?['usuario'] != null) {
-        usuario = Map<String, dynamic>.from(responseData['data']['usuario']);
-      } else if (responseData['usuario'] != null) {
-        usuario = Map<String, dynamic>.from(responseData['usuario']);
-      }
-      
-      String? conductorId;
-      if (responseData['data']?['conductor'] != null) {
-        conductorId = responseData['data']['conductor']['idConductor']?.toString();
-      }
-      
-      if (usuario != null) {
-        nombre = usuario['nombre'] ?? usuario['name'] ?? '';
-        email = usuario['email'] ?? _emailCtrl.text.trim();
-        id = usuario['idUsuario']?.toString() ?? usuario['id']?.toString() ?? '';
-        telefono = usuario['telefono'] ?? '';
-      } else {
-        email = _emailCtrl.text.trim();
-      }
-      
-      final user = UserModel(
-        id: id,
-        nombre: nombre,
-        email: email,
-        telefono: telefono,
-        rol: rol,
-        conductorId: conductorId,
-      );
+      // Forma real de POST /api/auth/login (authService.login en el backend):
+      // { success, message, data: { token, refreshToken, usuario: {..., rol}, conductor } }
+      final payload = result['data']?['data'] as Map<String, dynamic>?;
+      final usuario = payload?['usuario'] as Map<String, dynamic>?;
+      final conductor = payload?['conductor'] as Map<String, dynamic>?;
 
-      print('DEBUG - Usuario creado - rol final: ${user.rol}');
+      if (usuario == null) {
+        setState(() {
+          _loading = false;
+          _error = 'Respuesta inesperada del servidor';
+        });
+        return;
+      }
+
+      final user = UserModel(
+        id: usuario['idUsuario']?.toString() ?? '',
+        nombre: usuario['nombre'] ?? '',
+        // El backend no devuelve el email en el login — se conserva el que se tipeó.
+        email: _emailCtrl.text.trim(),
+        telefono: usuario['telefono'] ?? '',
+        rol: usuario['rol'] ?? '',
+        conductorId: conductor?['idConductor']?.toString(),
+      );
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('user_data', user.toJson().toString());
 
       setState(() => _loading = false);
 
-      final rolLower = user.rol.toLowerCase();
-      Widget dest = rolLower == 'admin' || rolLower == 'administrador'
-          ? AdminHome(user: user)
-          : DriverHome(user: user);
+      final dest = user.rol.toLowerCase() == 'conductor'
+          ? DriverHome(user: user)
+          : AdminHome(user: user);
 
       Navigator.pushReplacement(context,
           MaterialPageRoute(builder: (_) => dest));
@@ -124,261 +129,316 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _fillDemo(String email) {
-    _emailCtrl.text = email;
-    if (email == 'admin@encomiexpress.com') {
-      _passCtrl.text = 'admin123';
-    } else if (email == 'conductor@encomiexpress.com') {
-      _passCtrl.text = 'conductor123';
-    }
-    setState(() {});
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.cardBg,
       body: Column(
         children: [
-          Expanded(
-            flex: 2,
-            child: Container(
-              width: double.infinity,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [AppColors.loginGradStart, AppColors.loginGradEnd],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-              ),
-              child: SafeArea(
-                bottom: false,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+          // Zona superior gris con los hexágonos — recortados dentro de su
+          // propia caja (Clip.hardEdge) para que no se cuelen en la zona
+          // blanca de abajo.
+          Container(
+            width: double.infinity,
+            height: 320,
+            color: AppColors.bgGray,
+            child: SafeArea(
+              bottom: false,
+              child: ClipRect(
+                child: Stack(
+                  clipBehavior: Clip.hardEdge,
                   children: [
-                    Container(
-                      width: 64,
-                      height: 64,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.25),
-                        shape: BoxShape.circle,
+                    Positioned(
+                      bottom: -40,
+                      left: -40,
+                      child: IgnorePointer(
+                        child: Opacity(
+                          opacity: 0.12,
+                          child: Transform.rotate(
+                            angle: -5 * pi / 180,
+                            child: HexagonCluster(
+                              size: 220,
+                              fillTop: const Color(0xFFE84040),
+                              fillLeft: AppColors.adminPrimary,
+                              fillRight: const Color(0xFF9B1010),
+                              stroke: AppColors.adminPrimary,
+                            ),
+                          ),
+                        ),
                       ),
-                      child: const Icon(Icons.login_rounded,
-                          color: Colors.white, size: 30),
                     ),
-                    const SizedBox(height: 16),
-                    const Text('Bienvenido',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 28,
-                            fontWeight: FontWeight.w800)),
-                    const SizedBox(height: 4),
-                    Text('Inicia sesión para continuar',
-                        style: TextStyle(
-                            color: Colors.white.withOpacity(0.8),
-                            fontSize: 14)),
+                    Positioned(
+                      top: -40,
+                      right: -40,
+                      child: IgnorePointer(
+                        child: Opacity(
+                          opacity: 0.09,
+                          child: Transform.rotate(
+                            angle: 8 * pi / 180,
+                            child: HexagonCluster(
+                              size: 240,
+                              fillTop: const Color(0xFF2A3F8F),
+                              fillLeft: AppColors.secondary,
+                              fillRight: const Color(0xFF0F1C45),
+                              stroke: AppColors.secondary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              width: 130,
+                              height: 80,
+                              child: Image.asset('assets/images/logo.png', fit: BoxFit.contain),
+                            ),
+                            const SizedBox(height: 12),
+                            Text('Bienvenido',
+                                style: TextStyle(
+                                    color: AppColors.textMain,
+                                    fontSize: 26,
+                                    fontWeight: FontWeight.w800,
+                                    fontFamily: 'Cambria')),
+                            const SizedBox(height: 4),
+                            Text('Ingresa tus credenciales para acceder',
+                                style: TextStyle(color: AppColors.textSub, fontSize: 13)),
+                          ],
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),
             ),
           ),
+          // Zona inferior blanca — se estira hasta el fondo de la pantalla
+          // sin importar cuánto contenido tenga (Expanded), igual que en
+          // la captura de referencia.
           Expanded(
-            flex: 3,
             child: Container(
               width: double.infinity,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(28),
-                  topRight: Radius.circular(28),
-                ),
-              ),
+              color: AppColors.cardBg,
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
-                child: Form(
-                  key: _formKey,
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+                child: Center(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Text('Correo electrónico',
-                          style: TextStyle(
-                              color: AppColors.textMain,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 8),
-                      _inputField(
-                        controller: _emailCtrl,
-                        hint: 'ejemplo@correo.com',
-                        keyboard: TextInputType.emailAddress,
-                        validator: (v) {
-                          if (v == null || v.trim().isEmpty) return 'Ingresa tu correo';
-                          if (!v.contains('@')) return 'Correo inválido';
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      const Text('Contraseña',
-                          style: TextStyle(
-                              color: AppColors.textMain,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 8),
-                      _inputField(
-                        controller: _passCtrl,
-                        hint: '••••••••',
-                        obscure: _obscure,
-                        suffix: IconButton(
-                          icon: Icon(
-                            _obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                            color: AppColors.textSub, size: 20),
-                          onPressed: () => setState(() => _obscure = !_obscure),
-                        ),
-                        validator: (v) {
-                          if (v == null || v.isEmpty) return 'Ingresa tu contraseña';
-                          if (v.length < 6) return 'Mínimo 6 caracteres';
-                          return null;
-                        },
-                      ),
-                      if (_error != null) ...[
-                        const SizedBox(height: 10),
-                        Text(_error!,
-                            style: const TextStyle(
-                                color: AppColors.red, fontSize: 13)),
-                      ],
-                      const SizedBox(height: 20),
-                      GestureDetector(
-                        onTap: _loading ? null : _login,
-                        child: Container(
-                          width: double.infinity,
-                          height: 52,
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [AppColors.driverPrimary, AppColors.adminPrimary],
-                              begin: Alignment.centerLeft,
-                              end: Alignment.centerRight,
-                            ),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: Center(
-                            child: _loading
-                                ? const CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5)
-                                : const Text('Ingresar',
-                                    style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w700)),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Center(
-                        child: TextButton(
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const RecoverPasswordScreen(),
+                    // Campos + botón, sin tarjeta/borde alrededor — directo
+                    // sobre el fondo de la página (solo limitado en ancho
+                    // para que no quede pegado de lado a lado en desktop).
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 420),
+                      child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              _field(
+                                controller: _emailCtrl,
+                                focusNode: _emailFocus,
+                                label: 'Correo electrónico *',
+                                hint: 'correo@ejemplo.com',
+                                icon: Icons.mail_outline_rounded,
+                                keyboard: TextInputType.emailAddress,
+                                errorText: _emailError,
                               ),
-                            );
-                          },
-                          child: const Text('¿Olvidaste tu contraseña?',
-                              style: TextStyle(
-                                  color: AppColors.blue,
-                                  fontWeight: FontWeight.w600)),
-                        ),
-                      ),
-                      const Divider(color: AppColors.border),
-                      const SizedBox(height: 10),
-                      Center(
-                        child: Text('Usuarios de prueba:',
-                            style: TextStyle(
-                                color: AppColors.textSub, fontSize: 12)),
-                      ),
-                      const SizedBox(height: 10),
-                      _demoTile('Admin:', 'admin@encomiexpress.com',
-                          () => _fillDemo('admin@encomiexpress.com')),
-                      const SizedBox(height: 6),
-                      _demoTile('Conductor:', 'conductor@encomiexpress.com',
-                          () => _fillDemo('conductor@encomiexpress.com')),
-                    ],
-                  ),
+                              const SizedBox(height: 16),
+                              _field(
+                                controller: _passCtrl,
+                                focusNode: _passFocus,
+                                label: 'Contraseña *',
+                                icon: Icons.lock_outline_rounded,
+                                obscure: _obscure,
+                                suffix: IconButton(
+                                  icon: Icon(
+                                      _obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                                      color: AppColors.textSub, size: 20),
+                                  onPressed: () => setState(() => _obscure = !_obscure),
+                                ),
+                                errorText: _passwordError,
+                              ),
+                              if (_error != null) ...[
+                                const SizedBox(height: 16),
+                                Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.redBg,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(_error!, style: TextStyle(color: AppColors.red, fontSize: 13)),
+                                ),
+                              ],
+                              const SizedBox(height: 12),
+                              Align(
+                                alignment: Alignment.centerRight,
+                                child: TextButton(
+                                  onPressed: () {
+                                    showDialog(
+                                      context: context,
+                                      builder: (_) => const RecoverPasswordScreen(),
+                                    );
+                                  },
+                                  style: TextButton.styleFrom(
+                                    padding: EdgeInsets.zero,
+                                    minimumSize: Size.zero,
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                  child: Text('¿Olvidaste tu contraseña?',
+                                      style: TextStyle(color: AppColors.adminPrimary, fontWeight: FontWeight.w600, fontSize: 13)),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              SizedBox(
+                                height: 50,
+                                child: ElevatedButton(
+                                  onPressed: _loading ? null : _login,
+                                  style: ButtonStyle(
+                                    shape: WidgetStateProperty.all(
+                                        RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                                    // Fondo más oscuro al pasar el mouse o al presionar —
+                                    // igual que '&:hover' en el botón de Login.jsx (frontend web).
+                                    backgroundColor: WidgetStateProperty.resolveWith((states) {
+                                      if (states.contains(WidgetState.disabled)) {
+                                        return AppColors.adminPrimary.withOpacity(0.6);
+                                      }
+                                      if (states.contains(WidgetState.hovered) || states.contains(WidgetState.pressed)) {
+                                        return AppColors.adminGradEnd;
+                                      }
+                                      return AppColors.adminPrimary;
+                                    }),
+                                    elevation: WidgetStateProperty.resolveWith((states) =>
+                                        states.contains(WidgetState.hovered) || states.contains(WidgetState.pressed) ? 6 : 3),
+                                    shadowColor: WidgetStateProperty.all(AppColors.adminPrimary.withOpacity(0.4)),
+                                    mouseCursor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.disabled)
+                                        ? SystemMouseCursors.basic
+                                        : SystemMouseCursors.click),
+                                  ),
+                                  child: _loading
+                                      ? const SizedBox(
+                                          height: 20, width: 20,
+                                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
+                                      : const Row(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Text('Iniciar Sesión',
+                                                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+                                            SizedBox(width: 8),
+                                            Icon(Icons.login_rounded, color: Colors.white, size: 20),
+                                          ],
+                                        ),
+                                ),
+                              ),
+                            ],
+                          ),
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
+        ),
         ],
       ),
     );
   }
 
-  Widget _inputField({
+  Widget _field({
     required TextEditingController controller,
-    required String hint,
+    required FocusNode focusNode,
+    required String label,
+    required IconData icon,
+    String? hint,
     TextInputType? keyboard,
     bool obscure = false,
     Widget? suffix,
-    String? Function(String?)? validator,
+    String? errorText,
   }) {
-    return TextFormField(
-      controller: controller,
-      obscureText: obscure,
-      keyboardType: keyboard,
-      validator: validator,
-      style: const TextStyle(color: AppColors.textMain, fontSize: 15),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(color: AppColors.textSub, fontSize: 14),
-        suffixIcon: suffix,
-        filled: true,
-        fillColor: AppColors.bgGray,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.border),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.blue, width: 1.5),
-        ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.red),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.red, width: 1.5),
-        ),
-        errorStyle: const TextStyle(color: AppColors.red, fontSize: 11),
-      ),
-    );
-  }
+    // formFieldStyles.js (frontend web): el borde se queda delgado (1px)
+    // en todos los estados — el foco se marca con un halo suave alrededor
+    // del campo (boxShadow), no con un borde más grueso.
+    final hasError = errorText != null;
+    final borderColor = hasError ? AppColors.red : AppColors.border;
+    final glowColor = hasError ? AppColors.redBg : AppColors.activeBg;
 
-  Widget _demoTile(String role, String email, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: AppColors.bgGray,
-          borderRadius: BorderRadius.circular(10),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // El halo (boxShadow) solo envuelve el cuadro del campo — el mensaje
+        // de error se pinta aparte más abajo, fuera de este Container, para
+        // que la sombra no se estire hasta el texto.
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: focusNode.hasFocus
+                ? [BoxShadow(color: glowColor, blurRadius: 0, spreadRadius: 3)]
+                : [],
+          ),
+          child: TextFormField(
+            controller: controller,
+            focusNode: focusNode,
+            obscureText: obscure,
+            keyboardType: keyboard,
+            style: TextStyle(color: AppColors.textMain, fontSize: 15),
+            // Sin esto, Flutter tiñe el cursor del color de error mientras el campo
+            // esté inválido (y del color primario cuando no) — en el web el cursor
+            // es simplemente el color de texto por defecto, no cambia con el estado.
+            cursorColor: AppColors.textMain,
+            decoration: InputDecoration(
+              labelText: label,
+              // Sin esto, Flutter superpone el label con el placeholder hasta que
+              // el campo tiene foco — a diferencia de MUI, que en el web muestra
+              // el label chico arriba desde el inicio en cuanto hay un placeholder.
+              floatingLabelBehavior: FloatingLabelBehavior.always,
+              // El boxShadow del halo se dibuja detrás de todo el campo — sin un
+              // fondo opaco acá, se transparenta por el interior en vez de verse
+              // solo alrededor del borde.
+              filled: true,
+              fillColor: AppColors.cardBg,
+              hintText: hint,
+              hintStyle: TextStyle(color: AppColors.textSub, fontSize: 14),
+              labelStyle: TextStyle(color: AppColors.textSub, fontSize: 13),
+              // Gris normalmente, rojo si hay error, del color primario solo
+              // cuando el campo tiene foco — igual que MUI (Mui-focused).
+              floatingLabelStyle: WidgetStateTextStyle.resolveWith((states) => TextStyle(
+                  color: hasError
+                      ? AppColors.red
+                      : (states.contains(WidgetState.focused) ? AppColors.adminPrimary : AppColors.textSub),
+                  fontSize: 13)),
+              prefixIcon: Icon(icon, color: hasError ? AppColors.red : AppColors.textSub, size: 20),
+              suffixIcon: suffix,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              // No se usa errorBorder/errorText de Flutter a propósito — esos
+              // agregan el texto de error DENTRO del mismo widget del campo,
+              // que es justo lo que hacía que el halo se estirara hasta el
+              // texto. El color de borde/label/ícono se controla a mano con
+              // `hasError` en vez de depender del estado de error de Flutter.
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: borderColor),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: borderColor),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: hasError ? AppColors.red : AppColors.adminPrimary),
+              ),
+            ),
+          ),
         ),
-        child: Row(
-          children: [
-            Text(role,
-                style: const TextStyle(
-                    color: AppColors.textMain,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13)),
-            const SizedBox(width: 6),
-            Text(email,
-                style: const TextStyle(
-                    color: AppColors.blue, fontSize: 13)),
-          ],
-        ),
-      ),
+        if (hasError)
+          Padding(
+            padding: const EdgeInsets.only(top: 6, left: 12),
+            child: Text(errorText, style: TextStyle(color: AppColors.red, fontSize: 11)),
+          ),
+      ],
     );
   }
 
@@ -386,6 +446,8 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _emailCtrl.dispose();
     _passCtrl.dispose();
+    _emailFocus.dispose();
+    _passFocus.dispose();
     super.dispose();
   }
 }

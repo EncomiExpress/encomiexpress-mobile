@@ -1,10 +1,21 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:file_picker/file_picker.dart';
 import '../../../../core/models.dart';
+import '../../../../core/services/auth_service.dart';
 import '../../../../core/services/conductor_service.dart';
 import '../../../../core/widgets.dart';
+
+// Mismas validaciones y flujo que ActualizarConductor.jsx/ActualizarUsuario.jsx
+// (frontend web), adaptado al alcance real de PUT /conductores/perfil: el
+// conductor solo puede autoeditar nombre/apellido/documento/teléfono/correo.
+// Tipo de identificación y licencia son datos de verificación que solo el
+// admin gestiona desde el módulo de Conductores — no aparecen aquí.
+const _steps = ['Datos personales', 'Contraseña', 'Confirmación'];
+
+final _soloLetras = RegExp(r'^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$');
+final _emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+final _passwordRegex = RegExp(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9\s]).{8,64}$');
+const _passwordHelp = '8-64 caracteres, con mayúsculas, minúsculas, números y un carácter especial';
 
 class DriverProfileEdit extends StatefulWidget {
   final UserModel user;
@@ -17,177 +28,254 @@ class DriverProfileEdit extends StatefulWidget {
 }
 
 class _DriverProfileEditState extends State<DriverProfileEdit> {
-  final _formKey = GlobalKey<FormState>();
   final _conductorService = ConductorService();
-  
-  late TextEditingController _nombreCtrl;
-  late TextEditingController _telefonoCtrl;
-  late TextEditingController _emailCtrl;
-  late TextEditingController _documentoCtrl;
-  late TextEditingController _direccionCtrl;
-  
-  String? _fechaNacimiento;
-  PlatformFile? _nuevaFoto;
-  bool _saving = false;
-  String? _errorMessage;
+  final _authService = AuthService();
+
+  late final TextEditingController _nombreCtrl;
+  late final TextEditingController _apellidoCtrl;
+  late final TextEditingController _documentoCtrl;
+  late final TextEditingController _telefonoCtrl;
+  late final TextEditingController _emailCtrl;
+  final _passwordActualCtrl = TextEditingController();
+  final _passwordNuevaCtrl = TextEditingController();
+  final _confirmarPasswordCtrl = TextEditingController();
+
+  final _nombreFocus = FocusNode();
+  final _apellidoFocus = FocusNode();
+  final _documentoFocus = FocusNode();
+  final _telefonoFocus = FocusNode();
+  final _emailFocus = FocusNode();
+  final _passwordActualFocus = FocusNode();
+  final _passwordNuevaFocus = FocusNode();
+  final _confirmarPasswordFocus = FocusNode();
+
+  late final Map<String, String> _original;
+
+  int _activeStep = 0;
+  Map<String, String> _errores = {};
+  String? _apiError;
+  bool _sinCambios = false;
+  bool _submitting = false;
+  bool _showPasswordActual = false;
+  bool _showPasswordNueva = false;
+  bool _showConfirmarPassword = false;
+
+  bool get _esDocAlfanumerico => const ['CE', 'PAS'].contains(widget.user.tipoDocumento);
 
   @override
   void initState() {
     super.initState();
     _nombreCtrl = TextEditingController(text: widget.user.nombre);
+    _apellidoCtrl = TextEditingController(text: widget.user.apellido ?? '');
+    _documentoCtrl = TextEditingController(text: widget.user.documento ?? '');
     _telefonoCtrl = TextEditingController(text: widget.user.telefono);
     _emailCtrl = TextEditingController(text: widget.user.email);
-    _documentoCtrl = TextEditingController(text: widget.user.documento ?? '');
-    _direccionCtrl = TextEditingController(text: widget.user.direccion ?? '');
-    _fechaNacimiento = widget.user.fechaNacimiento;
+
+    _original = {
+      'nombre': _nombreCtrl.text.trim(),
+      'apellido': _apellidoCtrl.text.trim(),
+      'documento': _documentoCtrl.text.trim(),
+      'telefono': _telefonoCtrl.text.trim(),
+      'email': _emailCtrl.text.trim(),
+    };
+
+    for (final c in [_nombreCtrl, _apellidoCtrl, _documentoCtrl, _telefonoCtrl, _emailCtrl,
+        _passwordActualCtrl, _passwordNuevaCtrl, _confirmarPasswordCtrl]) {
+      c.addListener(_onAnyChange);
+    }
+    for (final f in [_nombreFocus, _apellidoFocus, _documentoFocus, _telefonoFocus, _emailFocus,
+        _passwordActualFocus, _passwordNuevaFocus, _confirmarPasswordFocus]) {
+      f.addListener(() => setState(() {}));
+    }
+  }
+
+  void _onAnyChange() {
+    if (_apiError != null || _sinCambios) {
+      setState(() {
+        _apiError = null;
+        _sinCambios = false;
+      });
+    }
   }
 
   @override
   void dispose() {
     _nombreCtrl.dispose();
+    _apellidoCtrl.dispose();
+    _documentoCtrl.dispose();
     _telefonoCtrl.dispose();
     _emailCtrl.dispose();
-    _documentoCtrl.dispose();
-    _direccionCtrl.dispose();
+    _passwordActualCtrl.dispose();
+    _passwordNuevaCtrl.dispose();
+    _confirmarPasswordCtrl.dispose();
+    _nombreFocus.dispose();
+    _apellidoFocus.dispose();
+    _documentoFocus.dispose();
+    _telefonoFocus.dispose();
+    _emailFocus.dispose();
+    _passwordActualFocus.dispose();
+    _passwordNuevaFocus.dispose();
+    _confirmarPasswordFocus.dispose();
     super.dispose();
   }
 
-  String? _validateEmail(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'El correo es requerido';
-    }
-    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-    if (!emailRegex.hasMatch(value)) {
-      return 'Ingresa un correo válido';
-    }
-    return null;
-  }
+  String get _docHelper => _esDocAlfanumerico
+      ? 'Alfanumérico, hasta 12 caracteres'
+      : 'Solo dígitos, entre 3 y 10';
 
-  String? _validateRequired(String? value, String fieldName) {
-    if (value == null || value.trim().isEmpty) {
-      return '$fieldName es requerido';
-    }
-    return null;
-  }
+  Map<String, String> _validarPaso(int step) {
+    final e = <String, String>{};
 
-  String? _validateTelefono(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'El teléfono es requerido';
-    }
-    if (value.length < 10) {
-      return 'El teléfono debe tener al menos 10 dígitos';
-    }
-    return null;
-  }
-
-  Future<void> _pickImage() async {
-    showModalBottomSheet(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Wrap(
-          children: [
-            ListTile(
-              leading: const Icon(Icons.camera_alt),
-              title: const Text('Elegir de galería'),
-              onTap: () async {
-                Navigator.pop(ctx);
-                await _pickImageFromGallery();
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _pickImageFromGallery() async {
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.image,
-      );
-      if (result != null && result.files.isNotEmpty) {
-        setState(() {
-          _nuevaFoto = result.files.first;
-        });
+    if (step == 0) {
+      if (_nombreCtrl.text.trim().isEmpty) {
+        e['nombre'] = 'El nombre es obligatorio';
+      } else if (!_soloLetras.hasMatch(_nombreCtrl.text.trim())) {
+        e['nombre'] = 'El nombre solo puede contener letras';
       }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al seleccionar imagen: $e')),
-        );
+      if (_apellidoCtrl.text.trim().isEmpty) {
+        e['apellido'] = 'El apellido es obligatorio';
+      } else if (!_soloLetras.hasMatch(_apellidoCtrl.text.trim())) {
+        e['apellido'] = 'El apellido solo puede contener letras';
+      }
+      final doc = _documentoCtrl.text.trim();
+      if (doc.isEmpty) {
+        e['documento'] = 'El número de documento es obligatorio';
+      } else if (_esDocAlfanumerico) {
+        if (!RegExp(r'^[a-zA-Z0-9]+$').hasMatch(doc)) {
+          e['documento'] = 'Solo letras y números, sin caracteres especiales';
+        }
+      } else if (!RegExp(r'^\d+$').hasMatch(doc)) {
+        e['documento'] = 'Solo se permiten dígitos';
+      } else if (doc.length < 3 || doc.length > 10) {
+        e['documento'] = 'Debe tener entre 3 y 10 dígitos';
+      }
+      final tel = _telefonoCtrl.text.trim();
+      if (tel.isEmpty) {
+        e['telefono'] = 'El teléfono es obligatorio';
+      } else if (!RegExp(r'^\d{10}$').hasMatch(tel)) {
+        e['telefono'] = 'El teléfono debe tener 10 dígitos';
+      }
+      final email = _emailCtrl.text.trim();
+      if (email.isEmpty) {
+        e['email'] = 'El correo es obligatorio';
+      } else if (!_emailRegex.hasMatch(email)) {
+        e['email'] = 'Ingresa un correo válido';
       }
     }
-  }
 
-  Future<void> _selectFechaNacimiento() async {
-    final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _fechaNacimiento != null 
-          ? DateTime.tryParse(_fechaNacimiento!) ?? now.subtract(const Duration(days: 365 * 25))
-          : now.subtract(const Duration(days: 365 * 25)),
-      firstDate: DateTime(1950),
-      lastDate: now.subtract(const Duration(days: 365 * 18)),
-    );
-    if (picked != null) {
-      setState(() {
-        _fechaNacimiento = '${picked.day}/${picked.month}/${picked.year}';
-      });
+    if (step == 1) {
+      final actual = _passwordActualCtrl.text;
+      final nueva = _passwordNuevaCtrl.text;
+      final confirmar = _confirmarPasswordCtrl.text;
+      final algunaLlena = actual.isNotEmpty || nueva.isNotEmpty || confirmar.isNotEmpty;
+      if (algunaLlena) {
+        if (actual.isEmpty) e['passwordActual'] = 'Ingresa tu contraseña actual';
+        if (nueva.isEmpty) {
+          e['passwordNueva'] = 'La nueva contraseña es obligatoria';
+        } else if (!_passwordRegex.hasMatch(nueva)) {
+          e['passwordNueva'] = _passwordHelp;
+        }
+        if (confirmar.isEmpty) {
+          e['confirmarPassword'] = 'Confirma la nueva contraseña';
+        } else if (confirmar != nueva) {
+          e['confirmarPassword'] = 'Las contraseñas no coinciden';
+        }
+      }
     }
+
+    return e;
   }
 
-  Future<void> _guardar() async {
-    if (!_formKey.currentState!.validate()) return;
+  bool get _hayCambios {
+    final cambiosSimples = _nombreCtrl.text.trim() != _original['nombre'] ||
+        _apellidoCtrl.text.trim() != _original['apellido'] ||
+        _documentoCtrl.text.trim() != _original['documento'] ||
+        _telefonoCtrl.text.trim() != _original['telefono'] ||
+        _emailCtrl.text.trim() != _original['email'];
+    return cambiosSimples || _passwordNuevaCtrl.text.isNotEmpty;
+  }
+
+  int get _totalModificados {
+    var n = 0;
+    if (_nombreCtrl.text.trim() != _original['nombre']) n++;
+    if (_apellidoCtrl.text.trim() != _original['apellido']) n++;
+    if (_documentoCtrl.text.trim() != _original['documento']) n++;
+    if (_telefonoCtrl.text.trim() != _original['telefono']) n++;
+    if (_emailCtrl.text.trim() != _original['email']) n++;
+    if (_passwordNuevaCtrl.text.isNotEmpty) n++;
+    return n;
+  }
+
+  void _handleNext() {
+    final errores = _validarPaso(_activeStep);
+    if (errores.isNotEmpty) {
+      setState(() => _errores = errores);
+      return;
+    }
+    setState(() {
+      _errores = {};
+      _activeStep++;
+    });
+  }
+
+  void _handleBack() => setState(() => _activeStep--);
+
+  Future<void> _handleSubmit() async {
+    if (!_hayCambios) {
+      setState(() => _sinCambios = true);
+      return;
+    }
 
     setState(() {
-      _saving = true;
-      _errorMessage = null;
+      _submitting = true;
+      _apiError = null;
+      _sinCambios = false;
     });
-
-    String? fotoUrl;
-    if (_nuevaFoto != null) {
-      final fotoResult = await _conductorService.uploadFotoPerfil(_nuevaFoto!);
-      if (fotoResult['success'] == true) {
-        fotoUrl = fotoResult['data']?['url'] ?? fotoResult['data']?['fotoPerfil'];
-      }
-    }
 
     final result = await _conductorService.updatePerfil(
       nombre: _nombreCtrl.text.trim(),
+      apellido: _apellidoCtrl.text.trim(),
       telefono: _telefonoCtrl.text.trim(),
       email: _emailCtrl.text.trim(),
-      documento: _documentoCtrl.text.trim().isNotEmpty ? _documentoCtrl.text.trim() : null,
-      fechaNacimiento: _fechaNacimiento,
-      direccion: _direccionCtrl.text.trim().isNotEmpty ? _direccionCtrl.text.trim() : null,
-      fotoPerfil: fotoUrl,
+      documento: _documentoCtrl.text.trim(),
     );
 
-    setState(() => _saving = false);
-
-    if (result['success'] == true) {
-      final updatedUser = widget.user.copyWith(
-        nombre: _nombreCtrl.text.trim(),
-        email: _emailCtrl.text.trim(),
-        telefono: _telefonoCtrl.text.trim(),
-        documento: _documentoCtrl.text.trim().isNotEmpty ? _documentoCtrl.text.trim() : null,
-        fechaNacimiento: _fechaNacimiento,
-        direccion: _direccionCtrl.text.trim().isNotEmpty ? _direccionCtrl.text.trim() : null,
-        fotoPerfil: fotoUrl ?? widget.user.fotoPerfil,
-      );
-      widget.onSave(updatedUser);
-      if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Perfil actualizado correctamente'),
-            backgroundColor: AppColors.green,
-          ),
-        );
-      }
-    } else {
+    if (result['success'] != true) {
       setState(() {
-        _errorMessage = result['message'] ?? 'Error al guardar cambios';
+        _submitting = false;
+        _apiError = result['message'] ?? 'Error al actualizar el perfil';
       });
+      return;
+    }
+
+    if (_passwordNuevaCtrl.text.isNotEmpty) {
+      final passResult = await _authService.cambiarPassword(
+        _passwordActualCtrl.text,
+        _passwordNuevaCtrl.text,
+      );
+      if (passResult['success'] != true) {
+        setState(() {
+          _submitting = false;
+          _apiError = passResult['message'] ?? 'El perfil se actualizó, pero no se pudo cambiar la contraseña';
+        });
+        return;
+      }
+    }
+
+    setState(() => _submitting = false);
+
+    final updatedUser = widget.user.copyWith(
+      nombre: _nombreCtrl.text.trim(),
+      apellido: _apellidoCtrl.text.trim(),
+      telefono: _telefonoCtrl.text.trim(),
+      email: _emailCtrl.text.trim(),
+      documento: _documentoCtrl.text.trim(),
+    );
+    widget.onSave(updatedUser);
+
+    if (mounted) {
+      Navigator.pop(context);
+      showAppSnackBar(context, 'Perfil actualizado correctamente');
     }
   }
 
@@ -195,277 +283,507 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bgGray,
-      appBar: AppBar(
-        backgroundColor: AppColors.driverPrimary,
-        foregroundColor: Colors.white,
-        title: const Text('Editar perfil', style: TextStyle(fontWeight: FontWeight.w600)),
-        elevation: 0,
-      ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
+      body: SafeArea(
+        child: Column(
           children: [
-            _buildFotoPerfil(),
-            const SizedBox(height: 16),
-            _buildSection('Información personal', [
-              _buildTextField(
-                controller: _nombreCtrl,
-                label: 'Nombre completo',
-                icon: Icons.person_outline_rounded,
-                iconColor: AppColors.blue,
-                validator: (v) => _validateRequired(v, 'El nombre'),
-                textCapitalization: TextCapitalization.words,
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: AppColors.cardBg,
+                border: Border(bottom: BorderSide(color: AppColors.border)),
               ),
-              _buildTextField(
-                controller: _emailCtrl,
-                label: 'Correo electrónico',
-                icon: Icons.email_outlined,
-                iconColor: AppColors.green,
-                keyboardType: TextInputType.emailAddress,
-                validator: _validateEmail,
-              ),
-              _buildTextField(
-                controller: _telefonoCtrl,
-                label: 'Teléfono',
-                icon: Icons.phone_outlined,
-                iconColor: AppColors.purple,
-                keyboardType: TextInputType.phone,
-                validator: _validateTelefono,
-              ),
-              _buildTextField(
-                controller: _documentoCtrl,
-                label: 'Número de documento',
-                icon: Icons.badge_outlined,
-                iconColor: AppColors.orange,
-                keyboardType: TextInputType.number,
-              ),
-            ]),
-            if (_errorMessage != null) ...[
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.redBg,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.error_outline, color: AppColors.red, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(_errorMessage!,
-                          style: const TextStyle(color: AppColors.red, fontSize: 14)),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: _saving ? null : () => Navigator.pop(context),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      side: const BorderSide(color: AppColors.border),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                    ),
-                    child: const Text('Cancelar',
-                        style: TextStyle(color: AppColors.textSub)),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+              child: Row(
+                children: [
+                  TapArea(
+                    onTap: () => Navigator.pop(context),
+                    child: Icon(Icons.arrow_back, color: AppColors.textMain, size: 22),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: _saving ? null : _guardar,
+                  const SizedBox(width: 12),
+                  Text('Editar perfil',
+                      style: TextStyle(
+                          color: AppColors.textMain, fontSize: 18, fontWeight: FontWeight.w700)),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 20),
+              child: Container(
+                width: 76,
+                height: 76,
+                decoration: BoxDecoration(color: AppColors.activeBg, shape: BoxShape.circle),
+                alignment: Alignment.center,
+                child: Icon(Icons.manage_accounts_outlined, color: AppColors.driverPrimary, size: 40),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 18, 16, 6),
+              child: _buildStepper(),
+            ),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: _buildStepContent(),
+              ),
+            ),
+            Container(
+              decoration: BoxDecoration(
+                color: AppColors.cardBg,
+                border: Border(top: BorderSide(color: AppColors.border)),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                children: [
+                  if (_activeStep > 0)
+                    OutlinedButton.icon(
+                      onPressed: _submitting ? null : _handleBack,
+                      icon: const Icon(Icons.arrow_back, size: 16),
+                      label: const Text('Anterior'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.textMain,
+                        side: BorderSide(color: AppColors.border),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ).copyWith(
+                        mouseCursor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.disabled)
+                            ? SystemMouseCursors.basic
+                            : SystemMouseCursors.click),
+                      ),
+                    )
+                  else
+                    TextButton(
+                      onPressed: _submitting ? null : () => Navigator.pop(context),
+                      style: TextButton.styleFrom().copyWith(
+                        mouseCursor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.disabled)
+                            ? SystemMouseCursors.basic
+                            : SystemMouseCursors.click),
+                      ),
+                      child: Text('Cancelar', style: TextStyle(color: AppColors.textSub)),
+                    ),
+                  const Spacer(),
+                  ElevatedButton(
+                    onPressed: _submitting
+                        ? null
+                        : (_activeStep < _steps.length - 1 ? _handleNext : _handleSubmit),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.driverPrimary,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ).copyWith(
+                      mouseCursor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.disabled)
+                          ? SystemMouseCursors.basic
+                          : SystemMouseCursors.click),
                     ),
-                    child: _saving
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Text('Guardar cambios',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(_activeStep < _steps.length - 1
+                            ? 'Siguiente'
+                            : (_sinCambios ? 'Sin cambios' : 'Guardar cambios')),
+                        const SizedBox(width: 8),
+                        _submitting
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            : Icon(
+                                _activeStep < _steps.length - 1 ? Icons.arrow_forward : Icons.save_outlined,
+                                size: 16),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-            const SizedBox(height: 32),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildFotoPerfil() {
-    return Center(
-      child: Stack(
-        children: [
-          GestureDetector(
-            onTap: _pickImage,
-            child: Container(
-              width: 120,
-              height: 120,
+  Widget _buildStepper() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: List.generate(_steps.length * 2 - 1, (i) {
+        if (i.isOdd) {
+          final leftDone = (i - 1) ~/ 2 < _activeStep;
+          return Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 14),
+              child: Container(height: 2, color: leftDone ? AppColors.driverPrimary : AppColors.border),
+            ),
+          );
+        }
+        final stepIndex = i ~/ 2;
+        final isActive = stepIndex == _activeStep;
+        final isDone = stepIndex < _activeStep;
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 28,
+              height: 28,
               decoration: BoxDecoration(
-                color: AppColors.bgGray,
                 shape: BoxShape.circle,
-                border: Border.all(color: AppColors.border, width: 2),
-                image: _nuevaFoto != null
-                    ? DecorationImage(
-                        image: FileImage(File(_nuevaFoto!.path!)),
-                        fit: BoxFit.cover,
-                      )
-                    : widget.user.fotoPerfil != null
-                        ? DecorationImage(
-                            image: NetworkImage(widget.user.fotoPerfil!),
-                            fit: BoxFit.cover,
-                          )
-                        : null,
+                color: (isActive || isDone) ? AppColors.driverPrimary : Colors.transparent,
+                border: Border.all(
+                    color: (isActive || isDone) ? AppColors.driverPrimary : AppColors.border, width: 1.5),
               ),
-              child: _nuevaFoto == null && widget.user.fotoPerfil == null
-                  ? const Icon(Icons.person, size: 60, color: AppColors.textSub)
-                  : null,
+              alignment: Alignment.center,
+              child: isDone
+                  ? const Icon(Icons.check, color: Colors.white, size: 16)
+                  : Text('${stepIndex + 1}',
+                      style: TextStyle(
+                          color: isActive ? Colors.white : AppColors.textSub,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700)),
             ),
-          ),
-          Positioned(
-            bottom: 0,
-            right: 0,
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: const BoxDecoration(
-                color: AppColors.driverPrimary,
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+            const SizedBox(height: 6),
+            SizedBox(
+              width: 68,
+              child: Text(_steps[stepIndex],
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontSize: 10,
+                      color: isActive ? AppColors.textMain : AppColors.textSub,
+                      fontWeight: isActive ? FontWeight.w700 : FontWeight.w400)),
             ),
-          ),
-        ],
-      ),
+          ],
+        );
+      }),
     );
   }
 
-  Widget _buildSection(String title, List<Widget> children) {
-    return SectionCard(
-      child: Column(
+  Widget _buildStepContent() {
+    switch (_activeStep) {
+      case 0:
+        return _buildPasoDatosPersonales();
+      case 1:
+        return _buildPasoContrasena();
+      default:
+        return _buildPasoConfirmacion();
+    }
+  }
+
+  Widget _buildPasoDatosPersonales() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildField(
+          controller: _nombreCtrl,
+          focusNode: _nombreFocus,
+          label: 'Nombres',
+          icon: Icons.person_outline_rounded,
+          errorText: _errores['nombre'],
+          maxLength: 50,
+          inputFormatters: [FilteringTextInputFormatter.allow(_soloLetras)],
+          textCapitalization: TextCapitalization.words,
+        ),
+        const SizedBox(height: 14),
+        _buildField(
+          controller: _apellidoCtrl,
+          focusNode: _apellidoFocus,
+          label: 'Apellidos',
+          icon: Icons.person_outline_rounded,
+          errorText: _errores['apellido'],
+          maxLength: 50,
+          inputFormatters: [FilteringTextInputFormatter.allow(_soloLetras)],
+          textCapitalization: TextCapitalization.words,
+        ),
+        const SizedBox(height: 14),
+        _buildField(
+          controller: _documentoCtrl,
+          focusNode: _documentoFocus,
+          label: 'Número de documento',
+          icon: Icons.badge_outlined,
+          errorText: _errores['documento'],
+          helperText: _docHelper,
+          maxLength: _esDocAlfanumerico ? 12 : 10,
+          keyboardType:
+              _esDocAlfanumerico ? TextInputType.text : TextInputType.number,
+          inputFormatters: [
+            FilteringTextInputFormatter.allow(
+                _esDocAlfanumerico ? RegExp(r'[a-zA-Z0-9]') : RegExp(r'[0-9]')),
+          ],
+        ),
+        const SizedBox(height: 14),
+        _buildField(
+          controller: _telefonoCtrl,
+          focusNode: _telefonoFocus,
+          label: 'Teléfono',
+          icon: Icons.phone_outlined,
+          errorText: _errores['telefono'],
+          helperText: _errores['telefono'] == null ? 'Número de 10 dígitos' : null,
+          keyboardType: TextInputType.phone,
+          maxLength: 10,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+        ),
+        const SizedBox(height: 14),
+        _buildField(
+          controller: _emailCtrl,
+          focusNode: _emailFocus,
+          label: 'Correo electrónico',
+          icon: Icons.email_outlined,
+          errorText: _errores['email'],
+          keyboardType: TextInputType.emailAddress,
+          maxLength: 80,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPasoContrasena() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          decoration: BoxDecoration(
+            color: AppColors.activeBg,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.driverPrimary.withOpacity(0.3)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.info_outline, color: AppColors.driverPrimary, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text('Deja estos campos vacíos si no quieres cambiar tu contraseña.',
+                    style: TextStyle(color: AppColors.driverPrimary, fontSize: 12, fontWeight: FontWeight.w500)),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        _buildField(
+          controller: _passwordActualCtrl,
+          focusNode: _passwordActualFocus,
+          label: 'Contraseña actual',
+          icon: Icons.lock_outline_rounded,
+          errorText: _errores['passwordActual'],
+          obscureText: !_showPasswordActual,
+          maxLength: 64,
+          suffixIcon: TapArea(
+            onTap: () => setState(() => _showPasswordActual = !_showPasswordActual),
+            child: Icon(
+                _showPasswordActual ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                color: AppColors.textSub, size: 20),
+          ),
+        ),
+        const SizedBox(height: 14),
+        _buildField(
+          controller: _passwordNuevaCtrl,
+          focusNode: _passwordNuevaFocus,
+          label: 'Nueva contraseña',
+          icon: Icons.lock_outline_rounded,
+          errorText: _errores['passwordNueva'],
+          helperText: _errores['passwordNueva'] == null ? _passwordHelp : null,
+          obscureText: !_showPasswordNueva,
+          maxLength: 64,
+          suffixIcon: TapArea(
+            onTap: () => setState(() => _showPasswordNueva = !_showPasswordNueva),
+            child: Icon(
+                _showPasswordNueva ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                color: AppColors.textSub, size: 20),
+          ),
+        ),
+        const SizedBox(height: 14),
+        _buildField(
+          controller: _confirmarPasswordCtrl,
+          focusNode: _confirmarPasswordFocus,
+          label: 'Confirmar nueva contraseña',
+          icon: Icons.lock_outline_rounded,
+          errorText: _errores['confirmarPassword'],
+          obscureText: !_showConfirmarPassword,
+          maxLength: 64,
+          suffixIcon: TapArea(
+            onTap: () => setState(() => _showConfirmarPassword = !_showConfirmarPassword),
+            child: Icon(
+                _showConfirmarPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                color: AppColors.textSub, size: 20),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPasoConfirmacion() {
+    final totalModificados = _totalModificados;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (totalModificados > 0)
+          _buildAlert(
+            icon: Icons.edit_outlined,
+            color: AppColors.blue,
+            bg: AppColors.blueBg,
+            text: 'Se ${totalModificados == 1 ? 'modificó' : 'modificaron'} $totalModificados '
+                '${totalModificados == 1 ? 'campo' : 'campos'}: revísalo${totalModificados == 1 ? '' : 's'} antes de guardar.',
+          ),
+        if (_sinCambios)
+          _buildAlert(
+            icon: Icons.warning_amber_outlined,
+            color: AppColors.orange,
+            bg: AppColors.orangeBg,
+            text: 'No has realizado ningún cambio. Los datos ya están actualizados.',
+          ),
+        if (_apiError != null)
+          _buildAlert(
+            icon: Icons.error_outline,
+            color: AppColors.red,
+            bg: AppColors.redBg,
+            text: _apiError!,
+          ),
+        SectionCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.person_outline_rounded, size: 18, color: AppColors.textMain),
+                  const SizedBox(width: 6),
+                  Text('Datos personales',
+                      style: TextStyle(color: AppColors.textMain, fontSize: 14, fontWeight: FontWeight.w700)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ConfirmRow(label: 'Nombres', value: _nombreCtrl.text.trim(), previousValue: _original['nombre']),
+              const Divider(height: 1),
+              ConfirmRow(label: 'Apellidos', value: _apellidoCtrl.text.trim(), previousValue: _original['apellido']),
+              const Divider(height: 1),
+              ConfirmRow(
+                  label: 'N° de documento', value: _documentoCtrl.text.trim(), previousValue: _original['documento']),
+            ],
+          ),
+        ),
+        SectionCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.email_outlined, size: 18, color: AppColors.textMain),
+                  const SizedBox(width: 6),
+                  Text('Contacto',
+                      style: TextStyle(color: AppColors.textMain, fontSize: 14, fontWeight: FontWeight.w700)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ConfirmRow(label: 'Teléfono', value: _telefonoCtrl.text.trim(), previousValue: _original['telefono']),
+              const Divider(height: 1),
+              ConfirmRow(label: 'Correo', value: _emailCtrl.text.trim(), previousValue: _original['email']),
+              const Divider(height: 1),
+              ConfirmRow(
+                label: 'Contraseña',
+                value: _passwordNuevaCtrl.text.isNotEmpty ? '••••••••' : 'Sin cambiar',
+                previousValue: 'Sin cambiar',
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAlert({
+    required IconData icon,
+    required Color color,
+    required Color bg,
+    required String text,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title,
-              style: const TextStyle(
-                  color: AppColors.textMain,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700)),
-          const SizedBox(height: 16),
-          ...children,
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 8),
+          Expanded(child: Text(text, style: TextStyle(color: color, fontSize: 13))),
         ],
       ),
     );
   }
 
-  Widget _buildTextField({
+  // Mismo patrón que los campos del login: borde delgado siempre + halo
+  // (boxShadow) al enfocar, en vez del borde grueso por defecto de Flutter.
+  // El texto de error va FUERA del contenedor con sombra para que el halo no
+  // se extienda hasta el texto.
+  Widget _buildField({
     required TextEditingController controller,
+    required FocusNode focusNode,
     required String label,
     required IconData icon,
-    required Color iconColor,
-    String? Function(String?)? validator,
+    String? errorText,
+    String? helperText,
     TextInputType? keyboardType,
-    TextCapitalization textCapitalization = TextCapitalization.none,
     List<TextInputFormatter>? inputFormatters,
+    int? maxLength,
+    bool obscureText = false,
+    Widget? suffixIcon,
+    TextCapitalization textCapitalization = TextCapitalization.none,
   }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: TextFormField(
-        controller: controller,
-        validator: validator,
-        keyboardType: keyboardType,
-        textCapitalization: textCapitalization,
-        inputFormatters: inputFormatters,
-        decoration: InputDecoration(
-          labelText: label,
-          prefixIcon: Container(
-            margin: const EdgeInsets.all(8),
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: iconColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: iconColor, size: 20),
-          ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppColors.border),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppColors.border),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppColors.driverPrimary, width: 2),
-          ),
-          errorBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppColors.red),
-          ),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        ),
-      ),
-    );
-  }
+    final hasError = errorText != null;
+    final hasFocus = focusNode.hasFocus;
+    final borderColor = hasError ? AppColors.red : (hasFocus ? AppColors.driverPrimary : AppColors.border);
+    final radius = BorderRadius.circular(12);
 
-  Widget _buildDateField({
-    required String label,
-    required String? value,
-    required IconData icon,
-    required Color iconColor,
-    required VoidCallback onTap,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: GestureDetector(
-        onTap: onTap,
-        child: InputDecorator(
-          decoration: InputDecoration(
-            labelText: label,
-            prefixIcon: Container(
-              margin: const EdgeInsets.all(8),
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: iconColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(icon, color: iconColor, size: 20),
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.border),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.border),
-            ),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          decoration: BoxDecoration(
+            borderRadius: radius,
+            boxShadow: hasFocus
+                ? [BoxShadow(color: hasError ? AppColors.redBg : AppColors.activeBg, blurRadius: 0, spreadRadius: 3)]
+                : [],
           ),
-          child: Text(
-            value ?? 'Seleccionar fecha',
-            style: TextStyle(
-              color: value != null ? AppColors.textMain : AppColors.textSub,
-              fontSize: 16,
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.cardBg,
+              borderRadius: radius,
+              border: Border.all(color: borderColor),
+            ),
+            child: TextField(
+              controller: controller,
+              focusNode: focusNode,
+              keyboardType: keyboardType,
+              inputFormatters: inputFormatters,
+              maxLength: maxLength,
+              obscureText: obscureText,
+              textCapitalization: textCapitalization,
+              style: TextStyle(color: AppColors.textMain, fontSize: 14),
+              decoration: InputDecoration(
+                labelText: label,
+                floatingLabelBehavior: FloatingLabelBehavior.auto,
+                counterText: '',
+                prefixIcon: Icon(icon, color: hasError ? AppColors.red : AppColors.textSub, size: 20),
+                suffixIcon: suffixIcon,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                focusedErrorBorder: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              ),
             ),
           ),
         ),
-      ),
+        if (errorText != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4, left: 4),
+            child: Text(errorText, style: TextStyle(color: AppColors.red, fontSize: 11)),
+          )
+        else if (helperText != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4, left: 4),
+            child: Text(helperText, style: TextStyle(color: AppColors.textSub, fontSize: 11)),
+          ),
+      ],
     );
   }
 }

@@ -6,13 +6,11 @@ import 'driver_profile_edit.dart';
 
 class DriverProfile extends StatefulWidget {
   final UserModel user;
-  final List<Anticipo> anticipos;
   final Function(UserModel)? onUserUpdated;
 
   const DriverProfile({
-    super.key, 
-    required this.user, 
-    required this.anticipos,
+    super.key,
+    required this.user,
     this.onUserUpdated,
   });
 
@@ -38,60 +36,97 @@ class _DriverProfileState extends State<DriverProfile> {
 
   @override
   Widget build(BuildContext context) {
-    final legalizados = widget.anticipos.where((a) => a.estado == 'Pagado').length;
-    final pendientes  = widget.anticipos.where((a) => a.estado == 'Pendiente').length;
-    final enProceso   = widget.anticipos.where((a) => a.estado == 'Activo').length;
-
-    return SingleChildScrollView(
+    return Scaffold(
+      backgroundColor: AppColors.bgGray,
+      body: SingleChildScrollView(
       child: Column(
         children: [
           Container(
             width: double.infinity,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [AppColors.driverGradStart, AppColors.driverGradEnd],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-              ),
+            decoration: BoxDecoration(
+              color: AppColors.cardBg,
+              border: Border(bottom: BorderSide(color: AppColors.border)),
             ),
             padding: EdgeInsets.fromLTRB(
-                20, MediaQuery.of(context).padding.top + 12, 20, 28),
+                20, MediaQuery.of(context).padding.top + 12, 20, 20),
             child: Column(
               children: [
-                const Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text('Mi perfil',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700)),
+                Row(
+                  children: [
+                    TapArea(
+                      onTap: () => Navigator.pop(context),
+                      child: Icon(Icons.arrow_back, color: AppColors.textMain, size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    Text('Mi perfil',
+                        style: TextStyle(
+                            color: AppColors.textMain,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700)),
+                  ],
                 ),
                 const SizedBox(height: 20),
-                Container(
-                  width: 72, height: 72,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                          color: Colors.black.withOpacity(0.15),
-                          blurRadius: 12)
-                    ],
-                  ),
-                  child: const Icon(Icons.person_outline_rounded,
-                      color: AppColors.driverPrimary, size: 34),
+                Row(
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                              color: Colors.black.withOpacity(0.15),
+                              blurRadius: 12)
+                        ],
+                      ),
+                      child: UserAvatar(nombre: _localUser.nombreCompleto, size: 64),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(_localUser.nombreCompleto,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                  color: AppColors.textMain,
+                                  fontSize: 19,
+                                  fontWeight: FontWeight.w800)),
+                          const SizedBox(height: 4),
+                          Text('Conductor',
+                              style: TextStyle(
+                                  color: AppColors.textSub,
+                                  fontSize: 13)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    TapArea(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => DriverProfileEdit(
+                              user: _localUser,
+                              onSave: (updatedUser) {
+                                _onUserUpdated(updatedUser);
+                              },
+                            ),
+                          ),
+                        );
+                      },
+                      child: Tooltip(
+                        message: 'Editar datos y contraseña',
+                        child: Container(
+                          padding: const EdgeInsets.all(9),
+                          decoration: BoxDecoration(
+                            color: AppColors.activeBg,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(Icons.edit_outlined, color: AppColors.driverPrimary, size: 18),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                Text(_localUser.nombre,
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800)),
-                const SizedBox(height: 4),
-                Text('Conductor',
-                    style: TextStyle(
-                        color: Colors.white.withOpacity(0.8),
-                        fontSize: 13)),
               ],
             ),
           ),
@@ -105,7 +140,7 @@ class _DriverProfileState extends State<DriverProfile> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Información personal',
+                      Text('Información personal',
                           style: TextStyle(
                               color: AppColors.textMain,
                               fontSize: 16,
@@ -116,7 +151,24 @@ class _DriverProfileState extends State<DriverProfile> {
                         iconColor: AppColors.blue,
                         iconBg: AppColors.blueBg,
                         label: 'Nombre completo',
-                        value: _localUser.nombre,
+                        value: _localUser.nombreCompleto,
+                      ),
+                      if (_localUser.documento != null && _localUser.documento!.isNotEmpty)
+                        InfoRow(
+                          icon: Icons.badge_outlined,
+                          iconColor: AppColors.orange,
+                          iconBg: AppColors.orangeBg,
+                          label: 'Identificación',
+                          value: _localUser.tipoDocumento != null && _localUser.tipoDocumento!.isNotEmpty
+                              ? '${_localUser.tipoDocumento} ${_localUser.documento}'
+                              : _localUser.documento!,
+                        ),
+                      InfoRow(
+                        icon: Icons.phone_outlined,
+                        iconColor: AppColors.purple,
+                        iconBg: AppColors.purpleBg,
+                        label: 'Teléfono',
+                        value: _localUser.telefono.isNotEmpty ? _localUser.telefono : 'No registrado',
                       ),
                       InfoRow(
                         icon: Icons.email_outlined,
@@ -125,159 +177,104 @@ class _DriverProfileState extends State<DriverProfile> {
                         label: 'Correo electrónico',
                         value: _localUser.email,
                       ),
-                      InfoRow(
-                        icon: Icons.phone_outlined,
-                        iconColor: AppColors.purple,
-                        iconBg: AppColors.purpleBg,
-                        label: 'Teléfono',
-                        value: _localUser.telefono.isNotEmpty ? _localUser.telefono : 'No registrado',
-                      ),
-                      if (_localUser.documento != null && _localUser.documento!.isNotEmpty)
-                        InfoRow(
-                          icon: Icons.badge_outlined,
-                          iconColor: AppColors.orange,
-                          iconBg: AppColors.orangeBg,
-                          label: 'Número de identificación',
-                          value: _localUser.documento!,
+                      if (_localUser.numeroLicencia != null && _localUser.numeroLicencia!.isNotEmpty)
+                        Opacity(
+                          opacity: 0.7,
+                          child: Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: AppColors.bgGray,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                    color: AppColors.blueBg, borderRadius: BorderRadius.circular(10)),
+                                child: Icon(Icons.card_membership_outlined, color: AppColors.blue, size: 18),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Text('Licencia',
+                                            style: TextStyle(color: AppColors.textSub, fontSize: 11)),
+                                        const SizedBox(width: 6),
+                                        Icon(Icons.lock_outline_rounded, size: 11, color: AppColors.textSub),
+                                        const SizedBox(width: 2),
+                                        Text('No editable',
+                                            style: TextStyle(
+                                                color: AppColors.textSub,
+                                                fontSize: 10,
+                                                fontStyle: FontStyle.italic)),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 4),
+                                    if (_localUser.categoriasLicencia.isEmpty)
+                                      Text('—',
+                                          style: TextStyle(
+                                              color: AppColors.textMain,
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w500))
+                                    else
+                                      Wrap(
+                                        spacing: 6,
+                                        runSpacing: 6,
+                                        children: _localUser.categoriasLicencia
+                                            .map((cat) => LicenciaChip(categoria: cat))
+                                            .toList(),
+                                      ),
+                                    const SizedBox(height: 4),
+                                    Text(_localUser.numeroLicencia!,
+                                        style: TextStyle(color: AppColors.textSub, fontSize: 11)),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          ),
                         ),
                     ],
                   ),
                 ),
-                if (_localUser.placa != null || _localUser.marcaVehiculo != null)
-                  SectionCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Información del vehículo',
-                            style: TextStyle(
-                                color: AppColors.textMain,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700)),
-                        const SizedBox(height: 14),
-                        if (_localUser.placa != null && _localUser.placa!.isNotEmpty)
-                          InfoRow(
-                            icon: Icons.directions_car_outlined,
-                            iconColor: AppColors.blue,
-                            iconBg: AppColors.blueBg,
-                            label: 'Placa',
-                            value: _localUser.placa!,
-                          ),
-                        if (_localUser.marcaVehiculo != null && _localUser.marcaVehiculo!.isNotEmpty)
-                          InfoRow(
-                            icon: Icons.factory_outlined,
-                            iconColor: AppColors.green,
-                            iconBg: AppColors.greenBg,
-                            label: 'Marca',
-                            value: _localUser.marcaVehiculo!,
-                          ),
-                        if (_localUser.modeloVehiculo != null && _localUser.modeloVehiculo!.isNotEmpty)
-                          InfoRow(
-                            icon: Icons.time_to_leave_outlined,
-                            iconColor: AppColors.purple,
-                            iconBg: AppColors.purpleBg,
-                            label: 'Modelo',
-                            value: _localUser.modeloVehiculo!,
-                          ),
-                        if (_localUser.anioVehiculo != null && _localUser.anioVehiculo!.isNotEmpty)
-                          InfoRow(
-                            icon: Icons.calendar_today_outlined,
-                            iconColor: AppColors.orange,
-                            iconBg: AppColors.orangeBg,
-                            label: 'Año',
-                            value: _localUser.anioVehiculo!,
-                          ),
-                        if (_localUser.colorVehiculo != null && _localUser.colorVehiculo!.isNotEmpty)
-                          InfoRow(
-                            icon: Icons.palette_outlined,
-                            iconColor: AppColors.blue,
-                            iconBg: AppColors.blueBg,
-                            label: 'Color',
-                            value: _localUser.colorVehiculo!,
-                          ),
-                      ],
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(builder: (_) => const LoginScreen()),
+                      (r) => false,
                     ),
-                  ),
-                SectionCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Mis estadísticas',
-                          style: TextStyle(
-                              color: AppColors.textMain,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700)),
-                      const SizedBox(height: 14),
-                      GridView.count(
-                        crossAxisCount: 2,
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        crossAxisSpacing: 10,
-                        mainAxisSpacing: 10,
-                        childAspectRatio: 1.8,
-                        children: [
-                          _miniStat('${widget.anticipos.length}', 'Anticipos totales',
-                              AppColors.blue, AppColors.blueBg),
-                          _miniStat('$legalizados', 'Legalizados',
-                              AppColors.green, AppColors.greenBg),
-                          _miniStat('$pendientes', 'Pendientes',
-                              AppColors.orange, AppColors.orangeBg),
-                          _miniStat('$enProceso', 'En proceso',
-                              AppColors.purple, AppColors.purpleBg),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                SectionCard(
-                  padding: EdgeInsets.zero,
-                  child: ListTile(
-                    leading: const Icon(Icons.edit_outlined,
-                        color: AppColors.driverPrimary),
-                    title: const Text('Editar perfil',
-                        style: TextStyle(
-                            color: AppColors.textMain,
-                            fontWeight: FontWeight.w500)),
-                    trailing: const Icon(Icons.chevron_right,
-                        color: AppColors.textSub),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => DriverProfileEdit(
-                            user: _localUser,
-                            onSave: (updatedUser) {
-                              _onUserUpdated(updatedUser);
-                            },
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () => Navigator.pushAndRemoveUntil(
-                    context,
-                    MaterialPageRoute(builder: (_) => const LoginScreen()),
-                    (r) => false,
-                  ),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFF1F2),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                          color: AppColors.red.withOpacity(0.3)),
+                    style: ButtonStyle(
+                      shape: WidgetStateProperty.all(
+                          RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
+                      backgroundColor: WidgetStateProperty.resolveWith((states) {
+                        if (states.contains(WidgetState.hovered) || states.contains(WidgetState.pressed)) {
+                          return AppColors.driverGradEnd;
+                        }
+                        return AppColors.driverPrimary;
+                      }),
+                      elevation: WidgetStateProperty.resolveWith((states) =>
+                          states.contains(WidgetState.hovered) || states.contains(WidgetState.pressed) ? 6 : 3),
+                      shadowColor: WidgetStateProperty.all(AppColors.driverPrimary.withOpacity(0.4)),
+                      mouseCursor: WidgetStateProperty.all(SystemMouseCursors.click),
                     ),
                     child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.logout_rounded,
-                            color: AppColors.red, size: 18),
+                        Icon(Icons.logout_rounded, color: Colors.white, size: 18),
                         SizedBox(width: 8),
                         Text('Cerrar sesión',
                             style: TextStyle(
-                                color: AppColors.red,
+                                color: Colors.white,
                                 fontWeight: FontWeight.w700,
                                 fontSize: 15)),
                       ],
@@ -290,25 +287,6 @@ class _DriverProfileState extends State<DriverProfile> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _miniStat(String value, String label, Color color, Color bg) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration:
-          BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(value,
-              style: TextStyle(
-                  color: color, fontSize: 22, fontWeight: FontWeight.w800)),
-          Text(label,
-              style: const TextStyle(
-                  color: AppColors.textSub, fontSize: 11)),
-        ],
       ),
     );
   }

@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_client.dart';
 
@@ -45,7 +46,7 @@ class AuthService {
 
   Future<Map<String, dynamic>> recoverPassword(String email) async {
     try {
-      final response = await _api.post('/api/auth/recover-password', data: {
+      final response = await _api.post('/api/auth/recuperar-password', data: {
         'email': email,
       });
 
@@ -55,6 +56,27 @@ class AuthService {
       
       return {'success': false, 'message': 'Error al procesar la solicitud'};
     } catch (e) {
+      return _handleError(e);
+    }
+  }
+
+  Future<Map<String, dynamic>> cambiarPassword(String passwordActual, String passwordNueva) async {
+    try {
+      final response = await _api.post('/api/auth/cambiar-password', data: {
+        'passwordActual': passwordActual,
+        'passwordNueva': passwordNueva,
+      });
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return {'success': true};
+      }
+
+      return {'success': false, 'message': 'Error al cambiar la contraseña'};
+    } catch (e) {
+      if (e is DioException && e.response?.data is Map) {
+        final msg = (e.response!.data as Map)['message'];
+        if (msg is String) return {'success': false, 'message': msg};
+      }
       return _handleError(e);
     }
   }

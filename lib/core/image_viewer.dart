@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'models.dart';
+import 'widgets.dart';
 
 class ImageViewer extends StatefulWidget {
   final List<String> imageUrls;
@@ -113,8 +114,9 @@ class _ImagePage extends StatefulWidget {
 }
 
 class _ImagePageState extends State<_ImagePage> {
-  bool _loading = true;
-  bool _error = false;
+  // Sube en cada "Reintentar" para forzar un Key nuevo — así Image.network
+  // vuelve a intentar la descarga en vez de quedarse con el error cacheado.
+  int _intento = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -122,19 +124,16 @@ class _ImagePageState extends State<_ImagePage> {
       minScale: 0.5,
       maxScale: 4.0,
       child: Center(
-        child: _loading
-            ? const CircularProgressIndicator(color: Colors.white)
-            : _error
-                ? _buildError()
-                : Image.network(
-                    widget.url,
-                    fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => _buildError(),
-                    loadingBuilder: (context, child, progress) {
-                      if (progress == null) return child;
-                      return const CircularProgressIndicator(color: Colors.white);
-                    },
-                  ),
+        child: Image.network(
+          widget.url,
+          key: ValueKey(_intento),
+          fit: BoxFit.contain,
+          errorBuilder: (_, __, ___) => _buildError(),
+          loadingBuilder: (context, child, progress) {
+            if (progress == null) return child;
+            return const CircularProgressIndicator(color: Colors.white);
+          },
+        ),
       ),
     );
   }
@@ -149,10 +148,7 @@ class _ImagePageState extends State<_ImagePage> {
             style: TextStyle(color: Colors.white70, fontSize: 14)),
         const SizedBox(height: 16),
         TextButton(
-          onPressed: () => setState(() {
-            _error = false;
-            _loading = true;
-          }),
+          onPressed: () => setState(() => _intento++),
           child: const Text('Reintentar', style: TextStyle(color: Colors.white)),
         ),
       ],
@@ -174,7 +170,7 @@ class ImageThumbnail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return TapArea(
       onTap: onTap ?? () => ImageViewer.show(context, [imageUrl]),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(8),
@@ -187,7 +183,7 @@ class ImageThumbnail extends StatelessWidget {
             width: size,
             height: size,
             color: AppColors.bgGray,
-            child: const Icon(Icons.image_not_supported, color: AppColors.textSub),
+            child: Icon(Icons.image_not_supported, color: AppColors.textSub),
           ),
         ),
       ),
@@ -227,7 +223,7 @@ class ImageGallery extends StatelessWidget {
           },
         )),
         if (remaining > 0)
-          GestureDetector(
+          TapArea(
             onTap: () => ImageViewer.show(context, imageUrls),
             child: Container(
               width: thumbnailSize,
@@ -239,7 +235,7 @@ class ImageGallery extends StatelessWidget {
               ),
               child: Center(
                 child: Text('+$remaining',
-                    style: const TextStyle(
+                    style: TextStyle(
                         color: AppColors.textSub,
                         fontWeight: FontWeight.w600)),
               ),

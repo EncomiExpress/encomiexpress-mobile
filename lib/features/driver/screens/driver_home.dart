@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/models.dart';
 import '../../../../core/services/anticipo_service.dart';
 import '../../../../core/services/conductor_service.dart';
+import '../../../../core/theme/theme_controller.dart';
 import '../../../../core/widgets.dart';
 import '../../admin/screens/anticipo_detail.dart';
 import '../../admin/screens/anticipo_edit.dart';
@@ -18,12 +19,10 @@ class DriverHome extends StatefulWidget {
 class _DriverHomeState extends State<DriverHome> {
   final _anticipoService = AnticipoService();
   final _conductorService = ConductorService();
-  int _tab = 0;
   late List<Anticipo> _anticipos;
   bool _loading = true;
   final _searchCtrl = TextEditingController();
-  bool _showFiltros = false;
-  String _filtroEstado = 'Todos';
+  String _filtroEstado = 'Estado';
   late UserModel _currentUser;
 
   @override
@@ -34,6 +33,18 @@ class _DriverHomeState extends State<DriverHome> {
     _loadPerfil();
     _loadAnticipos();
     _searchCtrl.addListener(() => setState(() {}));
+    ThemeController().addListener(_onThemeChanged);
+  }
+
+  void _onThemeChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    ThemeController().removeListener(_onThemeChanged);
+    _searchCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _loadPerfil() async {
@@ -51,10 +62,12 @@ class _DriverHomeState extends State<DriverHome> {
     });
   }
 
+  // GET /api/conductores/mis-anticipos — el idConductor sale del token, no
+  // hay que mandarlo. El listado genérico /api/anticipos exige un permiso
+  // que el rol conductor no tiene.
   Future<void> _loadAnticipos() async {
     setState(() => _loading = true);
-    final conductorId = widget.user.conductorId;
-    final data = await _anticipoService.getAnticipos(conductorId: conductorId);
+    final data = await _anticipoService.getMisAnticipos();
     if (mounted) {
       setState(() {
         _anticipos = data;
@@ -65,32 +78,32 @@ class _DriverHomeState extends State<DriverHome> {
 
   List<Anticipo> get _filtrados {
     return _anticipos.where((a) {
-      final query = _searchCtrl.text.toLowerCase();
+      final query = _searchCtrl.text.trim().toLowerCase();
       final matchSearch = query.isEmpty ||
-          a.tipo.toLowerCase().contains(query);
-      final matchEstado = _filtroEstado == 'Todos' ||
-          a.estado == _filtroEstado;
+          (a.nombreRuta ?? '').toLowerCase().contains(query) ||
+          a.id.toString().contains(query);
+      final matchEstado = _filtroEstado == 'Estado' || a.estado == _filtroEstado;
       return matchSearch && matchEstado;
     }).toList();
+  }
+
+  void _abrirPerfil() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DriverProfile(
+          user: _currentUser,
+          onUserUpdated: _onUserUpdated,
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bgGray,
-      body: IndexedStack(
-        index: _tab,
-        children: [
-          _buildMisAnticipos(),
-          DriverProfile(
-            user: _currentUser, 
-            anticipos: _anticipos,
-            onUserUpdated: _onUserUpdated,
-          ),
-          _buildSolicitar(),
-        ],
-      ),
-      bottomNavigationBar: _buildBottomNav(),
+      body: _buildMisAnticipos(),
     );
   }
 
@@ -98,127 +111,83 @@ class _DriverHomeState extends State<DriverHome> {
     return Column(
       children: [
         Container(
-          width: double.infinity,
-          decoration: const BoxDecoration(
+          height: 4,
+          decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [AppColors.driverGradStart, AppColors.driverGradEnd],
+              colors: AppColors.gradientNavbar,
               begin: Alignment.centerLeft,
               end: Alignment.centerRight,
             ),
+          ),
+        ),
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: AppColors.cardBg,
+            border: Border(bottom: BorderSide(color: AppColors.border)),
           ),
           padding: EdgeInsets.fromLTRB(
               20, MediaQuery.of(context).padding.top + 16, 20, 20),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Mis anticipos',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.w800)),
-                  Text('Gestiona tus anticipos y excedentes',
-                      style: TextStyle(
-                          color: Colors.white.withOpacity(0.8), fontSize: 13)),
-                ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('${greeting()} ${_currentUser.nombre}',
+                        style: TextStyle(
+                            color: AppColors.textMain,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            fontFamily: 'Cambria')),
+                    LiveDateTime(
+                        style: TextStyle(color: AppColors.textSub, fontSize: 13)),
+                  ],
+                ),
               ),
-              GestureDetector(
-                onTap: _loading ? null : _loadAnticipos,
-                child: const Icon(Icons.refresh,
-                    color: Colors.white, size: 26),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TapArea(
+                    onTap: _loading ? null : _loadAnticipos,
+                    child: Icon(Icons.refresh_outlined,
+                        color: AppColors.textSub, size: 24),
+                  ),
+                  const SizedBox(width: 14),
+                  AnimatedPaletteIcon(
+                    color: AppColors.textSub,
+                    size: 22,
+                    onTap: () => PersonalizarSheet.show(context),
+                  ),
+                  const SizedBox(width: 14),
+                  TapArea(
+                    onTap: _abrirPerfil,
+                    child: UserAvatar(nombre: _currentUser.nombreCompleto),
+                  ),
+                ],
               ),
             ],
           ),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-          child: Column(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: TextField(
+              Expanded(
+                child: SearchField(
                   controller: _searchCtrl,
-                  style: const TextStyle(
-                      color: AppColors.textMain, fontSize: 14),
-                  decoration: const InputDecoration(
-                    hintText: 'Buscar por tipo de anticipo...',
-                    hintStyle:
-                        TextStyle(color: AppColors.textSub, fontSize: 14),
-                    prefixIcon: Icon(Icons.search_rounded,
-                        color: AppColors.textSub, size: 20),
-                    border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(vertical: 12),
-                  ),
+                  hint: 'Buscar por ruta...',
                 ),
               ),
-              const SizedBox(height: 10),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: GestureDetector(
-                  onTap: () =>
-                      setState(() => _showFiltros = !_showFiltros),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.filter_alt_outlined,
-                            size: 16, color: AppColors.textSub),
-                        SizedBox(width: 6),
-                        Text('Filtros',
-                            style: TextStyle(
-                                color: AppColors.textMain, fontSize: 13)),
-                      ],
-                    ),
-                  ),
-                ),
+              const SizedBox(width: 10),
+              FilterSelect(
+                label: 'Estado',
+                value: _filtroEstado,
+                items: ['Estado', ...EstadoAnticipo.todos],
+                onChanged: (v) => setState(() => _filtroEstado = v),
               ),
-              if (_showFiltros) ...[
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Row(
-                    children: [
-                      const Text('Estado:',
-                          style: TextStyle(
-                              color: AppColors.textMain,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600)),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: DropdownButton<String>(
-                          value: _filtroEstado,
-                          isExpanded: true,
-                          underline: const SizedBox(),
-                          items: ['Todos', 'Activo', 'Pendiente', 'Pagado']
-                              .map((e) => DropdownMenuItem(
-                                  value: e, child: Text(e)))
-                              .toList(),
-                          onChanged: (v) =>
-                              setState(() => _filtroEstado = v!),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
             ],
           ),
         ),
@@ -234,34 +203,33 @@ class _DriverHomeState extends State<DriverHome> {
                   : RefreshIndicator(
                       onRefresh: _loadAnticipos,
                       child: ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 80),
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
                         itemCount: _filtrados.length,
-                        itemBuilder: (_, i) => AnticipoCard(
-                          anticipo: _filtrados[i],
-                          isAdmin: false,
-                          onVer: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => AnticipoDetail(
-                                      anticipo: _filtrados[i],
-                                      isAdmin: false))),
-                          onEditar: () async {
-                            final updated =
-                                await Navigator.push<Anticipo>(
-                                    context,
-                                    MaterialPageRoute(
-                                        builder: (_) => AnticipoEdit(
-                                            anticipo: _filtrados[i],
-                                            isAdmin: false)));
-                            if (updated != null) {
-                              setState(() {
-                                final idx = _anticipos
-                                    .indexWhere((x) => x.id == updated.id);
-                                if (idx != -1) _anticipos[idx] = updated;
-                              });
-                            }
-                          },
-                        ),
+                        itemBuilder: (_, i) {
+                          final a = _filtrados[i];
+                          return AnticipoCard(
+                            anticipo: a,
+                            isAdmin: false,
+                            onVer: () async {
+                              final updated = await Navigator.push<Anticipo>(
+                                  context,
+                                  MaterialPageRoute(
+                                      builder: (_) => AnticipoDetail(anticipo: a, isAdmin: false)));
+                              if (updated != null) _reemplazar(updated);
+                            },
+                            // El conductor solo legaliza — solo tiene sentido
+                            // editar mientras el anticipo está "En Legalización".
+                            onEditar: a.estado == EstadoAnticipo.enLegalizacion
+                                ? () async {
+                                    final updated = await Navigator.push<Anticipo>(
+                                        context,
+                                        MaterialPageRoute(
+                                            builder: (_) => AnticipoEdit(anticipo: a, isAdmin: false)));
+                                    if (updated != null) _reemplazar(updated);
+                                  }
+                                : null,
+                          );
+                        },
                       ),
                     ),
         ),
@@ -269,163 +237,12 @@ class _DriverHomeState extends State<DriverHome> {
     );
   }
 
-  Widget _buildSolicitar() {
-    return Column(
-      children: [
-        Container(
-          width: double.infinity,
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [AppColors.driverGradStart, AppColors.driverGradEnd],
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-            ),
-          ),
-          padding: EdgeInsets.fromLTRB(
-              20, MediaQuery.of(context).padding.top + 16, 20, 20),
-          child: const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Solicitar anticipo',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800)),
-              Text('Crea una nueva solicitud',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 13)),
-            ],
-          ),
-        ),
-        Expanded(
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    width: 80, height: 80,
-                    decoration: BoxDecoration(
-                        color: AppColors.blueBg,
-                        borderRadius: BorderRadius.circular(20)),
-                    child: const Icon(Icons.add_circle_outline_rounded,
-                        color: AppColors.driverPrimary, size: 40),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text('Nueva solicitud',
-                      style: TextStyle(
-                          color: AppColors.textMain,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 8),
-                  const Text(
-                      'Registra un nuevo anticipo para tus gastos de ruta.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                          color: AppColors.textSub, fontSize: 14)),
-                  const SizedBox(height: 24),
-                  GestureDetector(
-                    onTap: () async {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                            content: Text('Solo el administrador puede crear anticipos'),
-                            backgroundColor: AppColors.orange),
-                      );
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 32, vertical: 14),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [
-                            AppColors.driverGradStart,
-                            AppColors.driverGradEnd
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: const Text('Crear solicitud',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                              fontSize: 15)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
+  void _reemplazar(Anticipo updated) {
+    setState(() {
+      final idx = _anticipos.indexWhere((x) => x.id == updated.id);
+      if (idx != -1) _anticipos[idx] = updated;
+    });
   }
 
-  Widget _buildBottomNav() {
-    final items = [
-      {'icon': Icons.grid_view_rounded, 'label': 'Inicio'},
-      {'icon': Icons.person_outline_rounded, 'label': 'Perfil'},
-      {'icon': Icons.add_circle_outline_rounded, 'label': 'Solicitar'},
-    ];
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-              color: Colors.black.withOpacity(0.07),
-              blurRadius: 12,
-              offset: const Offset(0, -2))
-        ],
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Row(
-            children: List.generate(
-              items.length,
-              (i) => Expanded(
-                child: GestureDetector(
-                  onTap: () => setState(() => _tab = i),
-                  behavior: HitTestBehavior.opaque,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        items[i]['icon'] as IconData,
-                        color: _tab == i
-                            ? AppColors.driverPrimary
-                            : AppColors.textSub,
-                        size: 24,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        items[i]['label'] as String,
-                        style: TextStyle(
-                          color: _tab == i
-                              ? AppColors.driverPrimary
-                              : AppColors.textSub,
-                          fontSize: 11,
-                          fontWeight: _tab == i
-                              ? FontWeight.w700
-                              : FontWeight.w400,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    _searchCtrl.dispose();
-    super.dispose();
-  }
 }
