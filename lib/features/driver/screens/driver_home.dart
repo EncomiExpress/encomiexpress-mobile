@@ -7,6 +7,7 @@ import '../../../../core/widgets.dart';
 import '../../admin/screens/anticipo_detail.dart';
 import '../../admin/screens/anticipo_edit.dart';
 import 'driver_profile.dart';
+import 'driver_paquetes.dart';
 
 class DriverHome extends StatefulWidget {
   final UserModel user;
@@ -24,6 +25,8 @@ class _DriverHomeState extends State<DriverHome> {
   final _searchCtrl = TextEditingController();
   String _filtroEstado = 'Estado';
   late UserModel _currentUser;
+  int _itemsToShow = 5;
+  int _tabIndex = 0;
 
   @override
   void initState() {
@@ -32,7 +35,7 @@ class _DriverHomeState extends State<DriverHome> {
     _currentUser = widget.user;
     _loadPerfil();
     _loadAnticipos();
-    _searchCtrl.addListener(() => setState(() {}));
+    _searchCtrl.addListener(_onSearchChanged);
     ThemeController().addListener(_onThemeChanged);
   }
 
@@ -40,9 +43,16 @@ class _DriverHomeState extends State<DriverHome> {
     if (mounted) setState(() {});
   }
 
+  void _onSearchChanged() {
+    if (mounted) {
+      setState(() => _itemsToShow = 5);
+    }
+  }
+
   @override
   void dispose() {
     ThemeController().removeListener(_onThemeChanged);
+    _searchCtrl.removeListener(_onSearchChanged);
     _searchCtrl.dispose();
     super.dispose();
   }
@@ -72,6 +82,7 @@ class _DriverHomeState extends State<DriverHome> {
       setState(() {
         _anticipos = data;
         _loading = false;
+        _itemsToShow = 5;
       });
     }
   }
@@ -79,22 +90,35 @@ class _DriverHomeState extends State<DriverHome> {
   List<Anticipo> get _filtrados {
     return _anticipos.where((a) {
       final query = _searchCtrl.text.trim().toLowerCase();
-      final matchSearch = query.isEmpty ||
+      final matchSearch =
+          query.isEmpty ||
           (a.nombreRuta ?? '').toLowerCase().contains(query) ||
           a.id.toString().contains(query);
-      final matchEstado = _filtroEstado == 'Estado' || a.estado == _filtroEstado;
+      final matchEstado =
+          _filtroEstado == 'Estado' || a.estado == _filtroEstado;
       return matchSearch && matchEstado;
     }).toList();
+  }
+
+  List<Anticipo> get _visibleAnticipos =>
+      _filtrados.take(_itemsToShow).toList();
+
+  bool get _hayMas => _itemsToShow < _filtrados.length;
+
+  void _mostrarMas() {
+    if (_hayMas) {
+      setState(
+        () => _itemsToShow = (_itemsToShow + 5).clamp(0, _filtrados.length),
+      );
+    }
   }
 
   void _abrirPerfil() {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => DriverProfile(
-          user: _currentUser,
-          onUserUpdated: _onUserUpdated,
-        ),
+        builder: (_) =>
+            DriverProfile(user: _currentUser, onUserUpdated: _onUserUpdated),
       ),
     );
   }
@@ -103,7 +127,149 @@ class _DriverHomeState extends State<DriverHome> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bgGray,
-      body: _buildMisAnticipos(),
+      body: _tabIndex == 0
+          ? _buildMisAnticipos()
+          : DriverPaquetes(user: _currentUser),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.cardBg,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: AppColors.border),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.textSub.withValues(alpha: 0.08),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _buildQuickAction(
+                        icon: Icons.palette_outlined,
+                        tooltip: 'Tema',
+                        onTap: () => PersonalizarSheet.show(context),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildQuickAction(
+                        icon: Icons.refresh_outlined,
+                        tooltip: 'Refrescar',
+                        onTap: _loading ? null : () => _loadAnticipos(),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildQuickAction(
+                        icon: Icons.person_outline,
+                        tooltip: 'Perfil',
+                        onTap: _abrirPerfil,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              // Botones para cambiar entre pestañas (Anticipos / Paquetes)
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => setState(() => _tabIndex = 0),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(
+                          color: _tabIndex == 0
+                              ? AppColors.adminPrimary
+                              : AppColors.border,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        backgroundColor: _tabIndex == 0
+                            ? AppColors.adminPrimary.withValues(alpha: 0.08)
+                            : Colors.transparent,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.monetization_on,
+                            color: _tabIndex == 0
+                                ? AppColors.adminPrimary
+                                : AppColors.textSub,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Anticipos',
+                            style: TextStyle(
+                              color: _tabIndex == 0
+                                  ? AppColors.adminPrimary
+                                  : AppColors.textSub,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => setState(() => _tabIndex = 1),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(
+                          color: _tabIndex == 1
+                              ? AppColors.adminPrimary
+                              : AppColors.border,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        backgroundColor: _tabIndex == 1
+                            ? AppColors.adminPrimary.withValues(alpha: 0.08)
+                            : Colors.transparent,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.inventory_2_outlined,
+                            color: _tabIndex == 1
+                                ? AppColors.adminPrimary
+                                : AppColors.textSub,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Paquetes',
+                            style: TextStyle(
+                              color: _tabIndex == 1
+                                  ? AppColors.adminPrimary
+                                  : AppColors.textSub,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -127,7 +293,11 @@ class _DriverHomeState extends State<DriverHome> {
             border: Border(bottom: BorderSide(color: AppColors.border)),
           ),
           padding: EdgeInsets.fromLTRB(
-              20, MediaQuery.of(context).padding.top + 16, 20, 20),
+            20,
+            MediaQuery.of(context).padding.top + 16,
+            20,
+            20,
+          ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -135,38 +305,22 @@ class _DriverHomeState extends State<DriverHome> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('${greeting()} ${_currentUser.nombre}',
-                        style: TextStyle(
-                            color: AppColors.textMain,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                            fontFamily: 'Cambria')),
+                    Text(
+                      '${greeting()} ${_currentUser.nombre}',
+                      style: TextStyle(
+                        color: AppColors.textMain,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                        fontFamily: 'Cambria',
+                      ),
+                    ),
                     LiveDateTime(
-                        style: TextStyle(color: AppColors.textSub, fontSize: 13)),
+                      style: TextStyle(color: AppColors.textSub, fontSize: 13),
+                    ),
                   ],
                 ),
               ),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TapArea(
-                    onTap: _loading ? null : _loadAnticipos,
-                    child: Icon(Icons.refresh_outlined,
-                        color: AppColors.textSub, size: 24),
-                  ),
-                  const SizedBox(width: 14),
-                  AnimatedPaletteIcon(
-                    color: AppColors.textSub,
-                    size: 22,
-                    onTap: () => PersonalizarSheet.show(context),
-                  ),
-                  const SizedBox(width: 14),
-                  TapArea(
-                    onTap: _abrirPerfil,
-                    child: UserAvatar(nombre: _currentUser.nombreCompleto),
-                  ),
-                ],
-              ),
+              const SizedBox.shrink(),
             ],
           ),
         ),
@@ -196,44 +350,105 @@ class _DriverHomeState extends State<DriverHome> {
           child: _loading
               ? const Center(child: CircularProgressIndicator())
               : _filtrados.isEmpty
-                  ? Center(
-                      child: Text('Sin anticipos',
-                          style: TextStyle(
-                              color: AppColors.textSub, fontSize: 14)))
-                  : RefreshIndicator(
-                      onRefresh: _loadAnticipos,
-                      child: ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-                        itemCount: _filtrados.length,
-                        itemBuilder: (_, i) {
-                          final a = _filtrados[i];
-                          return AnticipoCard(
-                            anticipo: a,
-                            isAdmin: false,
-                            onVer: () async {
-                              final updated = await Navigator.push<Anticipo>(
-                                  context,
-                                  MaterialPageRoute(
-                                      builder: (_) => AnticipoDetail(anticipo: a, isAdmin: false)));
-                              if (updated != null) _reemplazar(updated);
-                            },
-                            // El conductor solo legaliza — solo tiene sentido
-                            // editar mientras el anticipo está "En Legalización".
-                            onEditar: a.estado == EstadoAnticipo.enLegalizacion
-                                ? () async {
-                                    final updated = await Navigator.push<Anticipo>(
+              ? Center(
+                  child: Text(
+                    'Sin anticipos',
+                    style: TextStyle(color: AppColors.textSub, fontSize: 14),
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _loadAnticipos,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                    itemCount: _visibleAnticipos.length + (_hayMas ? 1 : 0),
+                    itemBuilder: (_, i) {
+                      if (i < _visibleAnticipos.length) {
+                        final a = _visibleAnticipos[i];
+                        return AnticipoCard(
+                          anticipo: a,
+                          isAdmin: false,
+                          onVer: () async {
+                            final updated = await Navigator.push<Anticipo>(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    AnticipoDetail(anticipo: a, isAdmin: false),
+                              ),
+                            );
+                            if (updated != null) _reemplazar(updated);
+                          },
+                          // El conductor solo legaliza — solo tiene sentido
+                          // editar mientras el anticipo está "En Legalización".
+                          onEditar: a.estado == EstadoAnticipo.enLegalizacion
+                              ? () async {
+                                  final updated =
+                                      await Navigator.push<Anticipo>(
                                         context,
                                         MaterialPageRoute(
-                                            builder: (_) => AnticipoEdit(anticipo: a, isAdmin: false)));
-                                    if (updated != null) _reemplazar(updated);
-                                  }
-                                : null,
-                          );
-                        },
-                      ),
-                    ),
+                                          builder: (_) => AnticipoEdit(
+                                            anticipo: a,
+                                            isAdmin: false,
+                                          ),
+                                        ),
+                                      );
+                                  if (updated != null) _reemplazar(updated);
+                                }
+                              : null,
+                        );
+                      }
+
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: OutlinedButton(
+                          onPressed: _mostrarMas,
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: AppColors.border),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: Text(
+                            'Mostrar 5 más',
+                            style: TextStyle(color: AppColors.textMain),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
         ),
       ],
+    );
+  }
+
+  Widget _buildQuickAction({
+    required IconData icon,
+    required String tooltip,
+    VoidCallback? onTap,
+  }) {
+    final enabled = onTap != null;
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: enabled ? AppColors.cardBg : AppColors.bgGray,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(
+              icon,
+              size: 20,
+              color: enabled ? AppColors.textMain : AppColors.textSub,
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -243,6 +458,4 @@ class _DriverHomeState extends State<DriverHome> {
       if (idx != -1) _anticipos[idx] = updated;
     });
   }
-
-
 }

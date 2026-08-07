@@ -55,7 +55,7 @@ class AdminProfile extends StatelessWidget {
                       color: Colors.white,
                       shape: BoxShape.circle,
                       boxShadow: [
-                        BoxShadow(color: Colors.black.withOpacity(0.15),
+                        BoxShadow(color: Colors.black.withValues(alpha: 0.15),
                             blurRadius: 12)
                       ],
                     ),
@@ -71,7 +71,7 @@ class AdminProfile extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text('Admin',
                       style: TextStyle(
-                          color: Colors.white.withOpacity(0.75),
+                          color: Colors.white.withValues(alpha: 0.75),
                           fontSize: 13)),
                 ],
               ),
@@ -199,7 +199,7 @@ class AdminProfile extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: AppColors.redBg,
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: AppColors.red.withOpacity(0.3)),
+                        border: Border.all(color: AppColors.red.withValues(alpha: 0.3)),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,

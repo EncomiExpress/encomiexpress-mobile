@@ -131,7 +131,7 @@ class AnticipoService {
         'idConductor': int.tryParse(idConductor),
         'idRuta': int.tryParse(idRuta),
         'valorAnticipo': valorAnticipo,
-        if (fechaEntrega != null) 'fechaEntrega': fechaEntrega,
+        'fechaEntrega': ?fechaEntrega,
       });
       if (response.statusCode == 200 || response.statusCode == 201) {
         return {'success': true, 'anticipo': Anticipo.fromJson(response.data['data'])};
@@ -164,7 +164,7 @@ class AnticipoService {
   Future<Map<String, dynamic>> entregarExcedente(int id, {String? soporte}) async {
     try {
       final response = await _api.patch('/api/anticipos/$id/entregar-excedente', data: {
-        if (soporte != null) 'soporte': soporte,
+        'soporte': ?soporte,
       });
       if (response.statusCode == 200) {
         return {'success': true, 'anticipo': Anticipo.fromJson(response.data['data'])};

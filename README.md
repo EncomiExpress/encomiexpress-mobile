@@ -13,6 +13,20 @@ Aplicación móvil para la gestión de anticipos de conductores de OsvaldoC Mens
 
 ---
 
+### Índice
+
+- [Características Implementadas](#características-implementadas)
+- [Stack Tecnológico](#stack-tecnológico)
+- [Arquitectura Limpia](#arquitectura-limpia)
+- [Sistema de Navegación](#sistema-de-navegación)
+- [Sistema de Tema](#sistema-de-tema)
+- [Instalación](#instalación)
+- [Rutas de la API](#rutas-de-la-api)
+- [Repositorios relacionados](#repositorios-relacionados)
+- [Licencia](#licencia)
+
+---
+
 ## Características Implementadas
 
 | Rol | Funcionalidades |

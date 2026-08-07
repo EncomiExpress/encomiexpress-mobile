@@ -32,6 +32,7 @@ class _AdminHomeState extends State<AdminHome> {
   bool _loading = true;
   String _filtroEstado = 'Estado';
   String _filtroAnio = 'Año';
+  int _itemsToShow = 5;
   // Guarda el número de mes ('1'..'12') que espera el backend, no el label.
   String _filtroMes = '';
   List<String> _aniosDisponibles = [];
@@ -71,6 +72,7 @@ class _AdminHomeState extends State<AdminHome> {
       setState(() {
         _anticipos = result['data'] as List<Anticipo>;
         _loading = false;
+        _itemsToShow = 5;
       });
     }
   }
@@ -84,11 +86,19 @@ class _AdminHomeState extends State<AdminHome> {
       _anticipos.fold(0, (s, a) => s + a.valorAnticipo);
   double get _totalGastado =>
       _anticipos.fold(0, (s, a) => s + a.valorGastado);
+  List<Anticipo> get _visibleAnticipos => _anticipos.take(_itemsToShow).toList();
+  bool get _hayMas => _itemsToShow < _anticipos.length;
   double get _totalExcedentes => _anticipos
       .where((a) => a.estado == EstadoAnticipo.excedentePendiente)
       .fold(0, (s, a) => s + a.excedente);
   int get _porConfirmar =>
       _anticipos.where((a) => a.estado == EstadoAnticipo.excedentePendiente).length;
+
+  void _mostrarMas() {
+    if (_hayMas) {
+      setState(() => _itemsToShow = (_itemsToShow + 5).clamp(0, _anticipos.length));
+    }
+  }
 
   Future<void> _confirmarDevolucion(Anticipo a) async {
     final confirmado = await confirmarDialog(
@@ -134,33 +144,6 @@ class _AdminHomeState extends State<AdminHome> {
             title: '${greeting()} ${widget.user.nombre}',
             subtitleWidget: LiveDateTime(
               style: TextStyle(color: AppColors.textSub, fontSize: 13),
-            ),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // El toggle de claro/oscuro ya vive dentro de PersonalizarSheet
-                // (ícono de paleta) — igual que en driver_home.dart, sin ícono
-                // de luna suelto aparte.
-                AnimatedPaletteIcon(
-                  color: AppColors.textSub,
-                  size: 24,
-                  onTap: () => PersonalizarSheet.show(context),
-                ),
-                const SizedBox(width: 14),
-                TapArea(
-                  onTap: _loadAnticipos,
-                  child: Icon(Icons.refresh_outlined,
-                      color: AppColors.textSub, size: 26),
-                ),
-                const SizedBox(width: 12),
-                TapArea(
-                  onTap: () => Navigator.push(context,
-                      MaterialPageRoute(
-                          builder: (_) => AdminProfile(user: widget.user,
-                              anticipos: _anticipos))),
-                  child: UserAvatar(nombre: widget.user.nombreCompleto),
-                ),
-              ],
             ),
           ),
           Expanded(
@@ -298,7 +281,7 @@ class _AdminHomeState extends State<AdminHome> {
                                   style: TextStyle(color: AppColors.textSub, fontSize: 14)),
                             )
                           else
-                            ..._anticipos.map((a) => AnticipoCard(
+                            ..._visibleAnticipos.map((a) => AnticipoCard(
                               anticipo: a,
                               isAdmin: true,
                               onVer: () async {
@@ -319,23 +302,122 @@ class _AdminHomeState extends State<AdminHome> {
                                   : null,
                               onConfirmarDevolucion: () => _confirmarDevolucion(a),
                             )),
+                          if (_hayMas)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 10),
+                              child: OutlinedButton(
+                                onPressed: _mostrarMas,
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(color: AppColors.border),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                ),
+                                child: Text('Mostrar 5 más', style: TextStyle(color: AppColors.textMain)),
+                              ),
+                            ),
                           const SizedBox(height: 80),
                         ],
                       ),
                     ),
                   ),
           ),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.cardBg,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: AppColors.border),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.textSub.withValues(alpha: 0.08),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _buildQuickAction(
+                        icon: Icons.palette_outlined,
+                        tooltip: 'Tema',
+                        onTap: () => PersonalizarSheet.show(context),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildQuickAction(
+                        icon: Icons.refresh_outlined,
+                        tooltip: 'Refrescar',
+                        onTap: _loading ? null : _loadAnticipos,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildQuickAction(
+                        icon: Icons.person_outline,
+                        tooltip: 'Perfil',
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => AdminProfile(user: widget.user, anticipos: _anticipos),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _buildQuickAction(
+                        icon: Icons.add_circle_outline,
+                        tooltip: 'Nuevo',
+                        onTap: () async {
+                          final nuevo = await Navigator.push<Anticipo>(
+                            context,
+                            MaterialPageRoute(builder: (_) => const AnticipoEdit(isAdmin: true)),
+                          );
+                          if (nuevo != null) setState(() => _anticipos.insert(0, nuevo));
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final nuevo = await Navigator.push<Anticipo>(context,
-              MaterialPageRoute(
-                  builder: (_) => const AnticipoEdit(isAdmin: true)));
-          if (nuevo != null) setState(() => _anticipos.insert(0, nuevo));
-        },
-        backgroundColor: AppColors.adminPrimary,
-        child: const Icon(Icons.add, color: Colors.white),
+    );
+  }
+
+  Widget _buildQuickAction({
+    required IconData icon,
+    required String tooltip,
+    VoidCallback? onTap,
+  }) {
+    final enabled = onTap != null;
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: enabled ? AppColors.cardBg : AppColors.bgGray,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(
+              icon,
+              size: 20,
+              color: enabled ? AppColors.textMain : AppColors.textSub,
+            ),
+          ),
+        ),
       ),
     );
   }

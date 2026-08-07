@@ -444,7 +444,7 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                                       borderRadius: BorderRadius.circular(12),
                                       border: Border.all(
                                           color: (_excedente < 0 ? AppColors.red : AppColors.green)
-                                              .withOpacity(0.3)),
+                                              .withValues(alpha: 0.3)),
                                     ),
                                     child: Row(
                                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -756,7 +756,7 @@ class _AnticipoEditState extends State<AnticipoEdit> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         decoration: BoxDecoration(
-          color: readonly ? AppColors.border.withOpacity(0.25) : AppColors.bgGray,
+          color: readonly ? AppColors.border.withValues(alpha: 0.25) : AppColors.bgGray,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: AppColors.border),
         ),

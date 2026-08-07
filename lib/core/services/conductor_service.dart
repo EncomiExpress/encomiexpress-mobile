@@ -43,15 +43,12 @@ class ConductorService {
     try {
       final response = await _api.get('/api/conductores/perfil');
       
-      print('DEBUG getPerfil - response: ${response.data}');
-      
       if (response.statusCode == 200) {
         return UserModel.fromJson(response.data['data'] ?? response.data);
       }
       
       return null;
     } catch (e) {
-      print('DEBUG getPerfil - error: $e');
       return null;
     }
   }

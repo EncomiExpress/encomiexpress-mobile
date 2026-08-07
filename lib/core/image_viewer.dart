@@ -128,7 +128,7 @@ class _ImagePageState extends State<_ImagePage> {
           widget.url,
           key: ValueKey(_intento),
           fit: BoxFit.contain,
-          errorBuilder: (_, __, ___) => _buildError(),
+          errorBuilder: (_, _, _) => _buildError(),
           loadingBuilder: (context, child, progress) {
             if (progress == null) return child;
             return const CircularProgressIndicator(color: Colors.white);
@@ -179,7 +179,7 @@ class ImageThumbnail extends StatelessWidget {
           width: size,
           height: size,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => Container(
+          errorBuilder: (_, _, _) => Container(
             width: size,
             height: size,
             color: AppColors.bgGray,
