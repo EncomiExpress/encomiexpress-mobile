@@ -34,7 +34,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   dio: ^5.4.0
   shared_preferences: ^2.2.2
-  file_picker: ^6.1.1
+  file_picker: ^11.0.3
   url_launcher: ^6.3.2
 
 dev_dependencies:

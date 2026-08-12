@@ -186,82 +186,18 @@ class _DriverHomeState extends State<DriverHome> {
               Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => setState(() => _tabIndex = 0),
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(
-                          color: _tabIndex == 0
-                              ? AppColors.adminPrimary
-                              : AppColors.border,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        backgroundColor: _tabIndex == 0
-                            ? AppColors.adminPrimary.withValues(alpha: 0.08)
-                            : Colors.transparent,
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.monetization_on,
-                            color: _tabIndex == 0
-                                ? AppColors.adminPrimary
-                                : AppColors.textSub,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Anticipos',
-                            style: TextStyle(
-                              color: _tabIndex == 0
-                                  ? AppColors.adminPrimary
-                                  : AppColors.textSub,
-                            ),
-                          ),
-                        ],
-                      ),
+                    child: _buildTabButton(
+                      index: 0,
+                      icon: Icons.monetization_on,
+                      label: 'Anticipos',
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => setState(() => _tabIndex = 1),
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(
-                          color: _tabIndex == 1
-                              ? AppColors.adminPrimary
-                              : AppColors.border,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        backgroundColor: _tabIndex == 1
-                            ? AppColors.adminPrimary.withValues(alpha: 0.08)
-                            : Colors.transparent,
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.inventory_2_outlined,
-                            color: _tabIndex == 1
-                                ? AppColors.adminPrimary
-                                : AppColors.textSub,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Paquetes',
-                            style: TextStyle(
-                              color: _tabIndex == 1
-                                  ? AppColors.adminPrimary
-                                  : AppColors.textSub,
-                            ),
-                          ),
-                        ],
-                      ),
+                    child: _buildTabButton(
+                      index: 1,
+                      icon: Icons.inventory_2_outlined,
+                      label: 'Paquetes',
                     ),
                   ),
                 ],
@@ -269,6 +205,34 @@ class _DriverHomeState extends State<DriverHome> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildTabButton({
+    required int index,
+    required IconData icon,
+    required String label,
+  }) {
+    final active = _tabIndex == index;
+    return OutlinedButton(
+      onPressed: () => setState(() => _tabIndex = index),
+      style: OutlinedButton.styleFrom(
+        side: BorderSide(color: active ? AppColors.adminPrimary : AppColors.border),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        backgroundColor: active ? AppColors.adminPrimary.withValues(alpha: 0.08) : Colors.transparent,
+        padding: const EdgeInsets.symmetric(vertical: 10),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: active ? AppColors.adminPrimary : AppColors.textSub),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(color: active ? AppColors.adminPrimary : AppColors.textSub),
+          ),
+        ],
       ),
     );
   }

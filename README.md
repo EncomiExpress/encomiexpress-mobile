@@ -1,6 +1,6 @@
 # EncomiExpress - App Móvil
 
-Aplicación móvil para la gestión de anticipos de conductores de OsvaldoC Mensajería y Logística S.A.S., empresa especializada en el transporte de encomiendas. Diseñada como una herramienta de acceso rápido para conductores y administradores, que permite consultar, gestionar y legalizar anticipos desde el dispositivo móvil, complementando el panel web encargado de la administración y validación de la información del sistema.
+Aplicación móvil para conductores y administradores de OsvaldoC Mensajería y Logística S.A.S., empresa especializada en el transporte de encomiendas. Diseñada como una herramienta de acceso rápido desde el dispositivo móvil, permite al conductor ejecutar sus programaciones (salidas) del día, registrar la entrega de cada paquete y gestionar sus anticipos, complementando el panel web encargado de la administración y validación de la información del sistema.
 
 ---
 
@@ -31,8 +31,8 @@ Aplicación móvil para la gestión de anticipos de conductores de OsvaldoC Mens
 
 | Rol | Funcionalidades |
 |------|----------------|
-| **Conductor** | - Ver "Mis anticipos" con búsqueda y filtro por estado <br> - Legalizar anticipos: registrar el valor gastado y cargar los comprobantes (fotos/documentos) — el excedente se calcula automáticamente <br> - Consulta y edición de perfil propio (datos personales y foto) <br> - Recuperar contraseña |
-| **Administrador** | - Dashboard: anticipos totales, gastado, excedentes pendientes y por confirmar <br> - Listado de anticipos con filtros por Estado, Año y Mes <br> - Registrar anticipo (la ruta autocompleta el conductor, nunca se elige aparte) <br> - Editar anticipo (solo mientras sigue "Entregado") <br> - Confirmar devolución de excedente, con diálogo de confirmación previo <br> - Ver detalle de cualquier anticipo <br> - Perfil propio (solo lectura) |
+| **Conductor** | - Pestaña "Rutas": ver sus programaciones (salidas) de hoy y próximas, con indicador "Hoy" <br> - Iniciar una programación ("En curso") y finalizarla, con los errores del backend (documentos vencidos, licencia vencida, paquetes sin resultado) mostrados en pantalla <br> - Ver los paquetes de la programación actual con resumen Por Entregar / Entregados / No Entregados <br> - Registrar cada intento de entrega: exitoso (con nombre de quien recibió) o fallido (con motivo) — el paquete pasa a "Devuelto" automáticamente al agotar el máximo de intentos <br> - Ver "Mis anticipos" con búsqueda y filtro por estado <br> - Legalizar anticipos: registrar el valor gastado y cargar los comprobantes (fotos/documentos) — el excedente se calcula automáticamente <br> - Consulta y edición de perfil propio (datos personales y foto) <br> - Recuperar contraseña |
+| **Administrador** | - Dashboard: anticipos totales, gastado, excedentes pendientes y por confirmar <br> - Listado de anticipos con filtros por Estado, Año y Mes <br> - Registrar anticipo eligiendo una programación (el conductor se autocompleta, nunca se elige aparte) <br> - Editar anticipo (solo mientras sigue "Entregado") <br> - Confirmar devolución de excedente, con diálogo de confirmación previo <br> - Ver detalle de cualquier anticipo <br> - Perfil propio (solo lectura) |
 | **General** | - Inicio y cierre de sesión <br> - Recuperar contraseña <br> - Navegación basada en el rol devuelto por el backend <br> - Modo oscuro / modo claro <br> - Paleta de colores personalizable (rojo / azul), misma paleta que el panel web |
 
 ---
@@ -58,22 +58,24 @@ lib/
 ├── config/
 │   └── api_config.dart        # baseUrl configurable por --dart-define
 ├── core/                      # Servicios, modelos y componentes centrales
-│   ├── models.dart            # UserModel, Anticipo, AppColors
+│   ├── models.dart            # UserModel, Anticipo, Programacion, AppColors
 │   ├── widgets.dart           # Componentes reutilizables (SectionCard, StatCard, FilterSelect, ...)
 │   ├── image_viewer.dart      # Visor de imágenes a pantalla completa (comprobantes)
 │   ├── theme/                 # Modo claro/oscuro + paleta rojo/azul
-│   └── services/               # ApiClient, AuthService, AnticipoService, ConductorService
+│   └── services/               # ApiClient, AuthService, AnticipoService, ConductorService, ProgramacionService, PaqueteService
 └── features/                  # Funcionalidades específicas por rol
     ├── auth/screens/           # Login, recuperar contraseña
     ├── admin/screens/          # Dashboard, listado, detalle, crear/editar anticipo, perfil
-    └── driver/screens/         # Mis anticipos, perfil, edición de perfil
+    └── driver/screens/         # Home (pestañas Rutas/Paquetes/Anticipos), programaciones,
+                                 # paquetes de una programación, detalle de paquete + registrar
+                                 # intento de entrega, perfil
 ```
 
 ### Principios de Arquitectura Implementados
 
 - **Separación de responsabilidades**: Cada capa tiene un propósito bien definido
 - **Inyección de dependencias**: Servicios como `ApiClient` y `ThemeController` se inicializan desde `main.dart`
-- **Modelos consistentes**: `UserModel` y `Anticipo` definidos en `core/models.dart`
+- **Modelos consistentes**: `UserModel`, `Anticipo` y `Programacion` definidos en `core/models.dart`
 - **Navegación basada en roles**: Redirección automática según el rol que devuelve el backend en el login
 - **Pantallas compartidas**: el detalle y el formulario de anticipo son la misma pantalla para admin y conductor (ajustada por un flag), no una copia por rol
 
@@ -93,7 +95,7 @@ La aplicación utiliza un patrón de navegación basado en roles que determina l
 
 3. **Navegación interna**
    - `AdminHome`: dashboard, listado y gestión de anticipos
-   - `DriverHome`: "Mis anticipos" del conductor autenticado
+   - `DriverHome`: tres pestañas — **Rutas** (programaciones del conductor, iniciar/finalizar, paquetes y registro de entregas), **Paquetes** (todos los paquetes asignados al conductor) y **Anticipos** (los suyos)
    - Ambas pantallas incluyen cierre de sesión
 
 La navegación se implementa con `Navigator.pushReplacement` tras un login exitoso.
@@ -146,11 +148,16 @@ flutter run --dart-define=API_BASE_URL=https://encomiexpress-backend.onrender.co
 
 - Login: `POST /api/auth/login`
 - Recuperar contraseña: `POST /api/auth/recuperar-password`, `POST /api/auth/cambiar-password`
+- Programaciones del conductor: `GET /api/programaciones` (filtra automáticamente a las propias del conductor autenticado), `GET /api/programaciones/:id` (incluye sus paquetes)
+- Iniciar / finalizar programación: `PATCH /api/programaciones/:id/estado` (el conductor solo puede avanzar el estado de su propia programación)
+- Paquetes de una programación: `GET /api/paquetes?idProgramacion=`
+- Registrar intento de entrega (exitoso o fallido): `POST /api/paquetes/:id/intentos`
+- Detalle/resumen de un paquete: `GET /api/paquetes/:id/resumen`
 - Anticipos (admin): `GET/POST /api/anticipos`, `PUT /api/anticipos/:id`, `GET /api/anticipos/anios-disponibles`
 - Anticipos (conductor): `GET /api/conductores/mis-anticipos`
 - Confirmar devolución de excedente: `PATCH /api/anticipos/:id/entregar-excedente`
 - Soporte de anticipo: `POST /api/anticipos/:id/soporte`
-- Rutas (para el formulario de crear/editar anticipo): `GET /api/rutas`
+- Programaciones disponibles (para el formulario de crear/editar anticipo): `GET /api/programaciones?estado=Programada`
 - Perfil del conductor: `GET/PUT /api/conductores/perfil`
 
 ---

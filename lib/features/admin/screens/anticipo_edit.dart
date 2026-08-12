@@ -43,10 +43,11 @@ class _AnticipoEditState extends State<AnticipoEdit> {
   bool _saving = false;
   String? _error;
 
-  String _conductorId = '';
-
-  List<Map<String, dynamic>> _rutasList = [];
-  String? _rutaId;
+  List<Map<String, dynamic>> _rutas = [];
+  bool _loadingRutas = false;
+  bool _rutasError = false;
+  String? _idRuta;
+  String? _idRutaVehiculoConductor;
 
   late TextEditingController _valorAnticipoCtrl;
   late TextEditingController _valorGastadoCtrl;
@@ -61,7 +62,8 @@ class _AnticipoEditState extends State<AnticipoEdit> {
   // en ActualizarAnticipoExcedente.jsx (web).
   double _valorAnticipoOriginal = 0;
   double _valorGastadoOriginal = 0;
-  String? _rutaIdOriginal;
+  String? _idRutaOriginal;
+  String? _idRutaVehiculoConductorOriginal;
   DateTime? _fechaEntregaOriginal;
 
   bool get _isNew => widget.anticipo == null;
@@ -86,13 +88,28 @@ class _AnticipoEditState extends State<AnticipoEdit> {
   // `getNombreConductor()` en ActualizarAnticipoExcedente.jsx (web). En los
   // demás casos (solo consulta) se muestra el conductor que ya traía el
   // anticipo.
+  Map<String, dynamic> get _rutaSeleccionada => _rutas.firstWhere(
+        (r) => r['idRuta']?.toString() == _idRuta,
+        orElse: () => <String, dynamic>{},
+      );
+
+  List<Map<String, dynamic>> get _paresDeRutaSeleccionada =>
+      ((_rutaSeleccionada['paresVehiculoConductor'] as List?) ?? [])
+          .cast<Map<String, dynamic>>();
+
+  Map<String, dynamic> get _parSeleccionado => _paresDeRutaSeleccionada.firstWhere(
+        (p) => p['idRutaVehiculoConductor']?.toString() == _idRutaVehiculoConductor,
+        orElse: () => <String, dynamic>{},
+      );
+
+  String _nombreConductorDePar(Map<String, dynamic> par) {
+    final usuario = par['conductor']?['usuario'] as Map<String, dynamic>?;
+    return usuario != null ? '${usuario['nombre'] ?? ''} ${usuario['apellido'] ?? ''}'.trim() : '';
+  }
+
   String get _conductorNombreActual {
     if (_isNew || _entregado) {
-      final ruta = _rutasList.firstWhere(
-        (r) => r['idRuta'] == _rutaId,
-        orElse: () => const {},
-      );
-      return ruta['conductorNombre'] as String? ?? '';
+      return _nombreConductorDePar(_parSeleccionado);
     }
     return widget.anticipo?.conductorNombre ?? '';
   }
@@ -101,8 +118,7 @@ class _AnticipoEditState extends State<AnticipoEdit> {
   void initState() {
     super.initState();
     final a = widget.anticipo;
-    _conductorId = a?.idConductor.toString() ?? '';
-    _rutaId = a?.idRuta.toString();
+    _idRuta = a?.idRuta.toString();
     _valorAnticipoCtrl = TextEditingController(text: a != null ? a.valorAnticipo.toStringAsFixed(0) : '');
     _valorGastadoCtrl = TextEditingController(text: a != null ? a.valorGastado.toStringAsFixed(0) : '');
     _fechaEntrega = _parseIso(a?.fechaEntrega);
@@ -110,7 +126,7 @@ class _AnticipoEditState extends State<AnticipoEdit> {
 
     _valorAnticipoOriginal = a?.valorAnticipo ?? 0;
     _valorGastadoOriginal = a?.valorGastado ?? 0;
-    _rutaIdOriginal = a?.idRuta.toString();
+    _idRutaOriginal = a?.idRuta.toString();
     _fechaEntregaOriginal = _fechaEntrega;
 
     if (widget.isAdmin && (_isNew || _entregado)) {
@@ -132,9 +148,39 @@ class _AnticipoEditState extends State<AnticipoEdit> {
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   Future<void> _loadRutas() async {
-    final data = await _anticipoService.getRutas();
-    if (!mounted) return;
-    setState(() => _rutasList = data);
+    setState(() {
+      _loadingRutas = true;
+      _rutasError = false;
+    });
+    try {
+      final data = await _anticipoService.getRutas();
+      if (!mounted) return;
+      setState(() {
+        _rutas = data;
+        _loadingRutas = false;
+        // Al editar un anticipo "Entregado", preselecciona el par
+        // vehículo/conductor que ya tenía (mismo idConductor) dentro de la
+        // ruta que ya traía — igual que `parInicial` en
+        // ActualizarAnticipoExcedente.jsx (web).
+        if (!_isNew && _idRutaVehiculoConductor == null) {
+          final par = _paresDeRutaSeleccionada.firstWhere(
+            (p) => p['idConductor']?.toString() == widget.anticipo?.idConductor.toString(),
+            orElse: () => <String, dynamic>{},
+          );
+          if (par.isNotEmpty) {
+            _idRutaVehiculoConductor = par['idRutaVehiculoConductor']?.toString();
+            _idRutaVehiculoConductorOriginal = _idRutaVehiculoConductor;
+          }
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _rutas = [];
+        _loadingRutas = false;
+        _rutasError = true;
+      });
+    }
   }
 
   double get _excedente {
@@ -162,7 +208,7 @@ class _AnticipoEditState extends State<AnticipoEdit> {
   }
 
   Future<void> _pickSoporte() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
       allowMultiple: true,
@@ -186,10 +232,17 @@ class _AnticipoEditState extends State<AnticipoEdit> {
 
     Map<String, dynamic> result;
     if (_isNew) {
-      if (_rutaId == null || _rutaId!.isEmpty) {
+      if (_idRuta == null || _idRuta!.isEmpty) {
         setState(() {
           _saving = false;
           _error = 'Selecciona una ruta';
+        });
+        return;
+      }
+      if (_idRutaVehiculoConductor == null || _idRutaVehiculoConductor!.isEmpty) {
+        setState(() {
+          _saving = false;
+          _error = 'Selecciona el vehículo y conductor de la ruta';
         });
         return;
       }
@@ -201,8 +254,8 @@ class _AnticipoEditState extends State<AnticipoEdit> {
         return;
       }
       result = await _anticipoService.crearAnticipo(
-        idConductor: _conductorId,
-        idRuta: _rutaId!,
+        idRuta: _idRuta!,
+        idRutaVehiculoConductor: _idRutaVehiculoConductor!,
         valorAnticipo: double.tryParse(_valorAnticipoCtrl.text) ?? 0,
         fechaEntrega: _isoDate(_fechaEntrega!),
       );
@@ -221,7 +274,8 @@ class _AnticipoEditState extends State<AnticipoEdit> {
     } else {
       // Entregado — solo admin llega aquí (ver _puedeEditar).
       final valorAnticipo = double.tryParse(_valorAnticipoCtrl.text) ?? 0;
-      final sinCambios = _rutaId == _rutaIdOriginal &&
+      final sinCambios = _idRuta == _idRutaOriginal &&
+          _idRutaVehiculoConductor == _idRutaVehiculoConductorOriginal &&
           valorAnticipo == _valorAnticipoOriginal &&
           _fechaEntrega == _fechaEntregaOriginal;
       if (sinCambios && _soporteNuevo.isEmpty) {
@@ -232,7 +286,8 @@ class _AnticipoEditState extends State<AnticipoEdit> {
         return;
       }
       result = await _anticipoService.actualizarAnticipo(widget.anticipo!.id, {
-        'idRuta': int.tryParse(_rutaId ?? ''),
+        'idRuta': int.tryParse(_idRuta ?? ''),
+        'idRutaVehiculoConductor': int.tryParse(_idRutaVehiculoConductor ?? ''),
         'valorAnticipo': valorAnticipo,
         if (_fechaEntrega != null) 'fechaEntrega': _isoDate(_fechaEntrega!),
       });
@@ -319,29 +374,68 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                                 children: [
                                   _label('Ruta *'),
                                   const SizedBox(height: 8),
-                                  _rutasList.isEmpty
+                                  _loadingRutas
                                       ? Text('Cargando rutas...',
                                           style: TextStyle(color: AppColors.textSub, fontSize: 13))
-                                      : _dropdown(
-                                          value: _rutaId,
-                                          items: _rutasList
-                                              .map((r) => DropdownMenuItem<String>(
-                                                  value: r['idRuta'] as String, child: Text(r['nombre'] ?? '')))
-                                              .toList(),
-                                          // El conductor nunca se elige aparte — siempre sale de
-                                          // la ruta escogida, igual que en la web (Autocomplete de
-                                          // Ruta autocompleta el conductor) y que anticipoService
-                                          // .update() en el backend, para que nunca queden
-                                          // desincronizados.
+                                      : (_rutas.isEmpty
+                                          ? Row(
+                                              children: [
+                                                Expanded(
+                                                  child: Text(
+                                                      _rutasError
+                                                          ? 'No se pudieron cargar las rutas. Verifica tu conexión con el servidor.'
+                                                          : 'No hay rutas disponibles.',
+                                                      style: TextStyle(color: AppColors.textSub, fontSize: 13)),
+                                                ),
+                                                TapArea(
+                                                  onTap: _loadRutas,
+                                                  child: Padding(
+                                                    padding: const EdgeInsets.only(left: 8),
+                                                    child: Icon(Icons.refresh_rounded, color: primary, size: 20),
+                                                  ),
+                                                ),
+                                              ],
+                                            )
+                                          : _dropdown(
+                                          value: _idRuta,
+                                          items: _rutas.map((r) {
+                                            final destino = r['destino'] as Map<String, dynamic>?;
+                                            final origen = (r['origen'] as String?) ?? 'Ruta #${r['idRuta']}';
+                                            final destinoTxt = destino?['ciudad'] as String? ?? 'Sin destino';
+                                            return DropdownMenuItem<String>(
+                                                value: r['idRuta'].toString(),
+                                                child: Text('$origen → $destinoTxt'));
+                                          }).toList(),
+                                          // Cambiar de ruta invalida el par vehículo/conductor
+                                          // elegido — se autocompleta solo si la ruta tiene un
+                                          // único par, igual que en RegistrarAnticipoExcedente.jsx
+                                          // (web).
                                           onChanged: (v) => setState(() {
-                                            _rutaId = v;
-                                            final ruta = _rutasList.firstWhere(
-                                              (r) => r['idRuta'] == v,
-                                              orElse: () => const {},
-                                            );
-                                            _conductorId = ruta['idConductor'] as String? ?? '';
+                                            _idRuta = v;
+                                            final pares = _paresDeRutaSeleccionada;
+                                            _idRutaVehiculoConductor =
+                                                pares.length == 1 ? pares.first['idRutaVehiculoConductor']?.toString() : null;
                                           }),
-                                        ),
+                                        )),
+                                  if (!_loadingRutas && _rutas.isNotEmpty && _idRuta != null) ...[
+                                    const SizedBox(height: 14),
+                                    _label('Vehículo / Conductor *'),
+                                    const SizedBox(height: 8),
+                                    _paresDeRutaSeleccionada.isEmpty
+                                        ? Text('Esta ruta no tiene vehículo/conductor asignado.',
+                                            style: TextStyle(color: AppColors.textSub, fontSize: 13))
+                                        : _dropdown(
+                                            value: _idRutaVehiculoConductor,
+                                            items: _paresDeRutaSeleccionada.map((p) {
+                                              final placa = (p['vehiculo'] as Map<String, dynamic>?)?['placa'] as String? ?? 'Sin placa';
+                                              final nombre = _nombreConductorDePar(p);
+                                              return DropdownMenuItem<String>(
+                                                  value: p['idRutaVehiculoConductor'].toString(),
+                                                  child: Text('$placa — $nombre'));
+                                            }).toList(),
+                                            onChanged: (v) => setState(() => _idRutaVehiculoConductor = v),
+                                          ),
+                                  ],
                                 ],
                               ),
                             ),
