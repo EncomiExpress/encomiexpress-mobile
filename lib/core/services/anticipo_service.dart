@@ -1,44 +1,38 @@
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'api_client.dart';
 import '../models.dart';
 
 class AnticipoService {
   ApiClient get _api => ApiClient();
 
-  // Solo rutas donde tendría sentido asignar un anticipo — el backend igual
-  // rechaza con 409 si la ruta elegida ya tiene un anticipo activo.
+  // Solo rutas que aún no han iniciado ('Programada') y habilitadas — el
+  // backend igual rechaza con 409 si el conductor elegido ya tiene un
+  // anticipo activo en esa ruta. Un anticipo cuelga de una Ruta (plantilla
+  // reutilizable) + el par vehículo/conductor del convoy que le corresponde
+  // (ver anticipoService.create() en el backend) — no hay una "programación"
+  // separada.
   //
-  // Trae también el conductor de cada ruta (idConductor/conductorNombre) —
-  // igual que `rutasNormalizadas` en el frontend web (AnticipoExcedenteContext.jsx).
-  // El conductor de un anticipo nunca se elige aparte: sale siempre de la ruta
-  // elegida, para que nunca queden desincronizados (mismo criterio que aplica
-  // el backend en anticipoService.update()).
+  // Trae `paresVehiculoConductor` (con conductor/usuario y vehículo
+  // anidados) para que la pantalla arme el segundo picker (vehículo +
+  // conductor de la ruta elegida) — igual que `rutasNormalizadas` en el
+  // frontend web (AnticipoExcedenteContext.jsx).
   Future<List<Map<String, dynamic>>> getRutas() async {
     try {
-      final response = await _api.get('/api/rutas', queryParams: {'limit': 1000, 'habilitado': true});
+      final response = await _api.get('/api/rutas', queryParams: {
+        'estado': 'Programada',
+        'habilitado': 'true',
+        'limit': 100,
+      });
       if (response.statusCode == 200) {
         final List<dynamic> data = response.data['data'] ?? [];
-        return data
-            .where((json) => json['estado'] != 'Cancelada' && json['estado'] != 'Completada')
-            .map((json) {
-              final conductorJson = json['conductor'] as Map<String, dynamic>?;
-              final usuarioJson = conductorJson?['usuario'] as Map<String, dynamic>?;
-              final conductorNombre = usuarioJson != null
-                  ? '${usuarioJson['nombre'] ?? ''} ${usuarioJson['apellido'] ?? ''}'.trim()
-                  : '';
-              return {
-                'idRuta': json['idRuta']?.toString() ?? '',
-                'nombre': json['nombreRuta'] ?? 'Ruta #${json['idRuta']}',
-                'idConductor': json['idConductor']?.toString() ?? '',
-                'conductorNombre': conductorNombre,
-              };
-            })
-            .toList();
+        return data.map((json) => json as Map<String, dynamic>).toList();
       }
       return [];
     } catch (e) {
-      return [];
+      debugPrint('getRutas() falló: $e');
+      rethrow;
     }
   }
 
@@ -119,19 +113,22 @@ class AnticipoService {
     }
   }
 
-  // Solo admin — POST /api/anticipos exige idRuta e idConductor.
+  // Solo admin — POST /api/anticipos exige idRuta + idRutaVehiculoConductor.
+  // El idConductor ya no se manda: el backend lo deriva solo del par
+  // vehículo/conductor elegido (anticipoService.create()), para que nunca
+  // queden desincronizados.
   Future<Map<String, dynamic>> crearAnticipo({
-    required String idConductor,
     required String idRuta,
+    required String idRutaVehiculoConductor,
     required double valorAnticipo,
     String? fechaEntrega,
   }) async {
     try {
       final response = await _api.post('/api/anticipos', data: {
-        'idConductor': int.tryParse(idConductor),
         'idRuta': int.tryParse(idRuta),
+        'idRutaVehiculoConductor': int.tryParse(idRutaVehiculoConductor),
         'valorAnticipo': valorAnticipo,
-        if (fechaEntrega != null) 'fechaEntrega': fechaEntrega,
+        'fechaEntrega': ?fechaEntrega,
       });
       if (response.statusCode == 200 || response.statusCode == 201) {
         return {'success': true, 'anticipo': Anticipo.fromJson(response.data['data'])};
@@ -144,7 +141,7 @@ class AnticipoService {
 
   // PUT /api/anticipos/:id — qué campos se aceptan depende del estado actual
   // (ver anticipoService.update() en el backend):
-  //   Entregado        -> idRuta / valorAnticipo / fechaEntrega / soporte
+  //   Entregado        -> idRuta / idRutaVehiculoConductor / valorAnticipo / fechaEntrega / soporte
   //   En Legalización   -> solo valorGastado (obligatorio) / soporte
   // El caller decide qué mandar; este método no filtra nada por su cuenta.
   Future<Map<String, dynamic>> actualizarAnticipo(int id, Map<String, dynamic> data) async {
@@ -164,7 +161,7 @@ class AnticipoService {
   Future<Map<String, dynamic>> entregarExcedente(int id, {String? soporte}) async {
     try {
       final response = await _api.patch('/api/anticipos/$id/entregar-excedente', data: {
-        if (soporte != null) 'soporte': soporte,
+        'soporte': ?soporte,
       });
       if (response.statusCode == 200) {
         return {'success': true, 'anticipo': Anticipo.fromJson(response.data['data'])};

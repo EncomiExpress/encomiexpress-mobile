@@ -317,7 +317,9 @@ class Anticipo {
 
   // Forma real de una fila devuelta por GET /api/anticipos, GET /api/anticipos/:id
   // o GET /api/conductores/mis-anticipos (esta última sin `conductor` anidado,
-  // porque ya se sabe de quién son).
+  // porque ya se sabe de quién son). El anticipo cuelga directo de una `ruta`
+  // (ver anticipoService.js: ANTICIPO_INCLUDE) — no hay una "programación"
+  // separada; el nombre de ruta y el destino se leen de ruta / ruta.destino.
   factory Anticipo.fromJson(Map<String, dynamic> json) {
     final conductorJson = json['conductor'] as Map<String, dynamic>?;
     final usuarioJson = conductorJson?['usuario'] as Map<String, dynamic>?;
@@ -350,7 +352,7 @@ class Anticipo {
       conductorNombre: usuarioJson != null
           ? '${usuarioJson['nombre'] ?? ''} ${usuarioJson['apellido'] ?? ''}'.trim()
           : '',
-      nombreRuta: rutaJson?['nombreRuta'],
+      nombreRuta: rutaJson?['origen'],
       destinoTexto: destinoTexto,
     );
   }
@@ -407,5 +409,28 @@ Color estadoBg(String estado) {
     case EstadoAnticipo.excedentePendiente: return AppColors.orangeBg;
     case EstadoAnticipo.completado:         return AppColors.greenBg;
     default:                                return AppColors.bgGray;
+  }
+}
+
+// Paleta de estado para paquete.estado — los 4 valores reales que maneja el
+// backend (ver src/services/paqueteStateUtils.js): Por entregar, En reparto,
+// Entregado, Devuelto.
+Color estadoPaqueteColor(String estado) {
+  switch (estado) {
+    case 'Por entregar': return AppColors.blue;
+    case 'En reparto':   return AppColors.orange;
+    case 'Entregado':    return AppColors.green;
+    case 'Devuelto':     return AppColors.purple;
+    default:              return AppColors.textSub;
+  }
+}
+
+Color estadoPaqueteBg(String estado) {
+  switch (estado) {
+    case 'Por entregar': return AppColors.blueBg;
+    case 'En reparto':   return AppColors.orangeBg;
+    case 'Entregado':    return AppColors.greenBg;
+    case 'Devuelto':     return AppColors.purpleBg;
+    default:              return AppColors.bgGray;
   }
 }

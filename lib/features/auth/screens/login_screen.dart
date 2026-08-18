@@ -113,6 +113,8 @@ class _LoginScreenState extends State<LoginScreen> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('user_data', user.toJson().toString());
 
+      if (!mounted) return;
+
       setState(() => _loading = false);
 
       final dest = user.rol.toLowerCase() == 'conductor'
@@ -304,7 +306,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     // igual que '&:hover' en el botón de Login.jsx (frontend web).
                                     backgroundColor: WidgetStateProperty.resolveWith((states) {
                                       if (states.contains(WidgetState.disabled)) {
-                                        return AppColors.adminPrimary.withOpacity(0.6);
+                                        return AppColors.adminPrimary.withValues(alpha: 0.6);
                                       }
                                       if (states.contains(WidgetState.hovered) || states.contains(WidgetState.pressed)) {
                                         return AppColors.adminGradEnd;
@@ -313,7 +315,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     }),
                                     elevation: WidgetStateProperty.resolveWith((states) =>
                                         states.contains(WidgetState.hovered) || states.contains(WidgetState.pressed) ? 6 : 3),
-                                    shadowColor: WidgetStateProperty.all(AppColors.adminPrimary.withOpacity(0.4)),
+                                    shadowColor: WidgetStateProperty.all(AppColors.adminPrimary.withValues(alpha: 0.4)),
                                     mouseCursor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.disabled)
                                         ? SystemMouseCursors.basic
                                         : SystemMouseCursors.click),

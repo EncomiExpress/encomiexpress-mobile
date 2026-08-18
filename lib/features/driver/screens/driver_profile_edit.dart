@@ -542,7 +542,7 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
           decoration: BoxDecoration(
             color: AppColors.activeBg,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: AppColors.driverPrimary.withOpacity(0.3)),
+            border: Border.all(color: AppColors.driverPrimary.withValues(alpha: 0.3)),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,

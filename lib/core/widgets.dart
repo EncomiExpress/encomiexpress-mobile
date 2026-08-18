@@ -6,7 +6,11 @@ import 'theme/theme_controller.dart';
 // Mismo look que los <Alert severity="..."> de MUI en el web (ToastContext.jsx):
 // fondo suave del color de la severidad, ícono + texto del mismo color,
 // esquinas redondeadas y flotante — no la barra sólida por defecto de Flutter.
-void showAppSnackBar(BuildContext context, String message, {String severity = 'success'}) {
+void showAppSnackBar(
+  BuildContext context,
+  String message, {
+  String severity = 'success',
+}) {
   late final Color color;
   late final Color bg;
   late final IconData icon;
@@ -47,8 +51,14 @@ void showAppSnackBar(BuildContext context, String message, {String severity = 's
             Icon(icon, color: color, size: 20),
             const SizedBox(width: 10),
             Expanded(
-              child: Text(message,
-                  style: TextStyle(color: color, fontSize: 13.5, fontWeight: FontWeight.w600)),
+              child: Text(
+                message,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ],
         ),
@@ -71,18 +81,38 @@ Future<bool> confirmarDialog(
     builder: (ctx) => AlertDialog(
       backgroundColor: AppColors.cardBg,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      title: Text(titulo,
-          style: TextStyle(color: AppColors.textMain, fontWeight: FontWeight.w700, fontSize: 17)),
-      content: Text(mensaje, style: TextStyle(color: AppColors.textSub, fontSize: 14)),
+      title: Text(
+        titulo,
+        style: TextStyle(
+          color: AppColors.textMain,
+          fontWeight: FontWeight.w700,
+          fontSize: 17,
+        ),
+      ),
+      content: Text(
+        mensaje,
+        style: TextStyle(color: AppColors.textSub, fontSize: 14),
+      ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(ctx, false),
-          child: Text('Cancelar', style: TextStyle(color: AppColors.textSub, fontWeight: FontWeight.w600)),
+          child: Text(
+            'Cancelar',
+            style: TextStyle(
+              color: AppColors.textSub,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(ctx, true),
-          style: FilledButton.styleFrom(backgroundColor: colorConfirmar ?? AppColors.purple),
-          child: Text(textoConfirmar, style: const TextStyle(fontWeight: FontWeight.w700)),
+          style: FilledButton.styleFrom(
+            backgroundColor: colorConfirmar ?? AppColors.purple,
+          ),
+          child: Text(
+            textoConfirmar,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
         ),
       ],
     ),
@@ -138,14 +168,22 @@ class _SearchFieldState extends State<SearchField> {
       decoration: BoxDecoration(
         borderRadius: radius,
         boxShadow: hasFocus
-            ? [BoxShadow(color: AppColors.activeBg, blurRadius: 0, spreadRadius: 3)]
+            ? [
+                BoxShadow(
+                  color: AppColors.activeBg,
+                  blurRadius: 0,
+                  spreadRadius: 3,
+                ),
+              ]
             : [],
       ),
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.cardBg,
           borderRadius: radius,
-          border: Border.all(color: hasFocus ? AppColors.adminPrimary : AppColors.border),
+          border: Border.all(
+            color: hasFocus ? AppColors.adminPrimary : AppColors.border,
+          ),
         ),
         child: TextField(
           controller: widget.controller,
@@ -155,12 +193,20 @@ class _SearchFieldState extends State<SearchField> {
           decoration: InputDecoration(
             hintText: widget.hint,
             hintStyle: TextStyle(color: AppColors.textSub, fontSize: 14),
-            prefixIcon: Icon(Icons.search_rounded, color: AppColors.textSub, size: 20),
+            prefixIcon: Icon(
+              Icons.search_rounded,
+              color: AppColors.textSub,
+              size: 20,
+            ),
             suffixIcon: widget.controller.text.isEmpty
                 ? null
                 : TapArea(
                     onTap: () => widget.controller.clear(),
-                    child: Icon(Icons.close_rounded, size: 18, color: AppColors.textSub),
+                    child: Icon(
+                      Icons.close_rounded,
+                      size: 18,
+                      color: AppColors.textSub,
+                    ),
                   ),
             border: InputBorder.none,
             contentPadding: const EdgeInsets.symmetric(vertical: 12),
@@ -240,8 +286,12 @@ class _FilterSelectState extends State<FilterSelect> {
           CompositedTransformFollower(
             link: _layerLink,
             showWhenUnlinked: false,
-            targetAnchor: widget.alignLeft ? Alignment.bottomLeft : Alignment.bottomRight,
-            followerAnchor: widget.alignLeft ? Alignment.topLeft : Alignment.topRight,
+            targetAnchor: widget.alignLeft
+                ? Alignment.bottomLeft
+                : Alignment.bottomRight,
+            followerAnchor: widget.alignLeft
+                ? Alignment.topLeft
+                : Alignment.topRight,
             offset: const Offset(0, 6),
             child: Material(
               elevation: 4,
@@ -262,19 +312,29 @@ class _FilterSelectState extends State<FilterSelect> {
                         },
                         hoverColor: AppColors.activeBg,
                         child: Padding(
-                          padding:
-                              const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(text,
-                                  style: TextStyle(
-                                      fontSize: 13,
-                                      color: AppColors.textMain,
-                                      fontWeight:
-                                          selected ? FontWeight.w700 : FontWeight.w400)),
+                              Text(
+                                text,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: AppColors.textMain,
+                                  fontWeight: selected
+                                      ? FontWeight.w700
+                                      : FontWeight.w400,
+                                ),
+                              ),
                               if (selected)
-                                Icon(Icons.check, size: 16, color: AppColors.adminPrimary),
+                                Icon(
+                                  Icons.check,
+                                  size: 16,
+                                  color: AppColors.adminPrimary,
+                                ),
                             ],
                           ),
                         ),
@@ -306,7 +366,13 @@ class _FilterSelectState extends State<FilterSelect> {
           decoration: BoxDecoration(
             borderRadius: radius,
             boxShadow: _open
-                ? [BoxShadow(color: AppColors.activeBg, blurRadius: 0, spreadRadius: 3)]
+                ? [
+                    BoxShadow(
+                      color: AppColors.activeBg,
+                      blurRadius: 0,
+                      spreadRadius: 3,
+                    ),
+                  ]
                 : [],
           ),
           child: Container(
@@ -314,21 +380,28 @@ class _FilterSelectState extends State<FilterSelect> {
             decoration: BoxDecoration(
               color: AppColors.cardBg,
               borderRadius: radius,
-              border: Border.all(color: _open ? AppColors.adminPrimary : AppColors.border),
+              border: Border.all(
+                color: _open ? AppColors.adminPrimary : AppColors.border,
+              ),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(hasValue ? widget.value : widget.label,
-                    style: TextStyle(
-                        fontSize: 13, color: hasValue ? AppColors.textMain : AppColors.textSub)),
+                Text(
+                  hasValue ? widget.value : widget.label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: hasValue ? AppColors.textMain : AppColors.textSub,
+                  ),
+                ),
                 const SizedBox(width: 8),
                 Icon(
-                    _open
-                        ? Icons.keyboard_arrow_up_outlined
-                        : Icons.keyboard_arrow_down_outlined,
-                    color: AppColors.textSub,
-                    size: 18),
+                  _open
+                      ? Icons.keyboard_arrow_up_outlined
+                      : Icons.keyboard_arrow_down_outlined,
+                  color: AppColors.textSub,
+                  size: 18,
+                ),
               ],
             ),
           ),
@@ -347,7 +420,12 @@ class AnimatedPaletteIcon extends StatefulWidget {
   final double size;
   final VoidCallback? onTap;
 
-  const AnimatedPaletteIcon({super.key, required this.color, this.size = 22, this.onTap});
+  const AnimatedPaletteIcon({
+    super.key,
+    required this.color,
+    this.size = 22,
+    this.onTap,
+  });
 
   @override
   State<AnimatedPaletteIcon> createState() => _AnimatedPaletteIconState();
@@ -370,9 +448,11 @@ class _AnimatedPaletteIconState extends State<AnimatedPaletteIcon> {
   }
 
   void _schedule(List<bool> valores, Duration delay) {
-    _timers.add(Timer(delay, () {
-      if (mounted) setState(() => _ocultos = valores);
-    }));
+    _timers.add(
+      Timer(delay, () {
+        if (mounted) setState(() => _ocultos = valores);
+      }),
+    );
   }
 
   void _animar() {
@@ -389,9 +469,11 @@ class _AnimatedPaletteIconState extends State<AnimatedPaletteIcon> {
     _schedule([false, false, true, true], inicio + _paso);
     _schedule([false, false, false, true], inicio + _paso * 2);
     _schedule([false, false, false, false], inicio + _paso * 3);
-    _timers.add(Timer(inicio + _paso * 3 + _trans + const Duration(milliseconds: 80), () {
-      _animando = false;
-    }));
+    _timers.add(
+      Timer(inicio + _paso * 3 + _trans + const Duration(milliseconds: 80), () {
+        _animando = false;
+      }),
+    );
   }
 
   // Mismas coordenadas que PUNTOS_PALETA en Header.jsx (viewBox 24x24).
@@ -415,7 +497,11 @@ class _AnimatedPaletteIconState extends State<AnimatedPaletteIcon> {
           width: widget.size,
           height: widget.size,
           child: CustomPaint(
-            painter: _PalettePainter(color: widget.color, ocultos: _ocultos, puntos: _puntos),
+            painter: _PalettePainter(
+              color: widget.color,
+              ocultos: _ocultos,
+              puntos: _puntos,
+            ),
           ),
         ),
       ),
@@ -428,7 +514,11 @@ class _PalettePainter extends CustomPainter {
   final List<bool> ocultos;
   final List<Offset> puntos;
 
-  _PalettePainter({required this.color, required this.ocultos, required this.puntos});
+  _PalettePainter({
+    required this.color,
+    required this.ocultos,
+    required this.puntos,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -509,14 +599,19 @@ class UserAvatar extends StatelessWidget {
         color: backgroundColor ?? AppColors.adminPrimary,
       ),
       alignment: Alignment.center,
-      child: Text(_iniciales,
-          textHeightBehavior: const TextHeightBehavior(
-              applyHeightToFirstAscent: false, applyHeightToLastDescent: false),
-          style: TextStyle(
-              color: textColor ?? Colors.white,
-              fontSize: size * 0.36,
-              height: 1,
-              fontWeight: FontWeight.w700)),
+      child: Text(
+        _iniciales,
+        textHeightBehavior: const TextHeightBehavior(
+          applyHeightToFirstAscent: false,
+          applyHeightToLastDescent: false,
+        ),
+        style: TextStyle(
+          color: textColor ?? Colors.white,
+          fontSize: size * 0.36,
+          height: 1,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
     );
   }
 }
@@ -530,7 +625,12 @@ class TapArea extends StatelessWidget {
   final Widget child;
   final HitTestBehavior? behavior;
 
-  const TapArea({super.key, required this.onTap, required this.child, this.behavior});
+  const TapArea({
+    super.key,
+    required this.onTap,
+    required this.child,
+    this.behavior,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -564,7 +664,12 @@ class HexagonCluster extends StatelessWidget {
   Widget build(BuildContext context) {
     return CustomPaint(
       size: Size(size, size),
-      painter: _HexagonPainter(fillTop: fillTop, fillLeft: fillLeft, fillRight: fillRight, stroke: stroke),
+      painter: _HexagonPainter(
+        fillTop: fillTop,
+        fillLeft: fillLeft,
+        fillRight: fillRight,
+        stroke: stroke,
+      ),
     );
   }
 }
@@ -587,9 +692,12 @@ class _HexagonPainter extends CustomPainter {
     final scale = size.width / 300;
     Offset p(double x, double y) => Offset(x * scale, y * scale);
 
-    final top = Path()..addPolygon([p(150, 20), p(280, 90), p(150, 160), p(20, 90)], true);
-    final left = Path()..addPolygon([p(20, 90), p(150, 160), p(150, 280), p(20, 210)], true);
-    final right = Path()..addPolygon([p(280, 90), p(150, 160), p(150, 280), p(280, 210)], true);
+    final top = Path()
+      ..addPolygon([p(150, 20), p(280, 90), p(150, 160), p(20, 90)], true);
+    final left = Path()
+      ..addPolygon([p(20, 90), p(150, 160), p(150, 280), p(20, 210)], true);
+    final right = Path()
+      ..addPolygon([p(280, 90), p(150, 160), p(150, 280), p(280, 210)], true);
 
     canvas.drawPath(top, Paint()..color = fillTop);
     canvas.drawPath(left, Paint()..color = fillLeft);
@@ -636,7 +744,12 @@ class PersonalizarSheet extends StatelessWidget {
       builder: (context, _) {
         final controller = ThemeController();
         return Container(
-          padding: EdgeInsets.fromLTRB(20, 12, 20, MediaQuery.of(context).padding.bottom + 20),
+          padding: EdgeInsets.fromLTRB(
+            20,
+            12,
+            20,
+            MediaQuery.of(context).padding.bottom + 20,
+          ),
           decoration: BoxDecoration(
             color: AppColors.cardBg,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
@@ -647,16 +760,28 @@ class PersonalizarSheet extends StatelessWidget {
             children: [
               Center(
                 child: Container(
-                  width: 36, height: 4,
+                  width: 36,
+                  height: 4,
                   margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)),
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-              Text('Personalizar',
-                  style: TextStyle(color: AppColors.textMain, fontSize: 17, fontWeight: FontWeight.w700)),
+              Text(
+                'Personalizar',
+                style: TextStyle(
+                  color: AppColors.textMain,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
               const SizedBox(height: 2),
-              Text('Apariencia',
-                  style: TextStyle(color: AppColors.textSub, fontSize: 13)),
+              Text(
+                'Apariencia',
+                style: TextStyle(color: AppColors.textSub, fontSize: 13),
+              ),
               const SizedBox(height: 20),
               _sectionLabel('TEMA'),
               const SizedBox(height: 10),
@@ -668,7 +793,9 @@ class PersonalizarSheet extends StatelessWidget {
                       label: 'Claro',
                       color: AppColors.textMain,
                       active: !controller.darkMode,
-                      onTap: () { if (controller.darkMode) controller.toggleDarkMode(); },
+                      onTap: () {
+                        if (controller.darkMode) controller.toggleDarkMode();
+                      },
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -678,7 +805,9 @@ class PersonalizarSheet extends StatelessWidget {
                       label: 'Oscuro',
                       color: AppColors.textMain,
                       active: controller.darkMode,
-                      onTap: () { if (!controller.darkMode) controller.toggleDarkMode(); },
+                      onTap: () {
+                        if (!controller.darkMode) controller.toggleDarkMode();
+                      },
                     ),
                   ),
                 ],
@@ -714,8 +843,15 @@ class PersonalizarSheet extends StatelessWidget {
     );
   }
 
-  Widget _sectionLabel(String text) => Text(text,
-      style: TextStyle(color: AppColors.textSub, fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 0.8));
+  Widget _sectionLabel(String text) => Text(
+    text,
+    style: TextStyle(
+      color: AppColors.textSub,
+      fontSize: 11,
+      fontWeight: FontWeight.w700,
+      letterSpacing: 0.8,
+    ),
+  );
 
   Widget _optionCard({
     required IconData icon,
@@ -730,18 +866,30 @@ class PersonalizarSheet extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: active ? AppColors.adminPrimary : AppColors.border, width: 1.5),
-          color: active ? AppColors.adminPrimary.withOpacity(0.08) : Colors.transparent,
+          border: Border.all(
+            color: active ? AppColors.adminPrimary : AppColors.border,
+            width: 1.5,
+          ),
+          color: active
+              ? AppColors.adminPrimary.withValues(alpha: 0.08)
+              : Colors.transparent,
         ),
         child: Column(
           children: [
-            Icon(icon, size: 20, color: active ? AppColors.adminPrimary : AppColors.textSub),
+            Icon(
+              icon,
+              size: 20,
+              color: active ? AppColors.adminPrimary : AppColors.textSub,
+            ),
             const SizedBox(height: 6),
-            Text(label,
-                style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                    color: active ? AppColors.adminPrimary : AppColors.textSub)),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                color: active ? AppColors.adminPrimary : AppColors.textSub,
+              ),
+            ),
           ],
         ),
       ),
@@ -760,22 +908,35 @@ class PersonalizarSheet extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: active ? color : AppColors.border, width: 1.5),
-          color: active ? color.withOpacity(0.08) : Colors.transparent,
+          border: Border.all(
+            color: active ? color : AppColors.border,
+            width: 1.5,
+          ),
+          color: active ? color.withValues(alpha: 0.08) : Colors.transparent,
         ),
         child: Column(
           children: [
             Container(
-              width: 22, height: 22,
+              width: 22,
+              height: 22,
               decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-              child: active ? const Icon(Icons.check_rounded, size: 14, color: Colors.white) : null,
+              child: active
+                  ? const Icon(
+                      Icons.check_rounded,
+                      size: 14,
+                      color: Colors.white,
+                    )
+                  : null,
             ),
             const SizedBox(height: 6),
-            Text(label,
-                style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                    color: active ? color : AppColors.textSub)),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                color: active ? color : AppColors.textSub,
+              ),
+            ),
           ],
         ),
       ),
@@ -842,7 +1003,9 @@ class GradientHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final isFlat = gradStart == null || gradEnd == null;
     final fg = isFlat ? AppColors.textMain : Colors.white;
-    final fgSub = isFlat ? AppColors.textSub : Colors.white.withOpacity(0.75);
+    final fgSub = isFlat
+        ? AppColors.textSub
+        : Colors.white.withValues(alpha: 0.75);
 
     return Container(
       width: double.infinity,
@@ -859,7 +1022,11 @@ class GradientHeader extends StatelessWidget {
               ),
             ),
       padding: EdgeInsets.fromLTRB(
-          20, MediaQuery.of(context).padding.top + 16, 20, 20),
+        20,
+        MediaQuery.of(context).padding.top + 16,
+        20,
+        20,
+      ),
       child: Row(
         children: [
           if (showBack)
@@ -874,16 +1041,18 @@ class GradientHeader extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title,
-                    style: TextStyle(
-                        color: fg,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        fontFamily: 'Cambria')),
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: fg,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    fontFamily: 'Cambria',
+                  ),
+                ),
                 if (subtitle != null) ...[
                   const SizedBox(height: 2),
-                  Text(subtitle!,
-                      style: TextStyle(color: fgSub, fontSize: 13)),
+                  Text(subtitle!, style: TextStyle(color: fgSub, fontSize: 13)),
                 ],
                 if (subtitleWidget != null) ...[
                   const SizedBox(height: 2),
@@ -892,7 +1061,7 @@ class GradientHeader extends StatelessWidget {
               ],
             ),
           ),
-          if (trailing != null) trailing!,
+          ?trailing,
         ],
       ),
     );
@@ -911,11 +1080,14 @@ class EstadoBadge extends StatelessWidget {
         color: estadoBg(estado),
         borderRadius: BorderRadius.circular(20),
       ),
-      child: Text(estado,
-          style: TextStyle(
-              color: estadoColor(estado),
-              fontSize: 12,
-              fontWeight: FontWeight.w600))
+      child: Text(
+        estado,
+        style: TextStyle(
+          color: estadoColor(estado),
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 }
@@ -945,9 +1117,10 @@ class StatCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2))
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       child: Column(
@@ -959,25 +1132,29 @@ class StatCard extends StatelessWidget {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                    color: iconBg,
-                    borderRadius: BorderRadius.circular(10)),
+                  color: iconBg,
+                  borderRadius: BorderRadius.circular(10),
+                ),
                 child: Icon(icon, color: iconColor, size: 18),
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(label,
-                    style: TextStyle(
-                        color: AppColors.textSub,
-                        fontSize: 12)),
+                child: Text(
+                  label,
+                  style: TextStyle(color: AppColors.textSub, fontSize: 12),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          Text(value,
-              style: TextStyle(
-                  color: iconColor,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800)),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: TextStyle(
+              color: iconColor,
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
         ],
       ),
     );
@@ -1015,7 +1192,9 @@ class InfoRow extends StatelessWidget {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-                color: iconBg, borderRadius: BorderRadius.circular(10)),
+              color: iconBg,
+              borderRadius: BorderRadius.circular(10),
+            ),
             child: Icon(icon, color: iconColor, size: 18),
           ),
           const SizedBox(width: 12),
@@ -1023,14 +1202,18 @@ class InfoRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label,
-                    style: TextStyle(
-                        color: AppColors.textSub, fontSize: 11)),
-                Text(value,
-                    style: TextStyle(
-                        color: AppColors.textMain,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500)),
+                Text(
+                  label,
+                  style: TextStyle(color: AppColors.textSub, fontSize: 11),
+                ),
+                Text(
+                  value,
+                  style: TextStyle(
+                    color: AppColors.textMain,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
               ],
             ),
           ),
@@ -1059,11 +1242,14 @@ class LicenciaChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: AppColors.driverPrimary),
       ),
-      child: Text(label,
-          style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: vencida ? Colors.white : AppColors.driverPrimary)),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: vencida ? Colors.white : AppColors.driverPrimary,
+        ),
+      ),
     );
   }
 }
@@ -1085,9 +1271,10 @@ class SectionCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 8,
-              offset: const Offset(0, 2))
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       child: child,
@@ -1103,7 +1290,12 @@ class ConfirmRow extends StatelessWidget {
   final String value;
   final String? previousValue;
 
-  const ConfirmRow({super.key, required this.label, required this.value, this.previousValue});
+  const ConfirmRow({
+    super.key,
+    required this.label,
+    required this.value,
+    this.previousValue,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1119,13 +1311,23 @@ class ConfirmRow extends StatelessWidget {
             children: [
               if (huboCambio) ...[
                 Container(
-                    width: 6,
-                    height: 6,
-                    decoration: BoxDecoration(color: AppColors.adminPrimary, shape: BoxShape.circle)),
+                  width: 6,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: AppColors.adminPrimary,
+                    shape: BoxShape.circle,
+                  ),
+                ),
                 const SizedBox(width: 6),
               ],
-              Text(label,
-                  style: TextStyle(color: AppColors.textSub, fontSize: 13.5, fontWeight: FontWeight.w500)),
+              Text(
+                label,
+                style: TextStyle(
+                  color: AppColors.textSub,
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ],
           ),
           const SizedBox(width: 16),
@@ -1133,19 +1335,28 @@ class ConfirmRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text(value.isEmpty ? '—' : value,
-                    textAlign: TextAlign.right,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: AppColors.textMain, fontSize: 14, fontWeight: FontWeight.w600)),
+                Text(
+                  value.isEmpty ? '—' : value,
+                  textAlign: TextAlign.right,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.textMain,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 if (huboCambio) ...[
                   const SizedBox(height: 2),
-                  Text('antes: ${previousValue!.isEmpty ? '—' : previousValue}',
-                      textAlign: TextAlign.right,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                          color: AppColors.textSub,
-                          fontSize: 11,
-                          decoration: TextDecoration.lineThrough)),
+                  Text(
+                    'antes: ${previousValue!.isEmpty ? '—' : previousValue}',
+                    textAlign: TextAlign.right,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: AppColors.textSub,
+                      fontSize: 11,
+                      decoration: TextDecoration.lineThrough,
+                    ),
+                  ),
                 ],
               ],
             ),
@@ -1182,7 +1393,8 @@ class AnticipoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final mostrarConfirmarDevolucion = isAdmin &&
+    final mostrarConfirmarDevolucion =
+        isAdmin &&
         anticipo.estado == EstadoAnticipo.excedentePendiente &&
         onConfirmarDevolucion != null;
 
@@ -1193,9 +1405,10 @@ class AnticipoCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2))
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
         ],
       ),
       child: Column(
@@ -1213,21 +1426,28 @@ class AnticipoCard extends StatelessWidget {
                       message: 'Ver detalle',
                       child: IconButton(
                         onPressed: onVer,
-                        icon: Icon(Icons.remove_red_eye_outlined,
-                            color: AppColors.textSub, size: 20),
+                        icon: Icon(
+                          Icons.remove_red_eye_outlined,
+                          color: AppColors.textSub,
+                          size: 20,
+                        ),
                         constraints: const BoxConstraints(),
                         padding: const EdgeInsets.all(6),
                       ),
                     ),
                     Tooltip(
-                      message: onEditar != null ? 'Editar' : _editDisabledReason,
+                      message: onEditar != null
+                          ? 'Editar'
+                          : _editDisabledReason,
                       child: IconButton(
                         onPressed: onEditar,
-                        icon: Icon(Icons.edit_outlined,
-                            color: onEditar != null
-                                ? AppColors.textSub
-                                : AppColors.border,
-                            size: 20),
+                        icon: Icon(
+                          Icons.edit_outlined,
+                          color: onEditar != null
+                              ? AppColors.textSub
+                              : AppColors.border,
+                          size: 20,
+                        ),
                         constraints: const BoxConstraints(),
                         padding: const EdgeInsets.all(6),
                       ),
@@ -1235,48 +1455,63 @@ class AnticipoCard extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 6),
-                Text(anticipo.nombreRuta ?? 'Anticipo #${anticipo.id}',
-                    style: TextStyle(
-                        color: AppColors.textMain,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w700)),
+                Text(
+                  anticipo.nombreRuta ?? 'Anticipo #${anticipo.id}',
+                  style: TextStyle(
+                    color: AppColors.textMain,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
                 if (isAdmin && anticipo.conductorNombre.isNotEmpty)
-                  Text('Conductor: ${anticipo.conductorNombre}',
-                      style: TextStyle(
-                          color: AppColors.textSub, fontSize: 12)),
+                  Text(
+                    'Conductor: ${anticipo.conductorNombre}',
+                    style: TextStyle(color: AppColors.textSub, fontSize: 12),
+                  ),
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    _val('Anticipo', formatCOP(anticipo.valorAnticipo),
-                        AppColors.blue),
                     _val(
-                        'Gastado',
-                        anticipo.valorGastado == 0
-                            ? '—'
-                            : '-${formatCOP(anticipo.valorGastado)}',
-                        anticipo.valorGastado == 0 ? AppColors.textSub : AppColors.orange),
+                      'Anticipo',
+                      formatCOP(anticipo.valorAnticipo),
+                      AppColors.blue,
+                    ),
                     _val(
-                        'Excedente',
-                        anticipo.valorGastado == 0
-                            ? '—'
-                            : (anticipo.tieneDeficit
+                      'Gastado',
+                      anticipo.valorGastado == 0
+                          ? '—'
+                          : '-${formatCOP(anticipo.valorGastado)}',
+                      anticipo.valorGastado == 0
+                          ? AppColors.textSub
+                          : AppColors.orange,
+                    ),
+                    _val(
+                      'Excedente',
+                      anticipo.valorGastado == 0
+                          ? '—'
+                          : (anticipo.tieneDeficit
                                 ? formatCOP(anticipo.excedente)
                                 : '+${formatCOP(anticipo.excedente)}'),
-                        anticipo.valorGastado == 0
-                            ? AppColors.textSub
-                            : (anticipo.tieneDeficit ? AppColors.red : AppColors.green)),
+                      anticipo.valorGastado == 0
+                          ? AppColors.textSub
+                          : (anticipo.tieneDeficit
+                                ? AppColors.red
+                                : AppColors.green),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 10),
                 Row(
                   children: [
-                    Text('Entrega: ${formatFecha(anticipo.fechaEntrega)}',
-                        style: TextStyle(
-                            color: AppColors.textSub, fontSize: 11)),
+                    Text(
+                      'Entrega: ${formatFecha(anticipo.fechaEntrega)}',
+                      style: TextStyle(color: AppColors.textSub, fontSize: 11),
+                    ),
                     const Spacer(),
-                    Text('Legalización: ${formatFecha(anticipo.fechaLegalizacion)}',
-                        style: TextStyle(
-                            color: AppColors.textSub, fontSize: 11)),
+                    Text(
+                      'Legalización: ${formatFecha(anticipo.fechaLegalizacion)}',
+                      style: TextStyle(color: AppColors.textSub, fontSize: 11),
+                    ),
                   ],
                 ),
               ],
@@ -1299,12 +1534,19 @@ class AnticipoCard extends StatelessWidget {
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.check_circle_outline, color: Colors.white, size: 16),
+                    Icon(
+                      Icons.check_circle_outline,
+                      color: Colors.white,
+                      size: 16,
+                    ),
                     SizedBox(width: 6),
-                    Text('Confirmar devolución de excedente',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700)),
+                    Text(
+                      'Confirmar devolución de excedente',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1320,14 +1562,15 @@ class AnticipoCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label,
-              style: TextStyle(
-                  color: AppColors.textSub, fontSize: 11)),
-          Text(value,
-              style: TextStyle(
-                  color: color,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700)),
+          Text(label, style: TextStyle(color: AppColors.textSub, fontSize: 11)),
+          Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ],
       ),
     );

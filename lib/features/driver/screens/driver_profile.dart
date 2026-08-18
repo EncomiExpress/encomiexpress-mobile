@@ -73,7 +73,7 @@ class _DriverProfileState extends State<DriverProfile> {
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                              color: Colors.black.withOpacity(0.15),
+                              color: Colors.black.withValues(alpha: 0.15),
                               blurRadius: 12)
                         ],
                       ),
@@ -264,7 +264,7 @@ class _DriverProfileState extends State<DriverProfile> {
                       }),
                       elevation: WidgetStateProperty.resolveWith((states) =>
                           states.contains(WidgetState.hovered) || states.contains(WidgetState.pressed) ? 6 : 3),
-                      shadowColor: WidgetStateProperty.all(AppColors.driverPrimary.withOpacity(0.4)),
+                      shadowColor: WidgetStateProperty.all(AppColors.driverPrimary.withValues(alpha: 0.4)),
                       mouseCursor: WidgetStateProperty.all(SystemMouseCursors.click),
                     ),
                     child: const Row(
