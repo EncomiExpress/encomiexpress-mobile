@@ -14,20 +14,6 @@ class PaqueteService {
     return [];
   }
 
-  // PATCH /api/rutas/:idRuta/marcar-reparto — marca 'En reparto' todos los
-  // paquetes del par vehículo/conductor de este conductor en esa ruta (ver
-  // rutaService.marcarReparto en el backend). Se manda idConductor para no
-  // tocar los paquetes de otros conductores que compartan la misma ruta.
-  Future<Map<String, dynamic>> marcarReparto(int idRuta, int idConductor) async {
-    try {
-      final resp = await _api.patch('/api/rutas/$idRuta/marcar-reparto', data: {'idConductor': idConductor});
-      if (resp.statusCode == 200) return {'success': true};
-      return {'success': false, 'message': 'No se pudo iniciar el reparto'};
-    } catch (e) {
-      return {'success': false, 'message': _mensajeError(e)};
-    }
-  }
-
   // PATCH /api/paquetes/:id/evidencia — sube la foto de evidencia (form-data)
   // y deja el paquete en 'Entregado' o 'Devuelto' (ver paqueteController.subirEvidencia).
   Future<Map<String, dynamic>> subirEvidencia(

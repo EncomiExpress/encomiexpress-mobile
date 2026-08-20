@@ -418,9 +418,8 @@ Color estadoBg(String estado) {
 Color estadoPaqueteColor(String estado) {
   switch (estado) {
     case 'Por entregar': return AppColors.blue;
-    case 'En reparto':   return AppColors.orange;
     case 'Entregado':    return AppColors.green;
-    case 'Devuelto':     return AppColors.purple;
+    case 'Devuelto':     return AppColors.red;
     default:              return AppColors.textSub;
   }
 }
@@ -428,9 +427,8 @@ Color estadoPaqueteColor(String estado) {
 Color estadoPaqueteBg(String estado) {
   switch (estado) {
     case 'Por entregar': return AppColors.blueBg;
-    case 'En reparto':   return AppColors.orangeBg;
     case 'Entregado':    return AppColors.greenBg;
-    case 'Devuelto':     return AppColors.purpleBg;
+    case 'Devuelto':     return AppColors.redBg;
     default:              return AppColors.bgGray;
   }
 }

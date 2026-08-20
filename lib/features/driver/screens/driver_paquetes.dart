@@ -1,8 +1,11 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../../core/models.dart';
+import '../../../../core/platform_utils.dart';
 import '../../../../core/services/paquete_service.dart';
 import '../../../../core/widgets.dart';
+import '../../../../core/image_viewer.dart';
 
 class DriverPaquetes extends StatefulWidget {
   final UserModel user;
@@ -16,11 +19,13 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
   final _service = PaqueteService();
   bool _loading = true;
   List<dynamic> _paquetes = [];
-  int? _conductorId;
+  // Mismo patrón de "Mostrar más" que admin_home.dart/driver_home.dart con
+  // Anticipos: se trae todo de una vez y se revela de a 5, en vez de mostrar
+  // los paquetes de todas las rutas de golpe.
+  int _itemsToShow = 5;
 
-  // idRuta / idPaquete cuya acción está en curso — deshabilita el botón
-  // correspondiente mientras se espera la respuesta del backend.
-  final Set<int> _rutasIniciando = {};
+  // idPaquete cuya acción está en curso — deshabilita el botón correspondiente
+  // mientras se espera la respuesta del backend.
   final Set<int> _paquetesActualizando = {};
 
   @override
@@ -35,7 +40,6 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
     final conductorId = conductorIdStr != null
         ? int.tryParse(conductorIdStr)
         : null;
-    _conductorId = conductorId;
     if (conductorId == null) {
       if (mounted) {
         setState(() {
@@ -50,18 +54,28 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
       setState(() {
         _paquetes = data;
         _loading = false;
+        _itemsToShow = 5;
       });
     }
   }
 
   static int? _toInt(dynamic v) => v is num ? v.toInt() : int.tryParse('$v');
 
-  // Agrupa por ruta (Paquete.asignacion.ruta) porque "Iniciar reparto" es una
-  // acción masiva: rutaService.marcarReparto marca de una vez todos los
-  // paquetes del conductor en esa ruta — no tiene sentido pedirla por paquete.
+  bool get _hayMas => _itemsToShow < _paquetes.length;
+
+  void _mostrarMas() {
+    if (_hayMas) {
+      setState(() => _itemsToShow = (_itemsToShow + 5).clamp(0, _paquetes.length));
+    }
+  }
+
+  // Agrupa por ruta (Paquete.asignacion.ruta) — así se ve de un vistazo a qué
+  // ruta pertenece cada paquete, y de ahí sale el estado de la ruta que decide
+  // si ya se pueden marcar entregas (ver _buildGrupo). Se agrupa solo lo que
+  // ya está "revelado" (_itemsToShow), igual que Anticipos.
   List<_GrupoRuta> get _grupos {
     final Map<int, _GrupoRuta> mapa = {};
-    for (final p in _paquetes) {
+    for (final p in _paquetes.take(_itemsToShow)) {
       final paquete = p as Map<String, dynamic>;
       final asignacion = paquete['asignacion'] as Map<String, dynamic>?;
       final ruta = asignacion != null ? asignacion['ruta'] as Map<String, dynamic>? : null;
@@ -71,21 +85,6 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
       mapa[key]!.paquetes.add(paquete);
     }
     return mapa.values.toList();
-  }
-
-  Future<void> _iniciarReparto(_GrupoRuta grupo) async {
-    if (grupo.idRuta == null || _conductorId == null) return;
-    setState(() => _rutasIniciando.add(grupo.idRuta!));
-    final result = await _service.marcarReparto(grupo.idRuta!, _conductorId!);
-    if (!mounted) return;
-    setState(() => _rutasIniciando.remove(grupo.idRuta!));
-    if (result['success'] == true) {
-      _load();
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result['message'] ?? 'No se pudo iniciar el reparto')),
-      );
-    }
   }
 
   Future<void> _marcarPaquete(Map<String, dynamic> paquete, String estado) async {
@@ -133,8 +132,23 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
             )
           : ListView.builder(
               padding: const EdgeInsets.all(12),
-              itemCount: grupos.length,
-              itemBuilder: (_, i) => _buildGrupo(grupos[i]),
+              itemCount: grupos.length + (_hayMas ? 1 : 0),
+              itemBuilder: (_, i) {
+                if (i == grupos.length) {
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: OutlinedButton(
+                      onPressed: _mostrarMas,
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: AppColors.border),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: Text('Mostrar 5 más', style: TextStyle(color: AppColors.textMain)),
+                    ),
+                  );
+                }
+                return _buildGrupo(grupos[i]);
+              },
             ),
     );
   }
@@ -154,56 +168,52 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
         ? '${destino['ciudad'] ?? ''}${(destino['ciudad'] != null && destino['departamento'] != null) ? ', ' : ''}${destino['departamento'] ?? ''}'
         : '';
     final detalle = [destinoTexto, horario].where((s) => s.isNotEmpty).join(' · ');
-    final hayPendientes = grupo.paquetes.any((p) => p['estado'] == 'Por entregar');
-    final iniciando = grupo.idRuta != null && _rutasIniciando.contains(grupo.idRuta);
+    // El conductor solo puede marcar entregas mientras la ruta está "En Ruta" —
+    // antes de eso no ha salido de bodega (ver la misma validación en el backend,
+    // encomiendaService.actualizarEstadoPaquete).
+    final rutaEnRuta = ruta != null && ruta['estado'] == 'En Ruta';
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
+    // Cada ruta es su propio bloque (mismo SectionCard que usa el resto de la
+    // app) para que quede claramente separada de las demás — antes eran solo
+    // tarjetas de paquete sueltas, una tras otra, sin nada que agrupara cuáles
+    // eran de la misma ruta.
+    return SectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        rutaLabel,
-                        style: TextStyle(color: AppColors.textMain, fontWeight: FontWeight.w700, fontSize: 15),
-                      ),
-                      if (detalle.isNotEmpty)
-                        Text(detalle, style: TextStyle(color: AppColors.textSub, fontSize: 12)),
-                    ],
-                  ),
-                ),
-                if (hayPendientes && grupo.idRuta != null)
-                  TextButton.icon(
-                    onPressed: iniciando ? null : () => _iniciarReparto(grupo),
-                    icon: iniciando
-                        ? SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.driverPrimary),
-                          )
-                        : Icon(Icons.local_shipping_outlined, size: 16, color: AppColors.driverPrimary),
-                    label: Text(
-                      'Iniciar reparto',
-                      style: TextStyle(color: AppColors.driverPrimary, fontWeight: FontWeight.w600),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      rutaLabel,
+                      style: TextStyle(color: AppColors.textMain, fontWeight: FontWeight.w700, fontSize: 16),
                     ),
-                  ),
-              ],
-            ),
+                    if (detalle.isNotEmpty)
+                      Text(detalle, style: TextStyle(color: AppColors.textSub, fontSize: 12)),
+                  ],
+                ),
+              ),
+              if (!rutaEnRuta)
+                Text(
+                  'La ruta aún no ha salido',
+                  style: TextStyle(color: AppColors.textSub, fontSize: 11, fontStyle: FontStyle.italic),
+                ),
+            ],
           ),
-          ...grupo.paquetes.map(_buildPaqueteCard),
+          const SizedBox(height: 14),
+          for (final p in grupo.paquetes) ...[
+            _buildPaqueteCard(p, rutaEnRuta),
+            if (p != grupo.paquetes.last) const SizedBox(height: 10),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildPaqueteCard(Map<String, dynamic> p) {
+  Widget _buildPaqueteCard(Map<String, dynamic> p, bool rutaEnRuta) {
     final encomienda = p['encomienda'] as Map<String, dynamic>?;
     final destinatario = encomienda != null ? encomienda['destinatario'] as Map<String, dynamic>? : null;
     final nombreDestinatario = (destinatario?['nombreDestinatario'] as String?) ?? '';
@@ -213,13 +223,16 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
     final idPaquete = _toInt(p['idPaquete']);
     final actualizando = idPaquete != null && _paquetesActualizando.contains(idPaquete);
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.bgGray,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -283,10 +296,11 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
                   ),
                 ),
             ],
-            // Solo se puede marcar entregado/devuelto una vez la ruta está
-            // "En reparto" — antes de eso ('Por entregar') o después
-            // (ya 'Entregado'/'Devuelto') no hay acción que tomar.
-            if (estado == 'En reparto') ...[
+            // Solo se puede marcar entregado/devuelto mientras la ruta ya está
+            // "En Ruta" y el paquete sigue "Por entregar" — antes de eso la ruta
+            // no ha salido, y después ('Entregado'/'Devuelto') ya no hay acción
+            // que tomar (el backend además bloquea reabrir un estado final).
+            if (estado == 'Por entregar' && rutaEnRuta) ...[
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -321,9 +335,49 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
                   ),
                 ),
             ],
+            // Una vez el paquete queda en un estado final, el conductor puede
+            // volver a consultar lo que él mismo registró — la observación y la
+            // foto que subió al marcarlo (el backend ya no deja modificarlo).
+            if (estado == 'Entregado' || estado == 'Devuelto') ...[
+              if ((p['observacionEstado'] as String?)?.isNotEmpty == true ||
+                  (p['fotoEntrega'] as String?)?.isNotEmpty == true) ...[
+                const SizedBox(height: 10),
+                Divider(color: AppColors.border, height: 1),
+                const SizedBox(height: 10),
+              ],
+              if ((p['observacionEstado'] as String?)?.isNotEmpty == true)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Text(
+                    p['observacionEstado'] as String,
+                    style: TextStyle(color: AppColors.textSub, fontSize: 12, fontStyle: FontStyle.italic),
+                  ),
+                ),
+              if ((p['fotoEntrega'] as String?)?.isNotEmpty == true)
+                Builder(
+                  builder: (ctx) => TapArea(
+                    onTap: () => ImageViewer.show(ctx, [p['fotoEntrega'] as String]),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.photo_camera_outlined, size: 16, color: AppColors.driverPrimary),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Ver evidencia',
+                          style: TextStyle(
+                            color: AppColors.driverPrimary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            decoration: TextDecoration.underline,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
           ],
         ),
-      ),
     );
   }
 
@@ -377,10 +431,45 @@ class _EvidenciaSheetState extends State<_EvidenciaSheet> {
   final _obsCtrl = TextEditingController();
 
   Future<void> _pickFoto() async {
-    final result = await FilePicker.pickFiles(type: FileType.image);
-    if (result != null && result.files.isNotEmpty) {
-      setState(() => _foto = result.files.single);
+    if (!esMovil) {
+      final result = await FilePicker.pickFiles(type: FileType.image);
+      if (result != null && result.files.isNotEmpty) {
+        setState(() => _foto = result.files.single);
+      }
+      return;
     }
+
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      backgroundColor: AppColors.cardBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(Icons.photo_camera_outlined, color: AppColors.textMain),
+              title: Text('Tomar foto', style: TextStyle(color: AppColors.textMain)),
+              onTap: () => Navigator.pop(ctx, ImageSource.camera),
+            ),
+            ListTile(
+              leading: Icon(Icons.photo_library_outlined, color: AppColors.textMain),
+              title: Text('Elegir de la galería', style: TextStyle(color: AppColors.textMain)),
+              onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (source == null || !mounted) return;
+
+    final xfile = await ImagePicker().pickImage(source: source, imageQuality: 85);
+    if (xfile == null || !mounted) return;
+
+    final size = await xfile.length();
+    setState(() => _foto = PlatformFile(path: xfile.path, name: xfile.name, size: size));
   }
 
   @override
@@ -392,7 +481,9 @@ class _EvidenciaSheetState extends State<_EvidenciaSheet> {
   @override
   Widget build(BuildContext context) {
     final esEntregado = widget.estado == 'Entregado';
-    final acento = esEntregado ? AppColors.green : AppColors.red;
+    // El acento sigue el tema activo (rojo/azul), no el estado — igual que el
+    // resto de campos e inputs de la app, sin importar si es Entregado o Devuelto.
+    final acento = AppColors.driverPrimary;
 
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),

@@ -127,9 +127,63 @@ class _DriverHomeState extends State<DriverHome> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bgGray,
-      body: _tabIndex == 0
-          ? _buildMisAnticipos()
-          : DriverPaquetes(user: _currentUser),
+      body: Column(
+        children: [
+          Container(
+            height: 4,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: AppColors.gradientNavbar,
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+            ),
+          ),
+          Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: AppColors.cardBg,
+              border: Border(bottom: BorderSide(color: AppColors.border)),
+            ),
+            padding: EdgeInsets.fromLTRB(
+              20,
+              MediaQuery.of(context).padding.top + 16,
+              20,
+              20,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${greeting()} ${_currentUser.nombre}',
+                        style: TextStyle(
+                          color: AppColors.textMain,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          fontFamily: 'Cambria',
+                        ),
+                      ),
+                      LiveDateTime(
+                        style: TextStyle(color: AppColors.textSub, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox.shrink(),
+              ],
+            ),
+          ),
+          Expanded(
+            child: _tabIndex == 0
+                ? _buildMisAnticipos()
+                : DriverPaquetes(user: _currentUser),
+          ),
+        ],
+      ),
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
@@ -240,54 +294,6 @@ class _DriverHomeState extends State<DriverHome> {
   Widget _buildMisAnticipos() {
     return Column(
       children: [
-        Container(
-          height: 4,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: AppColors.gradientNavbar,
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-            ),
-          ),
-        ),
-        Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: AppColors.cardBg,
-            border: Border(bottom: BorderSide(color: AppColors.border)),
-          ),
-          padding: EdgeInsets.fromLTRB(
-            20,
-            MediaQuery.of(context).padding.top + 16,
-            20,
-            20,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${greeting()} ${_currentUser.nombre}',
-                      style: TextStyle(
-                        color: AppColors.textMain,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w800,
-                        fontFamily: 'Cambria',
-                      ),
-                    ),
-                    LiveDateTime(
-                      style: TextStyle(color: AppColors.textSub, fontSize: 13),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox.shrink(),
-            ],
-          ),
-        ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
           child: Row(

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../../core/models.dart';
+import '../../../../core/platform_utils.dart';
 import '../../../../core/services/anticipo_service.dart';
 import '../../../../core/widgets.dart';
 
@@ -207,7 +209,7 @@ class _AnticipoEditState extends State<AnticipoEdit> {
     if (picked != null) setState(() => _fechaEntrega = picked);
   }
 
-  Future<void> _pickSoporte() async {
+  Future<void> _pickArchivos() async {
     final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
@@ -216,6 +218,60 @@ class _AnticipoEditState extends State<AnticipoEdit> {
     if (result != null && result.files.isNotEmpty) {
       setState(() => _soporteNuevo.addAll(result.files));
     }
+  }
+
+  Future<void> _pickSoporte() async {
+    // En escritorio/web, image_picker no tiene cámara/galería — directo al
+    // selector de archivos de siempre (PDF + imágenes, varios a la vez).
+    if (!esMovil) {
+      await _pickArchivos();
+      return;
+    }
+
+    final opcion = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: AppColors.cardBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(Icons.photo_camera_outlined, color: AppColors.textMain),
+              title: Text('Tomar foto', style: TextStyle(color: AppColors.textMain)),
+              onTap: () => Navigator.pop(ctx, 'camera'),
+            ),
+            ListTile(
+              leading: Icon(Icons.photo_library_outlined, color: AppColors.textMain),
+              title: Text('Elegir de la galería', style: TextStyle(color: AppColors.textMain)),
+              onTap: () => Navigator.pop(ctx, 'gallery'),
+            ),
+            ListTile(
+              leading: Icon(Icons.insert_drive_file_outlined, color: AppColors.textMain),
+              title: Text('Elegir archivo (PDF o imagen)', style: TextStyle(color: AppColors.textMain)),
+              onTap: () => Navigator.pop(ctx, 'file'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (opcion == null || !mounted) return;
+
+    if (opcion == 'file') {
+      await _pickArchivos();
+      return;
+    }
+
+    final xfile = await ImagePicker().pickImage(
+      source: opcion == 'camera' ? ImageSource.camera : ImageSource.gallery,
+      imageQuality: 85,
+    );
+    if (xfile == null || !mounted) return;
+
+    final size = await xfile.length();
+    setState(() => _soporteNuevo.add(PlatformFile(path: xfile.path, name: xfile.name, size: size)));
   }
 
   void _quitarSoporteNuevo(int index) {
@@ -677,8 +733,10 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                                         Icon(
                                             (_soporteActual.isEmpty && _soporteNuevo.isEmpty)
                                                 ? Icons.upload_outlined
-                                                : Icons.add_circle_outline,
-                                            color: AppColors.textSub,
+                                                : Icons.check_circle,
+                                            color: (_soporteActual.isEmpty && _soporteNuevo.isEmpty)
+                                                ? AppColors.textSub
+                                                : AppColors.green,
                                             size: (_soporteActual.isEmpty && _soporteNuevo.isEmpty) ? 28 : 20),
                                         const SizedBox(height: 6),
                                         Text(
