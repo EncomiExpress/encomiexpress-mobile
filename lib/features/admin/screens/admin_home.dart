@@ -88,9 +88,15 @@ class _AdminHomeState extends State<AdminHome> {
       _anticipos.fold(0, (s, a) => s + a.valorGastado);
   List<Anticipo> get _visibleAnticipos => _anticipos.take(_itemsToShow).toList();
   bool get _hayMas => _itemsToShow < _anticipos.length;
+  // Separados por signo — sumar excedentes y faltantes juntos daría un neto
+  // que esconde cuánta plata hay realmente en cada dirección (ej. +500.000 y
+  // -300.000 sumados muestran 200.000, sin dejar ver que son dos montos reales).
   double get _totalExcedentes => _anticipos
-      .where((a) => a.estado == EstadoAnticipo.excedentePendiente)
+      .where((a) => a.estado == EstadoAnticipo.excedentePendiente && a.excedente > 0)
       .fold(0, (s, a) => s + a.excedente);
+  double get _totalFaltantes => _anticipos
+      .where((a) => a.estado == EstadoAnticipo.excedentePendiente && a.excedente < 0)
+      .fold(0, (s, a) => s + a.excedente.abs());
   int get _porConfirmar =>
       _anticipos.where((a) => a.estado == EstadoAnticipo.excedentePendiente).length;
 
@@ -101,11 +107,15 @@ class _AdminHomeState extends State<AdminHome> {
   }
 
   Future<void> _confirmarDevolucion(Anticipo a) async {
+    final esFaltante = a.tieneDeficit;
     final confirmado = await confirmarDialog(
       context,
-      titulo: 'Confirmar devolución',
-      mensaje: '¿El conductor devolvió el excedente? El anticipo pasará a Completado '
-          'y la fecha de entrega del excedente quedará registrada a la de hoy.',
+      titulo: esFaltante ? 'Confirmar reposición' : 'Confirmar devolución',
+      mensaje: esFaltante
+          ? '¿Ya le repusiste el faltante al conductor? El anticipo pasará a Completado '
+              'y quedará registrada la fecha de hoy.'
+          : '¿El conductor devolvió el excedente? El anticipo pasará a Completado '
+              'y la fecha de entrega del excedente quedará registrada a la de hoy.',
       textoConfirmar: 'Confirmar',
     );
     if (!confirmado || !mounted) return;
@@ -118,9 +128,9 @@ class _AdminHomeState extends State<AdminHome> {
         final idx = _anticipos.indexWhere((x) => x.id == a.id);
         if (idx != -1) _anticipos[idx] = result['anticipo'] as Anticipo;
       });
-      showAppSnackBar(context, 'Devolución confirmada');
+      showAppSnackBar(context, esFaltante ? 'Reposición confirmada' : 'Devolución confirmada');
     } else {
-      showAppSnackBar(context, result['message'] ?? 'Error al confirmar la devolución', severity: 'error');
+      showAppSnackBar(context, result['message'] ?? (esFaltante ? 'Error al confirmar la reposición' : 'Error al confirmar la devolución'), severity: 'error');
     }
   }
 
@@ -184,6 +194,16 @@ class _AdminHomeState extends State<AdminHome> {
                                 iconColor: AppColors.orange,
                                 iconBg: AppColors.orangeBg,
                               ),
+                              // Solo aparece si hay algún anticipo con excedente negativo — no
+                              // agrega ruido a la grilla cuando nunca hay faltantes.
+                              if (_totalFaltantes > 0)
+                                StatCard(
+                                  label: 'Faltantes pendientes',
+                                  value: formatCOP(_totalFaltantes),
+                                  icon: Icons.priority_high_rounded,
+                                  iconColor: AppColors.red,
+                                  iconBg: AppColors.redBg,
+                                ),
                               StatCard(
                                 label: 'Por confirmar',
                                 value: '$_porConfirmar',

@@ -7,6 +7,16 @@ import '../../../../core/services/paquete_service.dart';
 import '../../../../core/widgets.dart';
 import '../../../../core/image_viewer.dart';
 
+// Mismo tope que exige el backend para cualquier archivo subido (evidencia de
+// paquete o soporte de anticipo) — config/cloudinary.js, multer `fileSize`.
+const int _maxFotoBytes = 8 * 1024 * 1024;
+
+String _formatBytes(num bytes) {
+  final mb = bytes / (1024 * 1024);
+  if (mb < 0.1 && bytes > 0) return '${(bytes / 1024).toStringAsFixed(0)} KB';
+  return '${mb.toStringAsFixed(1)} MB';
+}
+
 class DriverPaquetes extends StatefulWidget {
   final UserModel user;
   const DriverPaquetes({super.key, required this.user});
@@ -428,13 +438,30 @@ class _EvidenciaSheet extends StatefulWidget {
 
 class _EvidenciaSheetState extends State<_EvidenciaSheet> {
   PlatformFile? _foto;
+  String? _errorPeso;
   final _obsCtrl = TextEditingController();
+
+  // Valida el peso antes de aceptar la foto — si no, el backend la rechaza
+  // recién al confirmar y el conductor pierde la evidencia que ya tomó.
+  void _setFoto(PlatformFile archivo) {
+    if (archivo.size > _maxFotoBytes) {
+      setState(() {
+        _foto = null;
+        _errorPeso = '"${archivo.name}" pesa ${_formatBytes(archivo.size)}: supera el máximo de ${_formatBytes(_maxFotoBytes)}.';
+      });
+      return;
+    }
+    setState(() {
+      _foto = archivo;
+      _errorPeso = null;
+    });
+  }
 
   Future<void> _pickFoto() async {
     if (!esMovil) {
       final result = await FilePicker.pickFiles(type: FileType.image);
       if (result != null && result.files.isNotEmpty) {
-        setState(() => _foto = result.files.single);
+        _setFoto(result.files.single);
       }
       return;
     }
@@ -469,7 +496,7 @@ class _EvidenciaSheetState extends State<_EvidenciaSheet> {
     if (xfile == null || !mounted) return;
 
     final size = await xfile.length();
-    setState(() => _foto = PlatformFile(path: xfile.path, name: xfile.name, size: size));
+    _setFoto(PlatformFile(path: xfile.path, name: xfile.name, size: size));
   }
 
   @override
@@ -511,6 +538,8 @@ class _EvidenciaSheetState extends State<_EvidenciaSheet> {
             ),
             const SizedBox(height: 2),
             Text('Se requiere una foto como evidencia', style: TextStyle(color: AppColors.textSub, fontSize: 13)),
+            const SizedBox(height: 2),
+            Text('Máx. ${_formatBytes(_maxFotoBytes)} por foto', style: TextStyle(color: AppColors.textSub, fontSize: 11.5)),
             const SizedBox(height: 16),
             TapArea(
               onTap: _pickFoto,
@@ -531,7 +560,7 @@ class _EvidenciaSheetState extends State<_EvidenciaSheet> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      _foto == null ? 'Seleccionar foto' : _foto!.name,
+                      _foto == null ? 'Seleccionar foto' : '${_foto!.name} · ${_formatBytes(_foto!.size)}',
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: _foto == null ? AppColors.textSub : AppColors.textMain,
@@ -542,6 +571,10 @@ class _EvidenciaSheetState extends State<_EvidenciaSheet> {
                 ),
               ),
             ),
+            if (_errorPeso != null) ...[
+              const SizedBox(height: 6),
+              Text(_errorPeso!, style: TextStyle(color: AppColors.red, fontSize: 12)),
+            ],
             const SizedBox(height: 14),
             TextField(
               controller: _obsCtrl,

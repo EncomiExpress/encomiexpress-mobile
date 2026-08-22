@@ -10,6 +10,18 @@ import '../../../../core/widgets.dart';
 // Mismo tope que el formulario web (RegistrarAnticipoExcedente.jsx / ActualizarAnticipoExcedente.jsx).
 const double _maxValorMonto = 999999999;
 
+// Mismos topes que exige el backend (config/cloudinary.js: multer `fileSize`,
+// y `upload.array('soporte', 5)` en routes/anticipos.js) — validados acá para
+// avisar antes de intentar subir, no solo cuando el backend ya rechazó.
+const int _maxSoporteBytes = 8 * 1024 * 1024; // 8 MB por archivo
+const int _maxSoporteArchivos = 5; // por cada vez que se suben (no es un total acumulado del anticipo)
+
+String _formatBytes(num bytes) {
+  final mb = bytes / (1024 * 1024);
+  if (mb < 0.1 && bytes > 0) return '${(bytes / 1024).toStringAsFixed(0)} KB';
+  return '${mb.toStringAsFixed(1)} MB';
+}
+
 // Bloquea la escritura en vez de solo marcar error después — mismo efecto que
 // el `if (num > NUMERIC_LIMITS[name]) return` del formulario web, adaptado a
 // TextInputFormatter porque en Flutter un TextField no es "controlado" como
@@ -209,6 +221,38 @@ class _AnticipoEditState extends State<AnticipoEdit> {
     if (picked != null) setState(() => _fechaEntrega = picked);
   }
 
+  // Filtra por tamaño y por el tope de cantidad antes de agregar — avisa qué
+  // quedó afuera y por qué, en vez de dejar que el backend lo rechace después
+  // sin que el conductor sepa cuál de los archivos era el problema.
+  void _agregarSoporte(List<PlatformFile> candidatos) {
+    if (candidatos.isEmpty) return;
+    final rechazadosPorPeso = <String>[];
+    final aceptados = <PlatformFile>[];
+    var cupoRestante = _maxSoporteArchivos - _soporteNuevo.length;
+
+    for (final f in candidatos) {
+      if (f.size > _maxSoporteBytes) {
+        rechazadosPorPeso.add(f.name);
+        continue;
+      }
+      if (cupoRestante <= 0) continue;
+      aceptados.add(f);
+      cupoRestante--;
+    }
+
+    if (aceptados.isNotEmpty) setState(() => _soporteNuevo.addAll(aceptados));
+
+    if (rechazadosPorPeso.isNotEmpty) {
+      showAppSnackBar(
+        context,
+        '${rechazadosPorPeso.length == 1 ? 'No se agregó "${rechazadosPorPeso.first}"' : 'No se agregaron ${rechazadosPorPeso.length} archivos'}: superan el máximo de ${_formatBytes(_maxSoporteBytes)} por archivo.',
+        severity: 'error',
+      );
+    } else if (cupoRestante < 0 || (candidatos.length - rechazadosPorPeso.length) > aceptados.length) {
+      showAppSnackBar(context, 'Solo se pueden agregar hasta $_maxSoporteArchivos archivos por vez.', severity: 'error');
+    }
+  }
+
   Future<void> _pickArchivos() async {
     final result = await FilePicker.pickFiles(
       type: FileType.custom,
@@ -216,11 +260,15 @@ class _AnticipoEditState extends State<AnticipoEdit> {
       allowMultiple: true,
     );
     if (result != null && result.files.isNotEmpty) {
-      setState(() => _soporteNuevo.addAll(result.files));
+      _agregarSoporte(result.files);
     }
   }
 
   Future<void> _pickSoporte() async {
+    if (_soporteNuevo.length >= _maxSoporteArchivos) {
+      showAppSnackBar(context, 'Ya agregaste el máximo de $_maxSoporteArchivos archivos por vez.', severity: 'error');
+      return;
+    }
     // En escritorio/web, image_picker no tiene cámara/galería — directo al
     // selector de archivos de siempre (PDF + imágenes, varios a la vez).
     if (!esMovil) {
@@ -271,7 +319,7 @@ class _AnticipoEditState extends State<AnticipoEdit> {
     if (xfile == null || !mounted) return;
 
     final size = await xfile.length();
-    setState(() => _soporteNuevo.add(PlatformFile(path: xfile.path, name: xfile.name, size: size)));
+    _agregarSoporte([PlatformFile(path: xfile.path, name: xfile.name, size: size)]);
   }
 
   void _quitarSoporteNuevo(int index) {
@@ -592,13 +640,14 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                                   const SizedBox(height: 8),
                                   _moneyField(_valorGastadoCtrl, _valorGastadoFocus,
                                       requerido: true,
-                                      maxValue: () => double.tryParse(_valorAnticipoCtrl.text) ?? _maxValorMonto,
+                                      // El gasto puede superar el anticipo (queda un excedente
+                                      // negativo a favor del conductor) — el tope acá es solo la
+                                      // cota de sanidad fija, ya no depende de "Valor del anticipo".
+                                      maxValue: () => _maxValorMonto,
                                       validator: (v) {
                                         if (v == null || v.isEmpty) return 'El valor gastado es obligatorio';
                                         final n = double.tryParse(v);
                                         if (n == null || n < 0) return 'Ingresa un valor válido';
-                                        final anticipoVal = double.tryParse(_valorAnticipoCtrl.text) ?? 0;
-                                        if (n > anticipoVal) return 'No puede ser mayor al valor del anticipo';
                                         return null;
                                       }),
                                   Container(
@@ -622,7 +671,7 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                                           child: Column(
                                             crossAxisAlignment: CrossAxisAlignment.start,
                                             children: [
-                                              Text('Excedente a Devolver',
+                                              Text(_excedente < 0 ? 'Faltante a Reponer' : 'Excedente a Devolver',
                                                   style: TextStyle(
                                                       color: _excedente < 0 ? AppColors.red : AppColors.green,
                                                       fontWeight: FontWeight.w700,
@@ -638,7 +687,7 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                                                 Padding(
                                                   padding: const EdgeInsets.only(top: 4),
                                                   child: Text(
-                                                      'El valor gastado no puede superar el anticipo entregado',
+                                                      'La empresa deberá reponerle esto al conductor',
                                                       style: TextStyle(color: AppColors.red, fontSize: 11)),
                                                 ),
                                             ],
@@ -697,6 +746,11 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 _label('Soporte'),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Máx. ${_formatBytes(_maxSoporteBytes)} por archivo · hasta $_maxSoporteArchivos por vez',
+                                  style: TextStyle(color: AppColors.textSub, fontSize: 11.5),
+                                ),
                                 const SizedBox(height: 12),
                                 // Comprobantes ya subidos (quedan tal cual — esta pantalla
                                 // solo agrega, nunca reemplaza ni borra los anteriores).
@@ -726,6 +780,10 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                                                 overflow: TextOverflow.ellipsis,
                                                 style: TextStyle(color: AppColors.textMain, fontSize: 13)),
                                           ),
+                                          const SizedBox(width: 6),
+                                          Text(_formatBytes(e.value.size),
+                                              style: TextStyle(color: AppColors.textSub, fontSize: 12)),
+                                          const SizedBox(width: 6),
                                           TapArea(
                                             onTap: () => _quitarSoporteNuevo(e.key),
                                             child: Icon(Icons.close_rounded, color: AppColors.textSub, size: 18),
@@ -733,6 +791,16 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                                         ],
                                       ),
                                     )),
+                                // Contador en vivo: se actualiza al agregar/quitar un archivo
+                                // (setState del propio _soporteNuevo ya dispara el rebuild).
+                                if (_soporteNuevo.isNotEmpty)
+                                  Padding(
+                                    padding: const EdgeInsets.only(bottom: 8),
+                                    child: Text(
+                                      '${_soporteNuevo.length}/$_maxSoporteArchivos archivos · ${_formatBytes(_soporteNuevo.fold<int>(0, (s, f) => s + f.size))} en total',
+                                      style: TextStyle(color: AppColors.textSub, fontSize: 11.5, fontWeight: FontWeight.w600),
+                                    ),
+                                  ),
                                 TapArea(
                                   onTap: _pickSoporte,
                                   child: Container(

@@ -31,11 +31,15 @@ class _AnticipoDetailState extends State<AnticipoDetail> {
   }
 
   Future<void> _confirmarDevolucion() async {
+    final esFaltante = _anticipo.tieneDeficit;
     final confirmado = await confirmarDialog(
       context,
-      titulo: 'Confirmar devolución',
-      mensaje: '¿El conductor devolvió el excedente? El anticipo pasará a Completado '
-          'y la fecha de entrega del excedente quedará registrada a la de hoy.',
+      titulo: esFaltante ? 'Confirmar reposición' : 'Confirmar devolución',
+      mensaje: esFaltante
+          ? '¿Ya le repusiste el faltante al conductor? El anticipo pasará a Completado '
+              'y quedará registrada la fecha de hoy.'
+          : '¿El conductor devolvió el excedente? El anticipo pasará a Completado '
+              'y la fecha de entrega del excedente quedará registrada a la de hoy.',
       textoConfirmar: 'Confirmar',
     );
     if (!confirmado || !mounted) return;
@@ -47,9 +51,9 @@ class _AnticipoDetailState extends State<AnticipoDetail> {
 
     if (result['success'] == true) {
       setState(() => _anticipo = result['anticipo'] as Anticipo);
-      showAppSnackBar(context, 'Devolución confirmada');
+      showAppSnackBar(context, esFaltante ? 'Reposición confirmada' : 'Devolución confirmada');
     } else {
-      showAppSnackBar(context, result['message'] ?? 'Error al confirmar la devolución', severity: 'error');
+      showAppSnackBar(context, result['message'] ?? (esFaltante ? 'Error al confirmar la reposición' : 'Error al confirmar la devolución'), severity: 'error');
     }
   }
 
@@ -217,7 +221,9 @@ class _AnticipoDetailState extends State<AnticipoDetail> {
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Text(
-                                'Excedente pendiente de devolución',
+                                _anticipo.tieneDeficit
+                                    ? 'Saldo pendiente de reponer al conductor'
+                                    : 'Excedente pendiente de devolución',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   color: AppColors.purple,
@@ -284,7 +290,7 @@ class _AnticipoDetailState extends State<AnticipoDetail> {
                           width: double.infinity,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           decoration: BoxDecoration(
-                            color: AppColors.purple,
+                            color: _anticipo.tieneDeficit ? AppColors.red : AppColors.purple,
                             borderRadius: BorderRadius.circular(14),
                           ),
                           child: Center(
@@ -292,8 +298,9 @@ class _AnticipoDetailState extends State<AnticipoDetail> {
                                 ? const SizedBox(
                                     height: 20, width: 20,
                                     child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
-                                : const Text('Confirmar devolución de excedente',
-                                    style: TextStyle(
+                                : Text(
+                                    _anticipo.tieneDeficit ? 'Confirmar reposición al conductor' : 'Confirmar devolución de excedente',
+                                    style: const TextStyle(
                                         color: Colors.white,
                                         fontWeight: FontWeight.w700,
                                         fontSize: 15)),
