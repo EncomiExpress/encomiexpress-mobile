@@ -531,6 +531,22 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                                       ),
                                     ],
                                   ),
+                                  if (widget.anticipo!.destinoTexto != null) ...[
+                                    Divider(color: AppColors.border, height: 20),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Text('Destino', style: TextStyle(color: AppColors.textMain, fontSize: 14)),
+                                        const SizedBox(width: 12),
+                                        Flexible(
+                                          child: Text(
+                                              widget.anticipo!.destinoTexto!,
+                                              textAlign: TextAlign.right,
+                                              style: TextStyle(color: AppColors.textMain, fontSize: 15)),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
                                   Divider(color: AppColors.border, height: 20),
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,

@@ -1456,7 +1456,9 @@ class AnticipoCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  anticipo.nombreRuta ?? 'Anticipo #${anticipo.id}',
+                  anticipo.nombreRuta != null
+                      ? '${anticipo.nombreRuta}${anticipo.destinoTexto != null ? ' → ${anticipo.destinoTexto}' : ''}'
+                      : 'Anticipo #${anticipo.id}',
                   style: TextStyle(
                     color: AppColors.textMain,
                     fontSize: 17,
