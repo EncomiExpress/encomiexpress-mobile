@@ -641,6 +641,98 @@ class TapArea extends StatelessWidget {
   }
 }
 
+// Barra de navegación inferior estilo YouTube: un solo renglón con ícono
+// arriba + texto pequeño abajo para cada ítem, todos con el mismo peso
+// visual — tanto para acciones (Tema, Perfil) como para pestañas activables
+// (ej. Anticipos/Paquetes en driver_home.dart). Reemplaza el patrón anterior
+// de una fila de íconos solos + una fila aparte de pestañas con label.
+class BottomMenuItem {
+  final IconData icon;
+  final String label;
+  final bool active;
+  final VoidCallback? onTap;
+
+  const BottomMenuItem({
+    required this.icon,
+    required this.label,
+    this.active = false,
+    this.onTap,
+  });
+}
+
+class BottomMenuBar extends StatelessWidget {
+  final List<BottomMenuItem> items;
+  const BottomMenuBar({super.key, required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          decoration: BoxDecoration(
+            color: AppColors.cardBg,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppColors.border),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.textSub.withValues(alpha: 0.08),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Row(
+            children: items
+                .map((item) => Expanded(child: _BottomMenuButton(item: item)))
+                .toList(),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BottomMenuButton extends StatelessWidget {
+  final BottomMenuItem item;
+  const _BottomMenuButton({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = item.onTap != null;
+    final color = !enabled
+        ? AppColors.border
+        : (item.active ? AppColors.adminPrimary : AppColors.textSub);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: item.onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(item.icon, size: 22, color: color),
+              const SizedBox(height: 3),
+              Text(
+                item.label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: item.active ? FontWeight.w700 : FontWeight.w500,
+                  color: color,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // Puerto de las figuras hexagonales decorativas del fondo de Login.jsx
 // (frontend web) — mismos 3 polígonos que el SVG original, sobre un
 // viewBox de 300x300 que se escala al tamaño pedido.

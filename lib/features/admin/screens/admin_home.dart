@@ -340,104 +340,37 @@ class _AdminHomeState extends State<AdminHome> {
                     ),
                   ),
           ),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                decoration: BoxDecoration(
-                  color: AppColors.cardBg,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: AppColors.border),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.textSub.withValues(alpha: 0.08),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: _buildQuickAction(
-                        icon: Icons.palette_outlined,
-                        tooltip: 'Tema',
-                        onTap: () => PersonalizarSheet.show(context),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _buildQuickAction(
-                        icon: Icons.refresh_outlined,
-                        tooltip: 'Refrescar',
-                        onTap: _loading ? null : _loadAnticipos,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _buildQuickAction(
-                        icon: Icons.person_outline,
-                        tooltip: 'Perfil',
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => AdminProfile(user: widget.user, anticipos: _anticipos),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _buildQuickAction(
-                        icon: Icons.add_circle_outline,
-                        tooltip: 'Nuevo',
-                        onTap: () async {
-                          final nuevo = await Navigator.push<Anticipo>(
-                            context,
-                            MaterialPageRoute(builder: (_) => const AnticipoEdit(isAdmin: true)),
-                          );
-                          if (nuevo != null) setState(() => _anticipos.insert(0, nuevo));
-                        },
-                      ),
-                    ),
-                  ],
-                ),
+        ],
+      ),
+      bottomNavigationBar: BottomMenuBar(
+        items: [
+          BottomMenuItem(
+            icon: Icons.palette_outlined,
+            label: 'Tema',
+            onTap: () => PersonalizarSheet.show(context),
+          ),
+          BottomMenuItem(
+            icon: Icons.person_outline,
+            label: 'Perfil',
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => AdminProfile(user: widget.user, anticipos: _anticipos),
               ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildQuickAction({
-    required IconData icon,
-    required String tooltip,
-    VoidCallback? onTap,
-  }) {
-    final enabled = onTap != null;
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(14),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: enabled ? AppColors.cardBg : AppColors.bgGray,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(
-              icon,
-              size: 20,
-              color: enabled ? AppColors.textMain : AppColors.textSub,
-            ),
+          BottomMenuItem(
+            icon: Icons.add_circle_outline,
+            label: 'Nuevo',
+            onTap: () async {
+              final nuevo = await Navigator.push<Anticipo>(
+                context,
+                MaterialPageRoute(builder: (_) => const AnticipoEdit(isAdmin: true)),
+              );
+              if (nuevo != null) setState(() => _anticipos.insert(0, nuevo));
+            },
           ),
-        ),
+        ],
       ),
     );
   }

@@ -184,107 +184,29 @@ class _DriverHomeState extends State<DriverHome> {
           ),
         ],
       ),
-      bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 8,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.cardBg,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: AppColors.border),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.textSub.withValues(alpha: 0.08),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: _buildQuickAction(
-                        icon: Icons.palette_outlined,
-                        tooltip: 'Tema',
-                        onTap: () => PersonalizarSheet.show(context),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _buildQuickAction(
-                        icon: Icons.refresh_outlined,
-                        tooltip: 'Refrescar',
-                        onTap: _loading ? null : () => _loadAnticipos(),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: _buildQuickAction(
-                        icon: Icons.person_outline,
-                        tooltip: 'Perfil',
-                        onTap: _abrirPerfil,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 8),
-              // Botones para cambiar entre pestañas (Anticipos / Paquetes)
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildTabButton(
-                      index: 0,
-                      icon: Icons.monetization_on,
-                      label: 'Anticipos',
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _buildTabButton(
-                      index: 1,
-                      icon: Icons.inventory_2_outlined,
-                      label: 'Paquetes',
-                    ),
-                  ),
-                ],
-              ),
-            ],
+      bottomNavigationBar: BottomMenuBar(
+        items: [
+          BottomMenuItem(
+            icon: Icons.palette_outlined,
+            label: 'Tema',
+            onTap: () => PersonalizarSheet.show(context),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTabButton({
-    required int index,
-    required IconData icon,
-    required String label,
-  }) {
-    final active = _tabIndex == index;
-    return OutlinedButton(
-      onPressed: () => setState(() => _tabIndex = index),
-      style: OutlinedButton.styleFrom(
-        side: BorderSide(color: active ? AppColors.adminPrimary : AppColors.border),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        backgroundColor: active ? AppColors.adminPrimary.withValues(alpha: 0.08) : Colors.transparent,
-        padding: const EdgeInsets.symmetric(vertical: 10),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: active ? AppColors.adminPrimary : AppColors.textSub),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(color: active ? AppColors.adminPrimary : AppColors.textSub),
+          BottomMenuItem(
+            icon: Icons.monetization_on,
+            label: 'Anticipos',
+            active: _tabIndex == 0,
+            onTap: () => setState(() => _tabIndex = 0),
+          ),
+          BottomMenuItem(
+            icon: Icons.inventory_2_outlined,
+            label: 'Paquetes',
+            active: _tabIndex == 1,
+            onTap: () => setState(() => _tabIndex = 1),
+          ),
+          BottomMenuItem(
+            icon: Icons.person_outline,
+            label: 'Perfil',
+            onTap: _abrirPerfil,
           ),
         ],
       ),
@@ -319,16 +241,24 @@ class _DriverHomeState extends State<DriverHome> {
         Expanded(
           child: _loading
               ? const Center(child: CircularProgressIndicator())
-              : _filtrados.isEmpty
-              ? Center(
-                  child: Text(
-                    'Sin anticipos',
-                    style: TextStyle(color: AppColors.textSub, fontSize: 14),
-                  ),
-                )
               : RefreshIndicator(
                   onRefresh: _loadAnticipos,
-                  child: ListView.builder(
+                  // Lista vacía envuelta igual en un ListView (no un simple
+                  // Center) para que arrastrar hacia abajo siga refrescando
+                  // aunque no haya anticipos que mostrar.
+                  child: _filtrados.isEmpty
+                      ? ListView(
+                          children: [
+                            SizedBox(height: MediaQuery.of(context).size.height * 0.3),
+                            Center(
+                              child: Text(
+                                'Sin anticipos',
+                                style: TextStyle(color: AppColors.textSub, fontSize: 14),
+                              ),
+                            ),
+                          ],
+                        )
+                      : ListView.builder(
                     padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
                     itemCount: _visibleAnticipos.length + (_hayMas ? 1 : 0),
                     itemBuilder: (_, i) {
@@ -388,37 +318,6 @@ class _DriverHomeState extends State<DriverHome> {
                 ),
         ),
       ],
-    );
-  }
-
-  Widget _buildQuickAction({
-    required IconData icon,
-    required String tooltip,
-    VoidCallback? onTap,
-  }) {
-    final enabled = onTap != null;
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(14),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: enabled ? AppColors.cardBg : AppColors.bgGray,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(
-              icon,
-              size: 20,
-              color: enabled ? AppColors.textMain : AppColors.textSub,
-            ),
-          ),
-        ),
-      ),
     );
   }
 
