@@ -10,6 +10,10 @@ import '../../../../core/widgets.dart';
 // Mismo tope que el formulario web (RegistrarAnticipoExcedente.jsx / ActualizarAnticipoExcedente.jsx).
 const double _maxValorMonto = 999999999;
 
+// Tope propio para "Valor gastado" — mucho más bajo que _maxValorMonto porque
+// en la práctica un anticipo no se gasta ni de cerca hasta los 999.999.999.
+const double _maxValorGastado = 999999;
+
 // Mismos topes que exige el backend (config/cloudinary.js: multer `fileSize`,
 // y `upload.array('soporte', 5)` en routes/anticipos.js) — validados acá para
 // avisar antes de intentar subir, no solo cuando el backend ya rechazó.
@@ -150,7 +154,16 @@ class _AnticipoEditState extends State<AnticipoEdit> {
     _valorAnticipoCtrl.addListener(() => setState(() {}));
     _valorGastadoCtrl.addListener(() => setState(() {}));
     _valorAnticipoFocus.addListener(() => setState(() {}));
-    _valorGastadoFocus.addListener(() => setState(() {}));
+    _valorGastadoFocus.addListener(() {
+      // El "0" que se ve al entrar a legalizar es el valor por defecto que
+      // pone el backend al crear el anticipo (nadie lo escribió) — se borra
+      // solo al enfocar el campo, para no obligar al conductor a borrarlo a
+      // mano antes de escribir el valor real.
+      if (_valorGastadoFocus.hasFocus && _valorGastadoCtrl.text == '0') {
+        _valorGastadoCtrl.clear();
+      }
+      setState(() {});
+    });
   }
 
   DateTime? _parseIso(String? iso) {
@@ -643,7 +656,7 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                                       // El gasto puede superar el anticipo (queda un excedente
                                       // negativo a favor del conductor) — el tope acá es solo la
                                       // cota de sanidad fija, ya no depende de "Valor del anticipo".
-                                      maxValue: () => _maxValorMonto,
+                                      maxValue: () => _maxValorGastado,
                                       validator: (v) {
                                         if (v == null || v.isEmpty) return 'El valor gastado es obligatorio';
                                         final n = double.tryParse(v);
@@ -687,7 +700,7 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                                                 Padding(
                                                   padding: const EdgeInsets.only(top: 4),
                                                   child: Text(
-                                                      'La empresa deberá reponerle esto al conductor',
+                                                      'La empresa deberá reponer este saldo',
                                                       style: TextStyle(color: AppColors.red, fontSize: 11)),
                                                 ),
                                             ],

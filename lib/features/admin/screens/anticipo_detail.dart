@@ -222,7 +222,7 @@ class _AnticipoDetailState extends State<AnticipoDetail> {
                               ),
                               child: Text(
                                 _anticipo.tieneDeficit
-                                    ? 'Saldo pendiente de reponer al conductor'
+                                    ? 'Saldo pendiente de reponer'
                                     : 'Excedente pendiente de devolución',
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
