@@ -9,6 +9,15 @@ class ApiClient {
   late final Dio _dio;
   String? _token;
 
+  // El login pantalla-de-login no pasa por acá (nunca hay _token puesto
+  // todavía), así que un 401 solo puede significar que el token guardado
+  // expiró o fue revocado a mitad de sesión. `_sessionExpiredNotified` evita
+  // disparar el logout/redirección varias veces cuando varias peticiones en
+  // vuelo (p. ej. las que arma una pantalla al abrir) devuelven 401 casi
+  // juntas; se resetea en `setToken()` al iniciar sesión de nuevo.
+  static void Function()? onSessionExpired;
+  bool _sessionExpiredNotified = false;
+
   ApiClient._internal() {
     _dio = Dio(BaseOptions(
       baseUrl: ApiConfig.baseUrl,
@@ -28,6 +37,12 @@ class ApiClient {
         return handler.next(options);
       },
       onError: (error, handler) {
+        if (error.response?.statusCode == 401 &&
+            _token != null &&
+            !_sessionExpiredNotified) {
+          _sessionExpiredNotified = true;
+          onSessionExpired?.call();
+        }
         return handler.next(error);
       },
     ));
@@ -40,6 +55,7 @@ class ApiClient {
 
   void setToken(String token) {
     _token = token;
+    _sessionExpiredNotified = false;
   }
 
   void clearToken() {

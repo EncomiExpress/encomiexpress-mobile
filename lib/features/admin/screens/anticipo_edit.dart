@@ -412,6 +412,11 @@ class _AnticipoEditState extends State<AnticipoEdit> {
 
     Anticipo? anticipo = result['success'] == true ? result['anticipo'] as Anticipo : null;
 
+    // Si esta llamada falla (p. ej. el token venció justo entre esta petición
+    // y la de arriba), _soporteNuevo se deja intacto para poder reintentar
+    // sin perder los archivos ya elegidos — no se puede tratar como éxito
+    // solo porque el resto del anticipo sí se guardó.
+    String? soporteError;
     if (anticipo != null && _soporteNuevo.isNotEmpty) {
       final subResult = await _anticipoService.subirSoporte(anticipo.id, _soporteNuevo);
       // Se arma el anticipo actualizado con la respuesta de la propia subida
@@ -421,16 +426,24 @@ class _AnticipoEditState extends State<AnticipoEdit> {
       // "invisible" hasta la próxima vez que abrieras el detalle.
       if (subResult['success'] == true) {
         anticipo = anticipo.copyWith(soporte: subResult['soporte'] as List<String>);
+      } else {
+        soporteError = subResult['message'] as String? ?? 'Error al subir el soporte';
       }
     }
 
     if (!mounted) return;
     setState(() => _saving = false);
 
-    if (anticipo != null) {
-      Navigator.pop(context, anticipo);
-    } else {
+    if (anticipo == null) {
       setState(() => _error = result['message'] ?? 'Error al guardar');
+    } else if (soporteError != null) {
+      // El anticipo sí quedó guardado, pero el comprobante no — mostrar el
+      // error y quedarse en la pantalla en vez de cerrarla como si todo
+      // hubiera salido bien (antes esto se mostraba como cargado en el
+      // móvil aunque el backend nunca recibió el archivo).
+      setState(() => _error = soporteError);
+    } else {
+      Navigator.pop(context, anticipo);
     }
   }
 

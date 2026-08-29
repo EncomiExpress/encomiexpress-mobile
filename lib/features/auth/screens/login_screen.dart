@@ -9,7 +9,12 @@ import '../../driver/screens/driver_home.dart';
 import 'recover_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  // Se muestra al entrar si vinimos de un cierre de sesión forzado (token
+  // vencido a mitad de uso) — así el usuario entiende por qué volvió al
+  // login en vez de pensar que la app falló.
+  final String? initialError;
+
+  const LoginScreen({super.key, this.initialError});
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -34,6 +39,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
+    _error = widget.initialError;
     _emailCtrl.addListener(() {
       _clearError();
       if (_emailError != null) setState(() => _emailError = null);
