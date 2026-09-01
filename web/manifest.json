@@ -1,11 +1,11 @@
 {
-    "name": "encomi_express",
-    "short_name": "encomi_express",
+    "name": "EncomiExpress",
+    "short_name": "EncomiExpress",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Aplicación móvil de EncomiExpress para conductores y administradores.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

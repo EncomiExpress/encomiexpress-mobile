@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:encomi_express/main.dart';
+import 'package:encomiexpress/main.dart';
 
 void main() {
   testWidgets('App loads correctly', (WidgetTester tester) async {
