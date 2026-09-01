@@ -268,21 +268,28 @@ class _AnticipoDetailState extends State<AnticipoDetail> {
                         ],
                       ),
                     ),
-                    if (_anticipo.soporte.isNotEmpty)
-                      SectionCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Soporte adjunto',
-                                style: TextStyle(
-                                    color: AppColors.textMain,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 16)),
-                            const SizedBox(height: 14),
-                            _buildSoporteSection(primary),
-                          ],
-                        ),
+                    SectionCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Soporte adjunto',
+                              style: TextStyle(
+                                  color: AppColors.textMain,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 16)),
+                          const SizedBox(height: 14),
+                          // Se muestra igual aunque esté vacío (en vez de ocultar toda
+                          // la tarjeta) — mismo criterio que ya usa el web
+                          // (ModalConsultarAnticipoExcedente.jsx muestra "—"), para
+                          // poder confirmar de un vistazo si de verdad no se subió
+                          // nada, en vez de no saber si la sección simplemente no
+                          // aparece por otra razón.
+                          _anticipo.soporte.isEmpty
+                              ? Text('—', style: TextStyle(color: AppColors.textSub, fontSize: 14))
+                              : _buildSoporteSection(primary),
+                        ],
                       ),
+                    ),
                     if (widget.isAdmin && _anticipo.estado == EstadoAnticipo.excedentePendiente)
                       TapArea(
                         onTap: _confirmando ? null : _confirmarDevolucion,
