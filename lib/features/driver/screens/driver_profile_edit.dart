@@ -12,10 +12,35 @@ import '../../../../core/widgets.dart';
 // admin gestiona desde el módulo de Conductores — no aparecen aquí.
 const _steps = ['Datos personales', 'Contraseña', 'Confirmación'];
 
-final _soloLetras = RegExp(r'^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$');
+final _soloLetras = RegExp(r'^[a-zA-ZáéíóúÁÉÍÓÚüÜñÑ\s]+$');
 final _emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+// Parte anterior al @ ("nombre de usuario"): solo letras, números y puntos. El punto no
+// puede ir al principio, al final ni dos seguidos (se chequea aparte). Mismo criterio que
+// validarUsuarioCorreo en el frontend web (shared/validations/emailValidation.js).
+final _emailUsuarioRegex = RegExp(r'^[a-zA-Z0-9.]+$');
 final _passwordRegex = RegExp(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9\s]).{8,64}$');
 const _passwordHelp = '8-64 caracteres, con mayúsculas, minúsculas, números y un carácter especial';
+
+// Filtro en vivo del campo de correo: quita lo que no está permitido (letras, números,
+// punto, @ y guion) e impide teclear un punto al inicio de la parte anterior al @ o dos
+// puntos seguidos (colapsa `..` → `.`). El punto justo antes del @ NO se filtra acá —
+// lo atrapa la validación al enviar. Equivale a filtrarCorreo en el frontend web
+// (shared/validations/emailValidation.js).
+class _CorreoInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    final text = newValue.text.replaceAll(RegExp(r'[^a-zA-Z0-9.@-]'), '');
+    final at = text.indexOf('@');
+    final usuario = (at == -1 ? text : text.substring(0, at))
+        .replaceAll(RegExp(r'\.{2,}'), '.')
+        .replaceFirst(RegExp(r'^\.+'), '');
+    final result = usuario + (at == -1 ? '' : text.substring(at));
+    if (result == newValue.text) return newValue;
+    final removed = newValue.text.length - result.length;
+    final offset = (newValue.selection.baseOffset - removed).clamp(0, result.length);
+    return TextEditingValue(text: result, selection: TextSelection.collapsed(offset: offset));
+  }
+}
 
 class DriverProfileEdit extends StatefulWidget {
   final UserModel user;
@@ -156,8 +181,15 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
         e['telefono'] = 'El teléfono debe tener 10 dígitos';
       }
       final email = _emailCtrl.text.trim();
+      final usuarioCorreo = email.split('@')[0];
       if (email.isEmpty) {
         e['email'] = 'El correo es obligatorio';
+      } else if (usuarioCorreo.startsWith('.') || usuarioCorreo.endsWith('.')) {
+        e['email'] = 'Antes del @, el punto no puede ir al principio ni al final';
+      } else if (usuarioCorreo.contains('..')) {
+        e['email'] = 'Antes del @ no puede haber dos puntos seguidos';
+      } else if (!_emailUsuarioRegex.hasMatch(usuarioCorreo)) {
+        e['email'] = 'Antes del @ solo se permiten letras, números y puntos';
       } else if (!_emailRegex.hasMatch(email)) {
         e['email'] = 'Ingresa un correo válido';
       }
@@ -527,6 +559,7 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
           errorText: _errores['email'],
           keyboardType: TextInputType.emailAddress,
           maxLength: 80,
+          inputFormatters: [_CorreoInputFormatter()],
         ),
       ],
     );

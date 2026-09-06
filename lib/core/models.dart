@@ -328,9 +328,9 @@ class Anticipo {
 
     String? destinoTexto;
     if (destinoJson != null) {
-      final ciudad = destinoJson['ciudad'] ?? '';
+      final municipio = destinoJson['municipio'] ?? '';
       final departamento = destinoJson['departamento'] ?? '';
-      destinoTexto = [ciudad, departamento].where((s) => (s as String).isNotEmpty).join(', ');
+      destinoTexto = [municipio, departamento].where((s) => (s as String).isNotEmpty).join(', ');
     }
 
     return Anticipo(

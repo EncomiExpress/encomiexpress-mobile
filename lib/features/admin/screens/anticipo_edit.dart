@@ -7,11 +7,12 @@ import '../../../../core/platform_utils.dart';
 import '../../../../core/services/anticipo_service.dart';
 import '../../../../core/widgets.dart';
 
-// Mismo tope que el formulario web (RegistrarAnticipoExcedente.jsx / ActualizarAnticipoExcedente.jsx).
-const double _maxValorMonto = 999999999;
+// Mismo tope que el formulario web (NUMERIC_LIMITS.valorAnticipo en anticipoValidation.js)
+// y que el backend (anticiposValidator.js).
+const double _maxValorMonto = 9999999;
 
-// Tope propio para "Valor gastado" — mucho más bajo que _maxValorMonto porque
-// en la práctica un anticipo no se gasta ni de cerca hasta los 999.999.999.
+// Tope propio para "Valor gastado" — más bajo que _maxValorMonto porque en la
+// práctica un anticipo no se gasta ni de cerca hasta ese techo.
 const double _maxValorGastado = 999999;
 
 // Mismos topes que exige el backend (config/cloudinary.js: multer `fileSize`,
@@ -531,7 +532,7 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                                           items: _rutas.map((r) {
                                             final destino = r['destino'] as Map<String, dynamic>?;
                                             final origen = (r['origen'] as String?) ?? 'Ruta #${r['idRuta']}';
-                                            final destinoTxt = destino?['ciudad'] as String? ?? 'Sin destino';
+                                            final destinoTxt = destino?['municipio'] as String? ?? 'Sin destino';
                                             return DropdownMenuItem<String>(
                                                 value: r['idRuta'].toString(),
                                                 child: Text('$origen → $destinoTxt'));

@@ -175,7 +175,7 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
         : '';
     final destino = ruta != null ? ruta['destino'] as Map<String, dynamic>? : null;
     final destinoTexto = destino != null
-        ? '${destino['ciudad'] ?? ''}${(destino['ciudad'] != null && destino['departamento'] != null) ? ', ' : ''}${destino['departamento'] ?? ''}'
+        ? '${destino['municipio'] ?? ''}${(destino['municipio'] != null && destino['departamento'] != null) ? ', ' : ''}${destino['departamento'] ?? ''}'
         : '';
     final detalle = [destinoTexto, horario].where((s) => s.isNotEmpty).join(' · ');
     // El conductor solo puede marcar entregas mientras la ruta está "En Ruta" —
