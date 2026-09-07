@@ -295,6 +295,12 @@ class Anticipo {
   final String conductorNombre;
   final String? nombreRuta;
   final String? destinoTexto;
+  // Estado de la ruta y su avance por sedes — solo vienen en GET
+  // /conductores/mis-anticipos y solo cuando la ruta está "En Ruta". El móvil
+  // los usa para el candado de legalización (ver `sedesPendientes`).
+  final String? rutaEstado;
+  final int? sedesTotales;
+  final int? sedesCompletadas;
 
   const Anticipo({
     required this.id,
@@ -312,6 +318,9 @@ class Anticipo {
     this.conductorNombre = '',
     this.nombreRuta,
     this.destinoTexto,
+    this.rutaEstado,
+    this.sedesTotales,
+    this.sedesCompletadas,
   });
 
   Anticipo copyWith({List<String>? soporte}) => Anticipo(
@@ -330,6 +339,9 @@ class Anticipo {
         conductorNombre: conductorNombre,
         nombreRuta: nombreRuta,
         destinoTexto: destinoTexto,
+        rutaEstado: rutaEstado,
+        sedesTotales: sedesTotales,
+        sedesCompletadas: sedesCompletadas,
       );
 
   // Forma real de una fila devuelta por GET /api/anticipos, GET /api/anticipos/:id
@@ -371,6 +383,9 @@ class Anticipo {
           : '',
       nombreRuta: rutaJson?['origen'],
       destinoTexto: destinoTexto,
+      rutaEstado: rutaJson?['estado']?.toString(),
+      sedesTotales: rutaJson?['sedesTotales'] is num ? (rutaJson!['sedesTotales'] as num).toInt() : null,
+      sedesCompletadas: rutaJson?['sedesCompletadas'] is num ? (rutaJson!['sedesCompletadas'] as num).toInt() : null,
     );
   }
 
@@ -388,6 +403,19 @@ class Anticipo {
   // "Entregado"; de ahí en adelante es tarea exclusiva del conductor. Mismo
   // criterio que el ícono deshabilitado en ListarAnticipoExcedente.jsx (web).
   bool get esEditable => estado == EstadoAnticipo.entregado;
+
+  // Candado de legalización: el conductor no puede legalizar el anticipo hasta
+  // dejar TODOS los paquetes en las sedes de la ruta (no puede reunir los
+  // soportes del viaje antes de llegar al destino final). El backend
+  // (anticipoService.update) rechaza igual con errorCode 'SEDES_INCOMPLETAS'.
+  bool get sedesPendientes =>
+      rutaEstado == 'En Ruta' &&
+      sedesTotales != null &&
+      sedesTotales! > 0 &&
+      (sedesCompletadas ?? 0) < sedesTotales!;
+
+  bool get puedeLegalizar =>
+      estado == EstadoAnticipo.enLegalizacion && !sedesPendientes;
 }
 
 // 'YYYY-MM-DD' (como llegan los campos DATEONLY del backend) -> 'DD/MM/YYYY'.

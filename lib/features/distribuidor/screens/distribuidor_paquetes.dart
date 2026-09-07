@@ -136,7 +136,7 @@ class _DistribuidorPaquetesState extends State<DistribuidorPaquetes> {
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 32),
                         child: Text(
-                          'No hay paquetes en tus sedes por entregar al destinatario.',
+                          'No hay paquetes en tu sede por entregar al destinatario.',
                           textAlign: TextAlign.center,
                           style: TextStyle(color: AppColors.textSub),
                         ),

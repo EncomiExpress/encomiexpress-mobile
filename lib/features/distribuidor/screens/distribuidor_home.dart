@@ -8,7 +8,7 @@ import 'distribuidor_paquetes.dart';
 
 /// Home del rol 'distribuidor' (encargado de sede) — versión reducida del home
 /// del conductor: barra inferior Tema / Paquetes / Perfil, sin "Anticipos".
-/// La pestaña "Paquetes" muestra los paquetes "En sede de destino" de las sedes
+/// La pestaña "Paquetes" muestra los paquetes "En sede de destino" de la sede
 /// que cubre y deja registrar la entrega final al destinatario.
 class DistribuidorHome extends StatefulWidget {
   final UserModel user;
@@ -50,7 +50,7 @@ class _DistribuidorHomeState extends State<DistribuidorHome> {
         .map((s) => (s['municipio'] ?? '').toString())
         .where((n) => n.isNotEmpty)
         .toList();
-    if (nombres.isEmpty) return 'Sin sedes asignadas';
+    if (nombres.isEmpty) return 'Sin sede asignada';
     return nombres.join(' · ');
   }
 
@@ -145,7 +145,7 @@ class _DistribuidorHomeState extends State<DistribuidorHome> {
 
 /// Perfil de solo lectura para el distribuidor — el rol no tiene endpoint de
 /// autogestión (GET/PUT /conductores/perfil es solo para conductores). Muestra
-/// los datos que ya vinieron en el login + las sedes que cubre.
+/// los datos que ya vinieron en el login + la sede que cubre.
 class _DistribuidorPerfil extends StatelessWidget {
   final UserModel user;
   const _DistribuidorPerfil({required this.user});
@@ -205,7 +205,7 @@ class _DistribuidorPerfil extends StatelessWidget {
               icon: Icons.location_city_outlined,
               iconColor: AppColors.orange,
               iconBg: AppColors.orangeBg,
-              label: 'Sedes que cubre',
+              label: 'Sede',
               value: sedes.isEmpty ? '—' : sedes.join(', '),
             ),
             const SizedBox(height: 12),

@@ -277,9 +277,11 @@ class _DriverHomeState extends State<DriverHome> {
                             );
                             if (updated != null) _reemplazar(updated);
                           },
-                          // El conductor solo legaliza — solo tiene sentido
-                          // editar mientras el anticipo está "En Legalización".
-                          onEditar: a.estado == EstadoAnticipo.enLegalizacion
+                          // El conductor solo legaliza, y solo cuando el anticipo
+                          // está "En Legalización" Y ya dejó todos los paquetes en
+                          // las sedes de la ruta (candado: no puede reunir los
+                          // soportes del viaje antes de llegar al destino final).
+                          onEditar: a.puedeLegalizar
                               ? () async {
                                   final updated =
                                       await Navigator.push<Anticipo>(
@@ -293,6 +295,11 @@ class _DriverHomeState extends State<DriverHome> {
                                       );
                                   if (updated != null) _reemplazar(updated);
                                 }
+                              : null,
+                          editDisabledReason:
+                              a.estado == EstadoAnticipo.enLegalizacion &&
+                                  a.sedesPendientes
+                              ? 'Deja todos los paquetes en las sedes de la ruta antes de legalizar'
                               : null,
                         );
                       }

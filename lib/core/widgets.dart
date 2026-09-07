@@ -1469,6 +1469,9 @@ class AnticipoCard extends StatelessWidget {
   final VoidCallback? onEditar;
   // Solo aplica para admin cuando estado == 'Excedente pendiente'.
   final VoidCallback? onConfirmarDevolucion;
+  // Texto del tooltip cuando el ícono de editar está deshabilitado (onEditar
+  // null). Si no se pasa, se usa el motivo por defecto.
+  final String? editDisabledReason;
 
   const AnticipoCard({
     super.key,
@@ -1477,11 +1480,12 @@ class AnticipoCard extends StatelessWidget {
     required this.onVer,
     this.onEditar,
     this.onConfirmarDevolucion,
+    this.editDisabledReason,
   });
 
   // Por qué el conductor no puede editar todavía — el admin sigue siendo
   // dueño del anticipo mientras la ruta no arranca (estado Entregado).
-  String get _editDisabledReason => 'Aún no lo puedes editar';
+  String get _editDisabledReason => editDisabledReason ?? 'Aún no lo puedes editar';
 
   @override
   Widget build(BuildContext context) {
