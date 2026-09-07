@@ -16,29 +16,29 @@ String _formatBytes(num bytes) {
   return '${mb.toStringAsFixed(1)} MB';
 }
 
-// Pantalla "Paquetes" del conductor — entrega en dos fases (ver ../../../LOGICA.md):
-// el conductor del tramo troncal NO entrega puerta a puerta, solo deja los
-// paquetes en la sede de cada municipio (parada intermedia o destino final).
-// Legaliza de una sola vez, por sede, con un único botón "Dejar N paquetes en
-// sede" — no hay marca por paquete individual. La entrega final al destinatario
-// (Entregado/Devuelto) la hace el distribuidor de esa sede desde su propio app.
-class DriverPaquetes extends StatefulWidget {
+// Pantalla "Paquetes" del distribuidor de sede — segunda fase de la entrega (ver
+// ../../../LOGICA.md, "Entrega en dos fases"): el conductor ya dejó los paquetes
+// "En sede de destino"; acá el distribuidor registra la entrega final al
+// destinatario. Tres acciones por paquete:
+//   - Entregado  -> terminal
+//   - No entregado -> terminal (valor interno 'Devuelto'), novedad obligatoria
+//   - Registrar intento -> no terminal, suma al contador de insistidera
+class DistribuidorPaquetes extends StatefulWidget {
   final UserModel user;
-  const DriverPaquetes({super.key, required this.user});
+  const DistribuidorPaquetes({super.key, required this.user});
 
   @override
-  State<DriverPaquetes> createState() => _DriverPaquetesState();
+  State<DistribuidorPaquetes> createState() => _DistribuidorPaquetesState();
 }
 
-class _DriverPaquetesState extends State<DriverPaquetes> {
+class _DistribuidorPaquetesState extends State<DistribuidorPaquetes> {
   final _service = PaqueteService();
   bool _loading = true;
   List<dynamic> _paquetes = [];
   int _itemsToShow = 5;
 
-  // Clave "idRuta-idDestino" de la sede cuya legalización está en curso — bloquea
-  // ese botón mientras se espera la respuesta del backend.
-  final Set<String> _sedesActualizando = {};
+  // idPaquete cuya acción está en curso — deshabilita sus botones.
+  final Set<int> _actualizando = {};
 
   @override
   void initState() {
@@ -48,19 +48,7 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    final conductorIdStr = widget.user.conductorId;
-    final conductorId =
-        conductorIdStr != null ? int.tryParse(conductorIdStr) : null;
-    if (conductorId == null) {
-      if (mounted) {
-        setState(() {
-          _paquetes = [];
-          _loading = false;
-        });
-      }
-      return;
-    }
-    final data = await _service.getPaquetesPorConductor(conductorId);
+    final data = await _service.getPaquetesEnSede();
     if (mounted) {
       setState(() {
         _paquetes = data;
@@ -81,68 +69,54 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
     }
   }
 
-  // Agrupa primero por ruta (Paquete.asignacion.ruta) y, dentro de cada ruta, por
-  // sede/municipio real de la venta (encomienda.destinatario.destino). Solo lo
-  // ya "revelado" (_itemsToShow), mismo patrón que Anticipos.
-  List<_GrupoRuta> get _grupos {
-    final Map<int, _GrupoRuta> mapa = {};
+  // Agrupa por sede/municipio (encomienda.destinatario.destino.municipio).
+  List<_GrupoSede> get _grupos {
+    final Map<String, _GrupoSede> mapa = {};
     for (final p in _paquetes.take(_itemsToShow)) {
       final paquete = p as Map<String, dynamic>;
-      final asignacion = paquete['asignacion'] as Map<String, dynamic>?;
-      final ruta = asignacion?['ruta'] as Map<String, dynamic>?;
-      final idRuta = ruta != null ? _toInt(ruta['idRuta']) : null;
-      final rutaKey = idRuta ?? -1;
-      final grupoRuta = mapa.putIfAbsent(
-          rutaKey, () => _GrupoRuta(idRuta: idRuta, ruta: ruta));
-
-      final destinatario =
-          (paquete['encomienda'] as Map<String, dynamic>?)?['destinatario']
-              as Map<String, dynamic>?;
-      final destino = destinatario?['destino'] as Map<String, dynamic>?;
-      final idDestino = destino != null
-          ? _toInt(destino['idDestino'])
-          : _toInt(destinatario?['idDestino']);
-      final municipio = (destino?['municipio'] as String?) ??
-          (destino?['departamento'] as String?) ??
-          'Sede';
-      final sedeKey = idDestino ?? -1;
-      final grupoSede = grupoRuta.sedes.putIfAbsent(
-          sedeKey, () => _GrupoSede(idDestino: idDestino, municipio: municipio));
-      grupoSede.paquetes.add(paquete);
+      final destino =
+          ((paquete['encomienda'] as Map<String, dynamic>?)?['destinatario']
+              as Map<String, dynamic>?)?['destino'] as Map<String, dynamic>?;
+      final municipio = (destino?['municipio'] as String?) ?? 'Sede';
+      final grupo = mapa.putIfAbsent(municipio, () => _GrupoSede(municipio));
+      grupo.paquetes.add(paquete);
     }
     return mapa.values.toList();
   }
 
-  Future<void> _dejarEnSede(int? idRuta, _GrupoSede sede) async {
-    if (idRuta == null || sede.idDestino == null) return;
-    final pendientes = sede.paquetes
-        .where((p) => (p['estado'] as String?) == 'Por entregar')
-        .length;
-    if (pendientes == 0) return;
+  Future<void> _accion(Map<String, dynamic> p, String accion) async {
+    final idPaquete = _toInt(p['idPaquete']);
+    if (idPaquete == null) return;
 
-    final resultado = await _DejarEnSedeSheet.show(
+    final titulo = accion == 'Entregado'
+        ? 'Marcar como entregado'
+        : accion == 'Devuelto'
+            ? 'Marcar como no entregado'
+            : 'Registrar intento fallido';
+    final novedadObligatoria = accion != 'Entregado';
+
+    final resultado = await _EntregaFinalSheet.show(
       context,
-      municipio: sede.municipio,
-      cantidad: pendientes,
+      titulo: titulo,
+      novedadObligatoria: novedadObligatoria,
     );
-    if (resultado == null || !mounted) return; // el conductor canceló
+    if (resultado == null || !mounted) return;
 
-    final key = '$idRuta-${sede.idDestino}';
-    setState(() => _sedesActualizando.add(key));
-    final res = await _service.dejarEnSede(
-      idRuta: idRuta,
-      idDestino: sede.idDestino!,
-      novedades: resultado.novedades,
+    setState(() => _actualizando.add(idPaquete));
+    final res = await _service.registrarEntregaFinal(
+      idPaquete,
+      accion: accion,
+      novedad: resultado.novedad,
       foto: resultado.foto,
     );
     if (!mounted) return;
-    setState(() => _sedesActualizando.remove(key));
+    setState(() => _actualizando.remove(idPaquete));
 
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(res['message'] ??
           (res['success'] == true
-              ? 'Paquetes dejados en sede'
-              : 'No se pudo legalizar la entrega en sede')),
+              ? 'Entrega registrada'
+              : 'No se pudo registrar la entrega')),
     ));
     if (res['success'] == true) _load();
   }
@@ -157,11 +131,15 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
           : _paquetes.isEmpty
               ? ListView(
                   children: [
-                    SizedBox(height: MediaQuery.of(context).size.height * 0.3),
+                    SizedBox(height: MediaQuery.of(context).size.height * 0.28),
                     Center(
-                      child: Text(
-                        'No hay paquetes asignados',
-                        style: TextStyle(color: AppColors.textSub),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 32),
+                        child: Text(
+                          'No hay paquetes en tus sedes por entregar al destinatario.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: AppColors.textSub),
+                        ),
                       ),
                     ),
                   ],
@@ -191,163 +169,37 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
     );
   }
 
-  Widget _buildGrupo(_GrupoRuta grupo) {
-    final ruta = grupo.ruta;
-    final rutaLabel = ruta != null
-        ? ((ruta['origen'] as String?)?.isNotEmpty == true
-            ? ruta['origen'] as String
-            : 'Ruta #${grupo.idRuta ?? '—'}')
-        : 'Ruta desconocida';
-    final horario = ruta != null
-        ? '${ruta['fechaSalida'] ?? '—'} ${ruta['horaSalida'] ?? ''}'.trim()
-        : '';
-    final destino = ruta?['destino'] as Map<String, dynamic>?;
-    final destinoTexto = destino != null
-        ? '${destino['municipio'] ?? ''}${(destino['municipio'] != null && destino['departamento'] != null) ? ', ' : ''}${destino['departamento'] ?? ''}'
-        : '';
-    final detalle =
-        [destinoTexto, horario].where((s) => s.isNotEmpty).join(' · ');
-    // El conductor solo puede legalizar mientras la ruta está "En Ruta" — antes
-    // de eso no ha salido de bodega (misma validación en el backend,
-    // encomiendaService.dejarPaquetesEnSede).
-    final rutaEnRuta = ruta != null && ruta['estado'] == 'En Ruta';
-
-    final sedes = grupo.sedes.values.toList();
-    final sedesCompletadas =
-        sedes.where((s) => s.paquetes.every((p) => (p['estado'] as String?) != 'Por entregar')).length;
-
+  Widget _buildGrupo(_GrupoSede grupo) {
     return SectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      rutaLabel,
-                      style: TextStyle(
-                          color: AppColors.textMain,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 16),
-                    ),
-                    if (detalle.isNotEmpty)
-                      Text(detalle,
-                          style: TextStyle(
-                              color: AppColors.textSub, fontSize: 12)),
-                  ],
-                ),
-              ),
-              if (!rutaEnRuta)
-                Text(
-                  'La ruta aún no ha salido',
-                  style: TextStyle(
-                      color: AppColors.textSub,
-                      fontSize: 11,
-                      fontStyle: FontStyle.italic),
-                )
-              else
-                Text(
-                  'Sedes: $sedesCompletadas de ${sedes.length}',
-                  style: TextStyle(
-                      color: AppColors.textSub,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600),
-                ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          for (final sede in sedes) ...[
-            const SizedBox(height: 8),
-            _buildSede(grupo.idRuta, sede, rutaEnRuta),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSede(int? idRuta, _GrupoSede sede, bool rutaEnRuta) {
-    final pendientes = sede.paquetes
-        .where((p) => (p['estado'] as String?) == 'Por entregar')
-        .toList();
-    final completada = pendientes.isEmpty;
-    final key = '$idRuta-${sede.idDestino}';
-    final actualizando = _sedesActualizando.contains(key);
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.bgGray,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
               Icon(Icons.location_city_outlined,
-                  size: 16, color: AppColors.textSub),
+                  size: 18, color: AppColors.adminPrimary),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  sede.municipio,
+                  grupo.municipio,
                   style: TextStyle(
                       color: AppColors.textMain,
                       fontWeight: FontWeight.w700,
-                      fontSize: 14),
+                      fontSize: 16),
                 ),
               ),
               Text(
-                completada
-                    ? '${sede.paquetes.length} en sede'
-                    : '${pendientes.length} por dejar',
-                style: TextStyle(
-                    color: completada ? AppColors.green : AppColors.textSub,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600),
+                grupo.paquetes.length == 1
+                    ? '1 paquete'
+                    : '${grupo.paquetes.length} paquetes',
+                style: TextStyle(color: AppColors.textSub, fontSize: 12),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          for (final p in sede.paquetes) ...[
+          const SizedBox(height: 12),
+          for (final p in grupo.paquetes) ...[
             _buildPaqueteCard(p),
-            if (p != sede.paquetes.last) const SizedBox(height: 8),
-          ],
-          if (rutaEnRuta && !completada) ...[
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: actualizando
-                    ? null
-                    : () => _dejarEnSede(idRuta, sede),
-                icon: actualizando
-                    ? SizedBox(
-                        width: 15,
-                        height: 15,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: AppColors.driverPrimary),
-                      )
-                    : Icon(Icons.inventory_2_outlined,
-                        size: 16, color: AppColors.driverPrimary),
-                label: Text(
-                  pendientes.length == 1
-                      ? 'Dejar 1 paquete en la sede'
-                      : 'Dejar ${pendientes.length} paquetes en la sede',
-                  style: TextStyle(
-                      color: AppColors.driverPrimary,
-                      fontWeight: FontWeight.w600),
-                ),
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: AppColors.driverPrimary),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                ),
-              ),
-            ),
+            if (p != grupo.paquetes.last) const SizedBox(height: 10),
           ],
         ],
       ),
@@ -357,19 +209,19 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
   Widget _buildPaqueteCard(Map<String, dynamic> p) {
     final encomienda = p['encomienda'] as Map<String, dynamic>?;
     final destinatario = encomienda?['destinatario'] as Map<String, dynamic>?;
-    final nombreDestinatario =
-        (destinatario?['nombreDestinatario'] as String?) ?? '';
-    final direccionDestinatario =
-        (destinatario?['direccionDestinatario'] as String?) ?? '';
-    final telefonoDestinatario =
-        (destinatario?['telefonoDestinatario'] as String?) ?? '';
-    final estado = (p['estado'] as String?) ?? 'Por entregar';
+    final nombre = (destinatario?['nombreDestinatario'] as String?) ?? '';
+    final direccion = (destinatario?['direccionDestinatario'] as String?) ?? '';
+    final telefono = (destinatario?['telefonoDestinatario'] as String?) ?? '';
+    final intentos = _toInt(p['intentosEntrega']) ?? 0;
+    final idPaquete = _toInt(p['idPaquete']);
+    final actualizando =
+        idPaquete != null && _actualizando.contains(idPaquete);
 
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(10),
+        color: AppColors.bgGray,
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
@@ -399,24 +251,22 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
                 ),
               ),
               const SizedBox(width: 8),
-              _estadoChip(estado),
+              _estadoChip('En sede de destino'),
             ],
           ),
-          if (nombreDestinatario.isNotEmpty ||
-              direccionDestinatario.isNotEmpty ||
-              telefonoDestinatario.isNotEmpty) ...[
-            const SizedBox(height: 8),
+          if (nombre.isNotEmpty ||
+              direccion.isNotEmpty ||
+              telefono.isNotEmpty) ...[
+            const SizedBox(height: 10),
             Divider(color: AppColors.border, height: 1),
-            const SizedBox(height: 8),
-            if (nombreDestinatario.isNotEmpty)
-              Text(
-                nombreDestinatario,
-                style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textMain,
-                    fontSize: 13),
-              ),
-            if (direccionDestinatario.isNotEmpty)
+            const SizedBox(height: 10),
+            if (nombre.isNotEmpty)
+              Text(nombre,
+                  style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textMain,
+                      fontSize: 13)),
+            if (direccion.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Row(
@@ -426,16 +276,14 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
                         size: 15, color: AppColors.textSub),
                     const SizedBox(width: 4),
                     Expanded(
-                      child: Text(
-                        direccionDestinatario,
-                        style: TextStyle(
-                            color: AppColors.textSub, fontSize: 13),
-                      ),
+                      child: Text(direccion,
+                          style: TextStyle(
+                              color: AppColors.textSub, fontSize: 13)),
                     ),
                   ],
                 ),
               ),
-            if (telefonoDestinatario.isNotEmpty)
+            if (telefono.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Row(
@@ -443,36 +291,46 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
                     Icon(Icons.phone_outlined,
                         size: 15, color: AppColors.textSub),
                     const SizedBox(width: 4),
-                    Text(telefonoDestinatario,
+                    Text(telefono,
                         style: TextStyle(
                             color: AppColors.textSub, fontSize: 13)),
                   ],
                 ),
               ),
           ],
-          // Una vez el paquete salió de "Por entregar", el conductor puede volver
-          // a consultar la novedad y la foto que él mismo dejó al legalizar la
-          // sede (el backend ya no le deja cambiarlo).
-          if (estado != 'Por entregar') ...[
-            if ((p['observacionEstado'] as String?)?.isNotEmpty == true ||
-                (p['fotoEntrega'] as String?)?.isNotEmpty == true) ...[
-              const SizedBox(height: 8),
-              Divider(color: AppColors.border, height: 1),
-              const SizedBox(height: 8),
-            ],
-            if ((p['observacionEstado'] as String?)?.isNotEmpty == true)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Text(
-                  p['observacionEstado'] as String,
+          if (intentos > 0) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.replay_rounded, size: 14, color: AppColors.orange),
+                const SizedBox(width: 4),
+                Text(
+                  intentos == 1
+                      ? 'Intentado 1 vez'
+                      : 'Intentado $intentos veces',
                   style: TextStyle(
-                      color: AppColors.textSub,
+                      color: AppColors.orange,
                       fontSize: 12,
-                      fontStyle: FontStyle.italic),
+                      fontWeight: FontWeight.w600),
                 ),
+              ],
+            ),
+          ],
+          if ((p['observacionEstado'] as String?)?.isNotEmpty == true)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                p['observacionEstado'] as String,
+                style: TextStyle(
+                    color: AppColors.textSub,
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic),
               ),
-            if ((p['fotoEntrega'] as String?)?.isNotEmpty == true)
-              Builder(
+            ),
+          if ((p['fotoEntrega'] as String?)?.isNotEmpty == true)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Builder(
                 builder: (ctx) => TapArea(
                   onTap: () =>
                       ImageViewer.show(ctx, [p['fotoEntrega'] as String]),
@@ -480,22 +338,78 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(Icons.photo_camera_outlined,
-                          size: 16, color: AppColors.driverPrimary),
+                          size: 16, color: AppColors.adminPrimary),
                       const SizedBox(width: 6),
-                      Text(
-                        'Ver evidencia',
-                        style: TextStyle(
-                          color: AppColors.driverPrimary,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          decoration: TextDecoration.underline,
-                        ),
-                      ),
+                      Text('Ver evidencia',
+                          style: TextStyle(
+                            color: AppColors.adminPrimary,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            decoration: TextDecoration.underline,
+                          )),
                     ],
                   ),
                 ),
               ),
-          ],
+            ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed:
+                      actualizando ? null : () => _accion(p, 'Entregado'),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: AppColors.green),
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                  ),
+                  child: Text('Entregado',
+                      style: TextStyle(
+                          color: AppColors.green, fontSize: 12.5)),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed:
+                      actualizando ? null : () => _accion(p, 'Devuelto'),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: AppColors.red),
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                  ),
+                  child: Text('No entregado',
+                      style:
+                          TextStyle(color: AppColors.red, fontSize: 12.5)),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed:
+                      actualizando ? null : () => _accion(p, 'Intento'),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: AppColors.orange),
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                  ),
+                  child: Text('Intento',
+                      style: TextStyle(
+                          color: AppColors.orange, fontSize: 12.5)),
+                ),
+              ),
+            ],
+          ),
+          if (actualizando)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Center(
+                child: SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: AppColors.adminPrimary),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -518,53 +432,45 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
   }
 }
 
-class _GrupoRuta {
-  final int? idRuta;
-  final Map<String, dynamic>? ruta;
-  final Map<int, _GrupoSede> sedes = {};
-  _GrupoRuta({required this.idRuta, required this.ruta});
-}
-
 class _GrupoSede {
-  final int? idDestino;
   final String municipio;
   final List<Map<String, dynamic>> paquetes = [];
-  _GrupoSede({required this.idDestino, required this.municipio});
+  _GrupoSede(this.municipio);
 }
 
-class _DejarEnSedeResult {
+class _EntregaFinalResult {
   final PlatformFile? foto; // opcional
-  final String novedades; // opcional
-  _DejarEnSedeResult(this.foto, this.novedades);
+  final String novedad;
+  _EntregaFinalResult(this.foto, this.novedad);
 }
 
-// Hoja inferior para legalizar la entrega en sede: foto y novedades OPCIONALES —
-// el conductor puede confirmar sin subir nada (ver dejarPaquetesEnSede en el
-// backend). Distinto de la evidencia de entrega final (esa sí obligatoria) que
-// hace el distribuidor desde su propio app.
-class _DejarEnSedeSheet extends StatefulWidget {
-  final String municipio;
-  final int cantidad;
-  const _DejarEnSedeSheet({required this.municipio, required this.cantidad});
+// Hoja inferior para la entrega final: foto opcional; novedad obligatoria cuando
+// `novedadObligatoria` es true (No entregado / Intento).
+class _EntregaFinalSheet extends StatefulWidget {
+  final String titulo;
+  final bool novedadObligatoria;
+  const _EntregaFinalSheet(
+      {required this.titulo, required this.novedadObligatoria});
 
-  static Future<_DejarEnSedeResult?> show(BuildContext context,
-      {required String municipio, required int cantidad}) {
-    return showModalBottomSheet<_DejarEnSedeResult>(
+  static Future<_EntregaFinalResult?> show(BuildContext context,
+      {required String titulo, required bool novedadObligatoria}) {
+    return showModalBottomSheet<_EntregaFinalResult>(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) =>
-          _DejarEnSedeSheet(municipio: municipio, cantidad: cantidad),
+      builder: (_) => _EntregaFinalSheet(
+          titulo: titulo, novedadObligatoria: novedadObligatoria),
     );
   }
 
   @override
-  State<_DejarEnSedeSheet> createState() => _DejarEnSedeSheetState();
+  State<_EntregaFinalSheet> createState() => _EntregaFinalSheetState();
 }
 
-class _DejarEnSedeSheetState extends State<_DejarEnSedeSheet> {
+class _EntregaFinalSheetState extends State<_EntregaFinalSheet> {
   PlatformFile? _foto;
   String? _errorPeso;
+  bool _intentoConfirmar = false;
   final _obsCtrl = TextEditingController();
 
   void _setFoto(PlatformFile archivo) {
@@ -635,9 +541,21 @@ class _DejarEnSedeSheetState extends State<_DejarEnSedeSheet> {
     super.dispose();
   }
 
+  void _confirmar() {
+    final novedad = _obsCtrl.text.trim();
+    if (widget.novedadObligatoria && novedad.isEmpty) {
+      setState(() => _intentoConfirmar = true);
+      return;
+    }
+    Navigator.pop(context, _EntregaFinalResult(_foto, novedad));
+  }
+
   @override
   Widget build(BuildContext context) {
-    final acento = AppColors.driverPrimary;
+    final acento = AppColors.adminPrimary;
+    final novedadFaltante = widget.novedadObligatoria &&
+        _intentoConfirmar &&
+        _obsCtrl.text.trim().isEmpty;
 
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
@@ -663,7 +581,7 @@ class _DejarEnSedeSheetState extends State<_DejarEnSedeSheet> {
               ),
             ),
             Text(
-              'Dejar en sede — ${widget.municipio}',
+              widget.titulo,
               style: TextStyle(
                   color: AppColors.textMain,
                   fontSize: 17,
@@ -671,14 +589,11 @@ class _DejarEnSedeSheetState extends State<_DejarEnSedeSheet> {
             ),
             const SizedBox(height: 2),
             Text(
-              widget.cantidad == 1
-                  ? 'Se marcará 1 paquete como dejado en la sede'
-                  : 'Se marcarán ${widget.cantidad} paquetes como dejados en la sede',
+              widget.novedadObligatoria
+                  ? 'La novedad es obligatoria. Foto opcional.'
+                  : 'Foto y novedad opcionales.',
               style: TextStyle(color: AppColors.textSub, fontSize: 13),
             ),
-            const SizedBox(height: 2),
-            Text('Foto y novedades son opcionales',
-                style: TextStyle(color: AppColors.textSub, fontSize: 11.5)),
             const SizedBox(height: 16),
             TapArea(
               onTap: _pickFoto,
@@ -708,8 +623,9 @@ class _DejarEnSedeSheetState extends State<_DejarEnSedeSheet> {
                           : '${_foto!.name} · ${_formatBytes(_foto!.size)}',
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color:
-                            _foto == null ? AppColors.textSub : AppColors.textMain,
+                        color: _foto == null
+                            ? AppColors.textSub
+                            : AppColors.textMain,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -726,12 +642,18 @@ class _DejarEnSedeSheetState extends State<_DejarEnSedeSheet> {
             TextField(
               controller: _obsCtrl,
               maxLines: 2,
+              onChanged: (_) {
+                if (_intentoConfirmar) setState(() {});
+              },
               style: TextStyle(color: AppColors.textMain),
               decoration: InputDecoration(
-                hintText: 'Novedades (opcional)',
+                hintText: widget.novedadObligatoria
+                    ? 'Novedad (obligatoria)'
+                    : 'Novedad (opcional)',
                 hintStyle: TextStyle(color: AppColors.textSub),
                 filled: true,
                 fillColor: AppColors.bgGray,
+                errorText: novedadFaltante ? 'Escribe una novedad' : null,
                 border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide(color: AppColors.border)),
@@ -745,8 +667,7 @@ class _DejarEnSedeSheetState extends State<_DejarEnSedeSheet> {
             ),
             const SizedBox(height: 16),
             TapArea(
-              onTap: () => Navigator.pop(
-                  context, _DejarEnSedeResult(_foto, _obsCtrl.text.trim())),
+              onTap: _confirmar,
               child: Container(
                 width: double.infinity,
                 height: 50,

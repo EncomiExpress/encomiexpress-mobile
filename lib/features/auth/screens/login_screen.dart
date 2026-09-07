@@ -6,6 +6,7 @@ import '../../../core/services/auth_service.dart';
 import '../../../core/widgets.dart';
 import '../../admin/screens/admin_home.dart';
 import '../../driver/screens/driver_home.dart';
+import '../../distribuidor/screens/distribuidor_home.dart';
 import 'recover_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -93,10 +94,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (result['success'] == true) {
       // Forma real de POST /api/auth/login (authService.login en el backend):
-      // { success, message, data: { token, refreshToken, usuario: {..., rol}, conductor } }
+      // { success, message, data: { token, refreshToken, usuario: {..., rol}, conductor, sedes } }
       final payload = result['data']?['data'] as Map<String, dynamic>?;
       final usuario = payload?['usuario'] as Map<String, dynamic>?;
       final conductor = payload?['conductor'] as Map<String, dynamic>?;
+      final sedes = (payload?['sedes'] as List?)
+          ?.map((e) => Map<String, dynamic>.from(e as Map))
+          .toList();
 
       if (usuario == null) {
         setState(() {
@@ -114,6 +118,7 @@ class _LoginScreenState extends State<LoginScreen> {
         telefono: usuario['telefono'] ?? '',
         rol: usuario['rol'] ?? '',
         conductorId: conductor?['idConductor']?.toString(),
+        sedes: sedes ?? const [],
       );
 
       final prefs = await SharedPreferences.getInstance();
@@ -123,9 +128,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
       setState(() => _loading = false);
 
-      final dest = user.rol.toLowerCase() == 'conductor'
-          ? DriverHome(user: user)
-          : AdminHome(user: user);
+      final rol = user.rol.toLowerCase();
+      final Widget dest;
+      if (rol == 'conductor') {
+        dest = DriverHome(user: user);
+      } else if (rol == 'distribuidor') {
+        dest = DistribuidorHome(user: user);
+      } else {
+        dest = AdminHome(user: user);
+      }
 
       Navigator.pushReplacement(context,
           MaterialPageRoute(builder: (_) => dest));

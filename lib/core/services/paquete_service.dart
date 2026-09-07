@@ -36,6 +36,71 @@ class PaqueteService {
     }
   }
 
+  // PATCH /api/paquetes/sede — el conductor del tramo troncal marca DE UNA VEZ
+  // todos los paquetes "Por entregar" de una sede (parada o destino final) como
+  // "En sede de destino". Foto y novedades son opcionales (ver dejarPaquetesEnSede).
+  Future<Map<String, dynamic>> dejarEnSede({
+    required int idRuta,
+    required int idDestino,
+    String novedades = '',
+    PlatformFile? foto,
+  }) async {
+    try {
+      final map = <String, dynamic>{
+        'idRuta': idRuta.toString(),
+        'idDestino': idDestino.toString(),
+        'novedades': novedades,
+      };
+      if (foto != null && foto.path != null) {
+        map['file'] = await MultipartFile.fromFile(foto.path!, filename: foto.name);
+      }
+      final resp = await _api.patch('/api/paquetes/sede', data: FormData.fromMap(map));
+      if (resp.statusCode == 200) {
+        return {
+          'success': true,
+          'data': resp.data['data'],
+          'message': resp.data['message'],
+        };
+      }
+      return {'success': false, 'message': 'No se pudo legalizar la entrega en sede'};
+    } catch (e) {
+      return {'success': false, 'message': _mensajeError(e)};
+    }
+  }
+
+  // GET /api/paquetes/sede — paquetes "En sede de destino" de las sedes que
+  // cubre el distribuidor autenticado (el idUsuario sale del token).
+  Future<List<dynamic>> getPaquetesEnSede() async {
+    final resp = await _api.get('/api/paquetes/sede');
+    if (resp.statusCode == 200) return resp.data['data'] as List<dynamic>;
+    return [];
+  }
+
+  // PATCH /api/paquetes/:id/entrega-final — el distribuidor registra la entrega
+  // final: accion = 'Entregado' | 'Devuelto' | 'Intento'. Foto opcional; la
+  // novedad la exige el backend para 'Devuelto'/'Intento'.
+  Future<Map<String, dynamic>> registrarEntregaFinal(
+    int idPaquete, {
+    required String accion,
+    String novedad = '',
+    PlatformFile? foto,
+  }) async {
+    try {
+      final map = <String, dynamic>{'accion': accion, 'novedad': novedad};
+      if (foto != null && foto.path != null) {
+        map['file'] = await MultipartFile.fromFile(foto.path!, filename: foto.name);
+      }
+      final resp = await _api.patch('/api/paquetes/$idPaquete/entrega-final',
+          data: FormData.fromMap(map));
+      if (resp.statusCode == 200) {
+        return {'success': true, 'data': resp.data['data'], 'message': resp.data['message']};
+      }
+      return {'success': false, 'message': 'No se pudo registrar la entrega'};
+    } catch (e) {
+      return {'success': false, 'message': _mensajeError(e)};
+    }
+  }
+
   String _mensajeError(dynamic e) {
     if (e is DioException && e.response?.data is Map) {
       return e.response?.data['message'] ?? 'Error de conexión';

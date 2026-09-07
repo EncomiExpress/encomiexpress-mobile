@@ -150,6 +150,9 @@ class UserModel {
   final String? fotoPerfil;
   final String? numeroLicencia;
   final List<LicenciaCategoria> categoriasLicencia;
+  // Sedes (municipios) que cubre — solo para el rol 'distribuidor'. Cada mapa trae
+  // { idDestino, municipio, departamento }. Vacío para conductor/admin.
+  final List<Map<String, dynamic>> sedes;
 
   const UserModel({
     required this.id,
@@ -166,7 +169,14 @@ class UserModel {
     this.fotoPerfil,
     this.numeroLicencia,
     this.categoriasLicencia = const [],
+    this.sedes = const [],
   });
+
+  // Ids de las sedes que cubre el distribuidor (para pedir "sus" paquetes).
+  List<int> get idsSedes => sedes
+      .map((s) => (s['idDestino'] as num?)?.toInt())
+      .whereType<int>()
+      .toList();
 
   // Nombre completo mostrado como "Nombre Apellido" — el backend guarda
   // nombre y apellido por separado.
@@ -192,6 +202,10 @@ class UserModel {
               ?.map((e) => LicenciaCategoria.fromJson(e as Map<String, dynamic>))
               .toList() ??
           const [],
+      sedes: (json['sedes'] as List?)
+              ?.map((e) => Map<String, dynamic>.from(e as Map))
+              .toList() ??
+          const [],
     );
   }
 
@@ -211,6 +225,7 @@ class UserModel {
       'fotoPerfil': fotoPerfil,
       'numeroLicencia': numeroLicencia,
       'categoriasLicencia': categoriasLicencia,
+      'sedes': sedes,
     };
   }
 
@@ -229,6 +244,7 @@ class UserModel {
     String? fotoPerfil,
     String? numeroLicencia,
     List<LicenciaCategoria>? categoriasLicencia,
+    List<Map<String, dynamic>>? sedes,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -245,6 +261,7 @@ class UserModel {
       fotoPerfil: fotoPerfil ?? this.fotoPerfil,
       numeroLicencia: numeroLicencia ?? this.numeroLicencia,
       categoriasLicencia: categoriasLicencia ?? this.categoriasLicencia,
+      sedes: sedes ?? this.sedes,
     );
   }
 }
