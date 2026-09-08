@@ -53,7 +53,8 @@ class _DistribuidorHomeState extends State<DistribuidorHome> {
   // tiene dirección cargada; con varias sedes sería ambiguo a cuál pertenece.
   String? get _direccionSede {
     if (_currentUser.sedes.length != 1) return null;
-    final direccion = (_currentUser.sedes.first['direccion'] as String?)?.trim();
+    final direccion = (_currentUser.sedes.first['direccion'] as String?)
+        ?.trim();
     return (direccion != null && direccion.isNotEmpty) ? direccion : null;
   }
 
@@ -114,29 +115,27 @@ class _DistribuidorHomeState extends State<DistribuidorHome> {
                 padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
                 child: Row(
                   children: [
-                    Icon(Icons.location_city_outlined,
-                        size: 15, color: AppColors.textSub),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(_resumenSedes,
-                          style: TextStyle(
-                              color: AppColors.textSub, fontSize: 12)),
+                    Icon(
+                      Icons.location_city_outlined,
+                      size: 15,
+                      color: AppColors.textSub,
                     ),
-                  ],
-                ),
-              ),
-            if (_direccionSede != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
-                child: Row(
-                  children: [
-                    Icon(Icons.location_on_outlined,
-                        size: 15, color: AppColors.textSub),
                     const SizedBox(width: 6),
                     Expanded(
-                      child: Text(_direccionSede!,
-                          style: TextStyle(
-                              color: AppColors.textSub, fontSize: 12)),
+                      // Municipio y dirección en la misma fila (antes cada uno
+                      // tenía su propia fila con su propio ícono) -- se ahorra
+                      // una fila completa, y la dirección solo aplica de todos
+                      // modos cuando hay una única sede (ver _direccionSede).
+                      child: Text(
+                        _direccionSede != null
+                            ? '$_resumenSedes · $_direccionSede'
+                            : _resumenSedes,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: AppColors.textSub,
+                          fontSize: 12,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -194,152 +193,175 @@ class _DistribuidorPerfil extends StatelessWidget {
     // Se embebe como pestaña de DistribuidorHome -- sin Scaffold ni flecha
     // "volver" propios, mismo criterio que DriverProfile.
     return SingleChildScrollView(
-        child: Column(
-          children: [
-            Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: AppColors.cardBg,
-                border: Border(bottom: BorderSide(color: AppColors.border)),
-              ),
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.15),
-                                blurRadius: 12)
-                          ],
-                        ),
-                        child: UserAvatar(nombre: user.nombreCompleto, size: 64),
+      child: Column(
+        children: [
+          Container(
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: AppColors.cardBg,
+              border: Border(bottom: BorderSide(color: AppColors.border)),
+            ),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.15),
+                            blurRadius: 12,
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(user.nombreCompleto,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                    color: AppColors.textMain,
-                                    fontSize: 19,
-                                    fontWeight: FontWeight.w800)),
-                            const SizedBox(height: 4),
-                            Text('Encargado de sede',
-                                style: TextStyle(
-                                    color: AppColors.textSub, fontSize: 13)),
-                          ],
+                      child: UserAvatar(nombre: user.nombreCompleto, size: 64),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            user.nombreCompleto,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: AppColors.textMain,
+                              fontSize: 19,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Encargado de sede',
+                            style: TextStyle(
+                              color: AppColors.textSub,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SectionCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Información personal',
+                        style: TextStyle(
+                          color: AppColors.textMain,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
                         ),
+                      ),
+                      const SizedBox(height: 14),
+                      InfoRow(
+                        icon: Icons.person_outline_rounded,
+                        iconColor: AppColors.blue,
+                        iconBg: AppColors.blueBg,
+                        label: 'Nombre completo',
+                        value: user.nombreCompleto,
+                      ),
+                      if (user.documento != null && user.documento!.isNotEmpty)
+                        InfoRow(
+                          icon: Icons.badge_outlined,
+                          iconColor: AppColors.orange,
+                          iconBg: AppColors.orangeBg,
+                          label: 'Identificación',
+                          value:
+                              user.tipoDocumento != null &&
+                                  user.tipoDocumento!.isNotEmpty
+                              ? '${user.tipoDocumento} ${user.documento}'
+                              : user.documento!,
+                        ),
+                      InfoRow(
+                        icon: Icons.phone_outlined,
+                        iconColor: AppColors.purple,
+                        iconBg: AppColors.purpleBg,
+                        label: 'Teléfono',
+                        value: user.telefono.isNotEmpty
+                            ? user.telefono
+                            : 'No registrado',
+                      ),
+                      InfoRow(
+                        icon: Icons.email_outlined,
+                        iconColor: AppColors.green,
+                        iconBg: AppColors.greenBg,
+                        label: 'Correo electrónico',
+                        value: user.email.isEmpty ? '—' : user.email,
+                      ),
+                      InfoRow(
+                        icon: Icons.location_city_outlined,
+                        iconColor: AppColors.blue,
+                        iconBg: AppColors.blueBg,
+                        label: 'Sede que cubre',
+                        value: sedes.isEmpty ? '—' : sedes.join(', '),
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SectionCard(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                ),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      await AuthService().logout();
+                      if (!context.mounted) return;
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(builder: (_) => const LoginScreen()),
+                        (r) => false,
+                      );
+                    },
+                    style: ButtonStyle(
+                      shape: WidgetStateProperty.all(
+                        RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      backgroundColor: WidgetStateProperty.all(
+                        AppColors.adminPrimary,
+                      ),
+                      elevation: WidgetStateProperty.all(3),
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text('Información personal',
-                            style: TextStyle(
-                                color: AppColors.textMain,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700)),
-                        const SizedBox(height: 14),
-                        InfoRow(
-                          icon: Icons.person_outline_rounded,
-                          iconColor: AppColors.blue,
-                          iconBg: AppColors.blueBg,
-                          label: 'Nombre completo',
-                          value: user.nombreCompleto,
+                        Icon(
+                          Icons.logout_rounded,
+                          color: Colors.white,
+                          size: 18,
                         ),
-                        if (user.documento != null && user.documento!.isNotEmpty)
-                          InfoRow(
-                            icon: Icons.badge_outlined,
-                            iconColor: AppColors.orange,
-                            iconBg: AppColors.orangeBg,
-                            label: 'Identificación',
-                            value: user.tipoDocumento != null &&
-                                    user.tipoDocumento!.isNotEmpty
-                                ? '${user.tipoDocumento} ${user.documento}'
-                                : user.documento!,
+                        SizedBox(width: 8),
+                        Text(
+                          'Cerrar sesión',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
                           ),
-                        InfoRow(
-                          icon: Icons.phone_outlined,
-                          iconColor: AppColors.purple,
-                          iconBg: AppColors.purpleBg,
-                          label: 'Teléfono',
-                          value: user.telefono.isNotEmpty
-                              ? user.telefono
-                              : 'No registrado',
-                        ),
-                        InfoRow(
-                          icon: Icons.email_outlined,
-                          iconColor: AppColors.green,
-                          iconBg: AppColors.greenBg,
-                          label: 'Correo electrónico',
-                          value: user.email.isEmpty ? '—' : user.email,
-                        ),
-                        InfoRow(
-                          icon: Icons.location_city_outlined,
-                          iconColor: AppColors.blue,
-                          iconBg: AppColors.blueBg,
-                          label: 'Sede que cubre',
-                          value: sedes.isEmpty ? '—' : sedes.join(', '),
                         ),
                       ],
                     ),
                   ),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        await AuthService().logout();
-                        if (!context.mounted) return;
-                        Navigator.pushAndRemoveUntil(
-                          context,
-                          MaterialPageRoute(builder: (_) => const LoginScreen()),
-                          (r) => false,
-                        );
-                      },
-                      style: ButtonStyle(
-                        shape: WidgetStateProperty.all(RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14))),
-                        backgroundColor:
-                            WidgetStateProperty.all(AppColors.adminPrimary),
-                        elevation: WidgetStateProperty.all(3),
-                      ),
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.logout_rounded, color: Colors.white, size: 18),
-                          SizedBox(width: 8),
-                          Text('Cerrar sesión',
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 15)),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                ],
-              ),
+                ),
+                const SizedBox(height: 32),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
+      ),
     );
   }
 }
