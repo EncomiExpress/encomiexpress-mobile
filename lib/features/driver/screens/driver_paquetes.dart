@@ -16,6 +16,21 @@ String _formatBytes(num bytes) {
   return '${mb.toStringAsFixed(1)} MB';
 }
 
+// Misma conversión que formatHora12() del frontend web (shared/utils/formatters.js)
+// -- la hora de una ruta se guarda en 24h ("08:00") pero en cualquier pantalla que
+// no sea el propio formulario de edición se muestra en 12h con AM/PM.
+String? _formatHora12(String? hora) {
+  if (hora == null || hora.isEmpty) return null;
+  final partes = hora.split(':');
+  if (partes.length < 2) return null;
+  final h = int.tryParse(partes[0]);
+  final m = int.tryParse(partes[1]);
+  if (h == null || m == null) return null;
+  final periodo = h >= 12 ? 'PM' : 'AM';
+  final h12 = h % 12 == 0 ? 12 : h % 12;
+  return '$h12:${m.toString().padLeft(2, '0')} $periodo';
+}
+
 // Pantalla "Paquetes" del conductor — entrega en dos fases (ver ../../../LOGICA.md):
 // el conductor del tramo troncal NO entrega puerta a puerta, solo deja los
 // paquetes en la sede de cada municipio (parada intermedia o destino final).
@@ -105,9 +120,12 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
       final municipio = (destino?['municipio'] as String?) ??
           (destino?['departamento'] as String?) ??
           'Sede';
+      final direccion = destino?['direccion'] as String?;
       final sedeKey = idDestino ?? -1;
       final grupoSede = grupoRuta.sedes.putIfAbsent(
-          sedeKey, () => _GrupoSede(idDestino: idDestino, municipio: municipio));
+          sedeKey,
+          () => _GrupoSede(
+              idDestino: idDestino, municipio: municipio, direccion: direccion));
       grupoSede.paquetes.add(paquete);
     }
     return mapa.values.toList();
@@ -138,12 +156,14 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
     if (!mounted) return;
     setState(() => _sedesActualizando.remove(key));
 
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(res['message'] ??
+    showAppSnackBar(
+      context,
+      res['message'] ??
           (res['success'] == true
               ? 'Paquetes dejados en sede'
-              : 'No se pudo legalizar la entrega en sede')),
-    ));
+              : 'No se pudo legalizar la entrega en sede'),
+      severity: res['success'] == true ? 'success' : 'error',
+    );
     if (res['success'] == true) _load();
   }
 
@@ -193,20 +213,19 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
 
   Widget _buildGrupo(_GrupoRuta grupo) {
     final ruta = grupo.ruta;
+    final destino = ruta?['destino'] as Map<String, dynamic>?;
+    final destinoMunicipio = destino?['municipio'] as String?;
     final rutaLabel = ruta != null
         ? ((ruta['origen'] as String?)?.isNotEmpty == true
-            ? ruta['origen'] as String
+            ? '${ruta['origen']}${(destinoMunicipio?.isNotEmpty ?? false) ? ' - $destinoMunicipio' : ''}'
             : 'Ruta #${grupo.idRuta ?? '—'}')
         : 'Ruta desconocida';
-    final horario = ruta != null
-        ? '${ruta['fechaSalida'] ?? '—'} ${ruta['horaSalida'] ?? ''}'.trim()
+    // horaSalida llega como "HH:mm:ss" (24h) del backend -- se muestra en 12h con
+    // AM/PM, igual que en el listado de Rutas del panel web (formatHora12()).
+    final horaSalida = _formatHora12(ruta?['horaSalida'] as String?) ?? '';
+    final detalle = ruta != null
+        ? '${ruta['fechaSalida'] ?? '—'} $horaSalida'.trim()
         : '';
-    final destino = ruta?['destino'] as Map<String, dynamic>?;
-    final destinoTexto = destino != null
-        ? '${destino['municipio'] ?? ''}${(destino['municipio'] != null && destino['departamento'] != null) ? ', ' : ''}${destino['departamento'] ?? ''}'
-        : '';
-    final detalle =
-        [destinoTexto, horario].where((s) => s.isNotEmpty).join(' · ');
     // El conductor solo puede legalizar mientras la ruta está "En Ruta" — antes
     // de eso no ha salido de bodega (misma validación en el backend,
     // encomiendaService.dejarPaquetesEnSede).
@@ -311,6 +330,16 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
               ),
             ],
           ),
+          if (sede.direccion != null && sede.direccion!.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Padding(
+              padding: const EdgeInsets.only(left: 22),
+              child: Text(
+                sede.direccion!,
+                style: TextStyle(color: AppColors.textSub, fontSize: 12),
+              ),
+            ),
+          ],
           const SizedBox(height: 10),
           for (final p in sede.paquetes) ...[
             _buildPaqueteCard(p),
@@ -399,7 +428,18 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
                 ),
               ),
               const SizedBox(width: 8),
-              _estadoChip(estado),
+              // "Entregado"/"Devuelto" son el resultado de la entrega FINAL al
+              // destinatario, que hace el distribuidor de la sede -- no el
+              // conductor del tramo troncal (ver ../../../LOGICA.md, "Entrega en
+              // dos fases"). Para el conductor, un paquete solo tiene dos estados
+              // relevantes: falta dejarlo en la sede, o ya lo dejó -- lo que pase
+              // después ya no es asunto suyo, mostrárselo solo generaría ruido
+              // (o incluso confusión, ya que el backend reutiliza los mismos
+              // campos observacionEstado/fotoEntrega para la novedad y evidencia
+              // que deja el distribuidor al entregar, ver el condicional de más
+              // abajo).
+              if (estado == 'Por entregar' || estado == 'En sede de destino')
+                _estadoChip(estado),
             ],
           ),
           if (nombreDestinatario.isNotEmpty ||
@@ -450,10 +490,14 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
                 ),
               ),
           ],
-          // Una vez el paquete salió de "Por entregar", el conductor puede volver
-          // a consultar la novedad y la foto que él mismo dejó al legalizar la
-          // sede (el backend ya no le deja cambiarlo).
-          if (estado != 'Por entregar') ...[
+          // Mientras sigue "En sede de destino", el conductor puede volver a
+          // consultar la novedad y la foto que él mismo dejó al legalizar la
+          // sede (el backend ya no le deja cambiarlo). Una vez el distribuidor
+          // hace la entrega final (Entregado/Devuelto), esos MISMOS campos
+          // (observacionEstado/fotoEntrega) pasan a ser la novedad y evidencia
+          // que dejó el distribuidor al entregar -- ya no son del conductor, así
+          // que dejan de mostrarse acá.
+          if (estado == 'En sede de destino') ...[
             if ((p['observacionEstado'] as String?)?.isNotEmpty == true ||
                 (p['fotoEntrega'] as String?)?.isNotEmpty == true) ...[
               const SizedBox(height: 8),
@@ -528,8 +572,9 @@ class _GrupoRuta {
 class _GrupoSede {
   final int? idDestino;
   final String municipio;
+  final String? direccion;
   final List<Map<String, dynamic>> paquetes = [];
-  _GrupoSede({required this.idDestino, required this.municipio});
+  _GrupoSede({required this.idDestino, required this.municipio, this.direccion});
 }
 
 class _DejarEnSedeResult {

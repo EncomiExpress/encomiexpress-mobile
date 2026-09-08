@@ -113,18 +113,14 @@ class _DriverHomeState extends State<DriverHome> {
     }
   }
 
-  void _abrirPerfil() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) =>
-            DriverProfile(user: _currentUser, onUserUpdated: _onUserUpdated),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    // Perfil es una pestaña más (índice 2), no una pantalla apilada encima --
+    // se llega y se sale por la misma barra inferior que Anticipos/Paquetes,
+    // sin flecha "volver". DriverProfile ya trae su propio encabezado con
+    // avatar/nombre/botón de editar, así que el saludo genérico de arriba solo
+    // se muestra en las otras dos pestañas para no duplicar esa fila.
+    final enPerfil = _tabIndex == 2;
     return Scaffold(
       backgroundColor: AppColors.bgGray,
       body: Column(
@@ -139,48 +135,52 @@ class _DriverHomeState extends State<DriverHome> {
               ),
             ),
           ),
-          Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: AppColors.cardBg,
-              border: Border(bottom: BorderSide(color: AppColors.border)),
-            ),
-            padding: EdgeInsets.fromLTRB(
-              20,
-              MediaQuery.of(context).padding.top + 16,
-              20,
-              20,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${greeting()} ${_currentUser.nombre}',
-                        style: TextStyle(
-                          color: AppColors.textMain,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          fontFamily: 'Cambria',
+          if (!enPerfil)
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: AppColors.cardBg,
+                border: Border(bottom: BorderSide(color: AppColors.border)),
+              ),
+              padding: EdgeInsets.fromLTRB(
+                20,
+                MediaQuery.of(context).padding.top + 16,
+                20,
+                20,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${greeting()} ${_currentUser.nombre}',
+                          style: TextStyle(
+                            color: AppColors.textMain,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            fontFamily: 'Cambria',
+                          ),
                         ),
-                      ),
-                      LiveDateTime(
-                        style: TextStyle(color: AppColors.textSub, fontSize: 13),
-                      ),
-                    ],
+                        LiveDateTime(
+                          style: TextStyle(color: AppColors.textSub, fontSize: 13),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox.shrink(),
-              ],
+                  const SizedBox.shrink(),
+                ],
+              ),
             ),
-          ),
           Expanded(
             child: _tabIndex == 0
                 ? _buildMisAnticipos()
-                : DriverPaquetes(user: _currentUser),
+                : _tabIndex == 1
+                    ? DriverPaquetes(user: _currentUser)
+                    : DriverProfile(
+                        user: _currentUser, onUserUpdated: _onUserUpdated),
           ),
         ],
       ),
@@ -206,7 +206,8 @@ class _DriverHomeState extends State<DriverHome> {
           BottomMenuItem(
             icon: Icons.person_outline,
             label: 'Perfil',
-            onTap: _abrirPerfil,
+            active: _tabIndex == 2,
+            onTap: () => setState(() => _tabIndex = 2),
           ),
         ],
       ),

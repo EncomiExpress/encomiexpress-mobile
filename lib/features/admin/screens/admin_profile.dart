@@ -15,9 +15,9 @@ class AdminProfile extends StatelessWidget {
     final aprobados  = anticipos.where((a) => a.estado == EstadoAnticipo.completado).length;
     final conductores = anticipos.map((a) => a.idConductor).toSet().length;
 
-    return Scaffold(
-      backgroundColor: AppColors.bgGray,
-      body: SingleChildScrollView(
+    // Se embebe como pestaña de AdminHome -- sin Scaffold ni flecha "volver"
+    // propios, mismo criterio que DriverProfile/_DistribuidorPerfil.
+    return SingleChildScrollView(
         child: Column(
           children: [
             Container(
@@ -29,26 +29,9 @@ class AdminProfile extends StatelessWidget {
                   end: Alignment.centerRight,
                 ),
               ),
-              padding: EdgeInsets.fromLTRB(
-                  20, MediaQuery.of(context).padding.top + 12, 20, 28),
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
               child: Column(
                 children: [
-                  Row(
-                    children: [
-                      TapArea(
-                        onTap: () => Navigator.pop(context),
-                        child: const Icon(Icons.arrow_back,
-                            color: Colors.white, size: 22),
-                      ),
-                      const SizedBox(width: 12),
-                      const Text('Perfil de administrador',
-                          style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.w700)),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
                   Container(
                     width: 80, height: 80,
                     decoration: BoxDecoration(
@@ -222,7 +205,6 @@ class AdminProfile extends StatelessWidget {
             ),
           ],
         ),
-      ),
     );
   }
 

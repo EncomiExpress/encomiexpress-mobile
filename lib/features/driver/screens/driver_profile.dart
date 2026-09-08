@@ -36,9 +36,10 @@ class _DriverProfileState extends State<DriverProfile> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.bgGray,
-      body: SingleChildScrollView(
+    // Se embebe como una pestaña más de DriverHome (barra inferior Tema /
+    // Anticipos / Paquetes / Perfil) — sin Scaffold ni flecha "volver" propios,
+    // que solo tendrían sentido si esta pantalla se abriera apilada sobre otra.
+    return SingleChildScrollView(
       child: Column(
         children: [
           Container(
@@ -47,25 +48,9 @@ class _DriverProfileState extends State<DriverProfile> {
               color: AppColors.cardBg,
               border: Border(bottom: BorderSide(color: AppColors.border)),
             ),
-            padding: EdgeInsets.fromLTRB(
-                20, MediaQuery.of(context).padding.top + 12, 20, 20),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
             child: Column(
               children: [
-                Row(
-                  children: [
-                    TapArea(
-                      onTap: () => Navigator.pop(context),
-                      child: Icon(Icons.arrow_back, color: AppColors.textMain, size: 22),
-                    ),
-                    const SizedBox(width: 12),
-                    Text('Mi perfil',
-                        style: TextStyle(
-                            color: AppColors.textMain,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700)),
-                  ],
-                ),
-                const SizedBox(height: 20),
                 Row(
                   children: [
                     Container(
@@ -286,7 +271,6 @@ class _DriverProfileState extends State<DriverProfile> {
             ),
           ),
         ],
-      ),
       ),
     );
   }

@@ -36,6 +36,7 @@ class _AdminHomeState extends State<AdminHome> {
   // Guarda el número de mes ('1'..'12') que espera el backend, no el label.
   String _filtroMes = '';
   List<String> _aniosDisponibles = [];
+  int _tabIndex = 0;
 
   @override
   void initState() {
@@ -150,14 +151,17 @@ class _AdminHomeState extends State<AdminHome> {
               ),
             ),
           ),
-          GradientHeader(
-            title: '${greeting()} ${widget.user.nombre}',
-            subtitleWidget: LiveDateTime(
-              style: TextStyle(color: AppColors.textSub, fontSize: 13),
+          if (_tabIndex == 0)
+            GradientHeader(
+              title: '${greeting()} ${widget.user.nombre}',
+              subtitleWidget: LiveDateTime(
+                style: TextStyle(color: AppColors.textSub, fontSize: 13),
+              ),
             ),
-          ),
           Expanded(
-            child: _loading
+            child: _tabIndex == 1
+                ? AdminProfile(user: widget.user, anticipos: _anticipos)
+                : _loading
                 ? const Center(child: CircularProgressIndicator())
                 : RefreshIndicator(
                     onRefresh: _loadAnticipos,
@@ -350,14 +354,16 @@ class _AdminHomeState extends State<AdminHome> {
             onTap: () => PersonalizarSheet.show(context),
           ),
           BottomMenuItem(
+            icon: Icons.monetization_on,
+            label: 'Anticipos',
+            active: _tabIndex == 0,
+            onTap: () => setState(() => _tabIndex = 0),
+          ),
+          BottomMenuItem(
             icon: Icons.person_outline,
             label: 'Perfil',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => AdminProfile(user: widget.user, anticipos: _anticipos),
-              ),
-            ),
+            active: _tabIndex == 1,
+            onTap: () => setState(() => _tabIndex = 1),
           ),
           BottomMenuItem(
             icon: Icons.add_circle_outline,

@@ -16,6 +16,15 @@ String _formatBytes(num bytes) {
   return '${mb.toStringAsFixed(1)} MB';
 }
 
+// "2026-09-05T20:15:00.000Z" (o similar) -> "05/09/2026" -- clave de agrupación
+// y también lo que se muestra. Solo interesa el día, no la hora exacta.
+String _fechaCorta(String? iso) {
+  if (iso == null || iso.length < 10) return 'Sin fecha';
+  final fecha = DateTime.tryParse(iso);
+  if (fecha == null) return 'Sin fecha';
+  return '${fecha.day.toString().padLeft(2, '0')}/${fecha.month.toString().padLeft(2, '0')}/${fecha.year}';
+}
+
 // Pantalla "Paquetes" del distribuidor de sede — segunda fase de la entrega (ver
 // ../../../LOGICA.md, "Entrega en dos fases"): el conductor ya dejó los paquetes
 // "En sede de destino"; acá el distribuidor registra la entrega final al
@@ -69,16 +78,24 @@ class _DistribuidorPaquetesState extends State<DistribuidorPaquetes> {
     }
   }
 
-  // Agrupa por sede/municipio (encomienda.destinatario.destino.municipio).
-  List<_GrupoSede> get _grupos {
-    final Map<String, _GrupoSede> mapa = {};
+  // Agrupa por fecha de llegada a la sede (Paquete.fechaUltimoEstado -- el
+  // conductor deja los paquetes en sede de una sola vez por sede/ruta, así que
+  // esa fecha ya es un buen indicador de "tanda"). No se agrupa por municipio:
+  // un distribuidor cubre una sola sede (ver ../../../LOGICA.md), así que ese
+  // dato nunca varía entre paquetes propios y mostrarlo como grupo era
+  // redundante -- el municipio/dirección de la sede ya se ven una sola vez
+  // arriba, en distribuidor_home.dart. Tampoco se agrupa por ruta (origen -
+  // destino): esa es información de logística/flota que no le corresponde ver
+  // al distribuidor, solo al conductor/admin.
+  //
+  // El backend ya ordena por fechaUltimoEstado DESC, así que el orden de
+  // inserción en el Map ya deja primero la fecha más reciente sin resortear acá.
+  List<_GrupoFecha> get _grupos {
+    final Map<String, _GrupoFecha> mapa = {};
     for (final p in _paquetes.take(_itemsToShow)) {
       final paquete = p as Map<String, dynamic>;
-      final destino =
-          ((paquete['encomienda'] as Map<String, dynamic>?)?['destinatario']
-              as Map<String, dynamic>?)?['destino'] as Map<String, dynamic>?;
-      final municipio = (destino?['municipio'] as String?) ?? 'Sede';
-      final grupo = mapa.putIfAbsent(municipio, () => _GrupoSede(municipio));
+      final etiqueta = _fechaCorta(paquete['fechaUltimoEstado'] as String?);
+      final grupo = mapa.putIfAbsent(etiqueta, () => _GrupoFecha(etiqueta));
       grupo.paquetes.add(paquete);
     }
     return mapa.values.toList();
@@ -112,12 +129,14 @@ class _DistribuidorPaquetesState extends State<DistribuidorPaquetes> {
     if (!mounted) return;
     setState(() => _actualizando.remove(idPaquete));
 
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(res['message'] ??
+    showAppSnackBar(
+      context,
+      res['message'] ??
           (res['success'] == true
               ? 'Entrega registrada'
-              : 'No se pudo registrar la entrega')),
-    ));
+              : 'No se pudo registrar la entrega'),
+      severity: res['success'] == true ? 'success' : 'error',
+    );
     if (res['success'] == true) _load();
   }
 
@@ -169,19 +188,19 @@ class _DistribuidorPaquetesState extends State<DistribuidorPaquetes> {
     );
   }
 
-  Widget _buildGrupo(_GrupoSede grupo) {
+  Widget _buildGrupo(_GrupoFecha grupo) {
     return SectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.location_city_outlined,
+              Icon(Icons.event_outlined,
                   size: 18, color: AppColors.adminPrimary),
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  grupo.municipio,
+                  'Llegaron el ${grupo.etiqueta}',
                   style: TextStyle(
                       color: AppColors.textMain,
                       fontWeight: FontWeight.w700,
@@ -432,10 +451,10 @@ class _DistribuidorPaquetesState extends State<DistribuidorPaquetes> {
   }
 }
 
-class _GrupoSede {
-  final String municipio;
+class _GrupoFecha {
+  final String etiqueta;
   final List<Map<String, dynamic>> paquetes = [];
-  _GrupoSede(this.municipio);
+  _GrupoFecha(this.etiqueta);
 }
 
 class _EntregaFinalResult {
