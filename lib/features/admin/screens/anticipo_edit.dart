@@ -19,7 +19,8 @@ const double _maxValorGastado = 999999;
 // y `upload.array('soporte', 5)` en routes/anticipos.js) — validados acá para
 // avisar antes de intentar subir, no solo cuando el backend ya rechazó.
 const int _maxSoporteBytes = 8 * 1024 * 1024; // 8 MB por archivo
-const int _maxSoporteArchivos = 5; // por cada vez que se suben (no es un total acumulado del anticipo)
+const int _maxSoporteArchivos =
+    5; // por cada vez que se suben (no es un total acumulado del anticipo)
 
 String _formatBytes(num bytes) {
   final mb = bytes / (1024 * 1024);
@@ -38,7 +39,10 @@ class _MaxValueFormatter extends TextInputFormatter {
   _MaxValueFormatter(this.maxValue);
 
   @override
-  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
     if (newValue.text.isEmpty) return newValue;
     final value = double.tryParse(newValue.text);
     if (value != null && value > maxValue()) return oldValue;
@@ -89,7 +93,8 @@ class _AnticipoEditState extends State<AnticipoEdit> {
 
   // Qué se puede tocar depende de quién mira la tarjeta y en qué estado está
   // el anticipo — ver anticipoService.update() en el backend.
-  bool get _enLegalizacion => widget.anticipo?.estado == EstadoAnticipo.enLegalizacion;
+  bool get _enLegalizacion =>
+      widget.anticipo?.estado == EstadoAnticipo.enLegalizacion;
   bool get _entregado => widget.anticipo?.estado == EstadoAnticipo.entregado;
 
   // El admin solo gestiona el anticipo mientras sigue "Entregado" (la ruta no
@@ -108,22 +113,27 @@ class _AnticipoEditState extends State<AnticipoEdit> {
   // demás casos (solo consulta) se muestra el conductor que ya traía el
   // anticipo.
   Map<String, dynamic> get _rutaSeleccionada => _rutas.firstWhere(
-        (r) => r['idRuta']?.toString() == _idRuta,
-        orElse: () => <String, dynamic>{},
-      );
+    (r) => r['idRuta']?.toString() == _idRuta,
+    orElse: () => <String, dynamic>{},
+  );
 
   List<Map<String, dynamic>> get _paresDeRutaSeleccionada =>
       ((_rutaSeleccionada['paresVehiculoConductor'] as List?) ?? [])
           .cast<Map<String, dynamic>>();
 
-  Map<String, dynamic> get _parSeleccionado => _paresDeRutaSeleccionada.firstWhere(
-        (p) => p['idRutaVehiculoConductor']?.toString() == _idRutaVehiculoConductor,
+  Map<String, dynamic> get _parSeleccionado =>
+      _paresDeRutaSeleccionada.firstWhere(
+        (p) =>
+            p['idRutaVehiculoConductor']?.toString() ==
+            _idRutaVehiculoConductor,
         orElse: () => <String, dynamic>{},
       );
 
   String _nombreConductorDePar(Map<String, dynamic> par) {
     final usuario = par['conductor']?['usuario'] as Map<String, dynamic>?;
-    return usuario != null ? '${usuario['nombre'] ?? ''} ${usuario['apellido'] ?? ''}'.trim() : '';
+    return usuario != null
+        ? '${usuario['nombre'] ?? ''} ${usuario['apellido'] ?? ''}'.trim()
+        : '';
   }
 
   String get _conductorNombreActual {
@@ -138,8 +148,12 @@ class _AnticipoEditState extends State<AnticipoEdit> {
     super.initState();
     final a = widget.anticipo;
     _idRuta = a?.idRuta.toString();
-    _valorAnticipoCtrl = TextEditingController(text: a != null ? a.valorAnticipo.toStringAsFixed(0) : '');
-    _valorGastadoCtrl = TextEditingController(text: a != null ? a.valorGastado.toStringAsFixed(0) : '');
+    _valorAnticipoCtrl = TextEditingController(
+      text: a != null ? a.valorAnticipo.toStringAsFixed(0) : '',
+    );
+    _valorGastadoCtrl = TextEditingController(
+      text: a != null ? a.valorGastado.toStringAsFixed(0) : '',
+    );
     _fechaEntrega = _parseIso(a?.fechaEntrega);
     _soporteActual = a?.soporte ?? [];
 
@@ -192,11 +206,14 @@ class _AnticipoEditState extends State<AnticipoEdit> {
         // ActualizarAnticipoExcedente.jsx (web).
         if (!_isNew && _idRutaVehiculoConductor == null) {
           final par = _paresDeRutaSeleccionada.firstWhere(
-            (p) => p['idConductor']?.toString() == widget.anticipo?.idConductor.toString(),
+            (p) =>
+                p['idConductor']?.toString() ==
+                widget.anticipo?.idConductor.toString(),
             orElse: () => <String, dynamic>{},
           );
           if (par.isNotEmpty) {
-            _idRutaVehiculoConductor = par['idRutaVehiculoConductor']?.toString();
+            _idRutaVehiculoConductor = par['idRutaVehiculoConductor']
+                ?.toString();
             _idRutaVehiculoConductorOriginal = _idRutaVehiculoConductor;
           }
         }
@@ -226,7 +243,9 @@ class _AnticipoEditState extends State<AnticipoEdit> {
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
           colorScheme: ColorScheme.light(
-            primary: widget.isAdmin ? AppColors.adminPrimary : AppColors.driverPrimary,
+            primary: widget.isAdmin
+                ? AppColors.adminPrimary
+                : AppColors.driverPrimary,
           ),
         ),
         child: child!,
@@ -262,8 +281,13 @@ class _AnticipoEditState extends State<AnticipoEdit> {
         '${rechazadosPorPeso.length == 1 ? 'No se agregó "${rechazadosPorPeso.first}"' : 'No se agregaron ${rechazadosPorPeso.length} archivos'}: superan el máximo de ${_formatBytes(_maxSoporteBytes)} por archivo.',
         severity: 'error',
       );
-    } else if (cupoRestante < 0 || (candidatos.length - rechazadosPorPeso.length) > aceptados.length) {
-      showAppSnackBar(context, 'Solo se pueden agregar hasta $_maxSoporteArchivos archivos por vez.', severity: 'error');
+    } else if (cupoRestante < 0 ||
+        (candidatos.length - rechazadosPorPeso.length) > aceptados.length) {
+      showAppSnackBar(
+        context,
+        'Solo se pueden agregar hasta $_maxSoporteArchivos archivos por vez.',
+        severity: 'error',
+      );
     }
   }
 
@@ -280,7 +304,11 @@ class _AnticipoEditState extends State<AnticipoEdit> {
 
   Future<void> _pickSoporte() async {
     if (_soporteNuevo.length >= _maxSoporteArchivos) {
-      showAppSnackBar(context, 'Ya agregaste el máximo de $_maxSoporteArchivos archivos por vez.', severity: 'error');
+      showAppSnackBar(
+        context,
+        'Ya agregaste el máximo de $_maxSoporteArchivos archivos por vez.',
+        severity: 'error',
+      );
       return;
     }
     // En escritorio/web, image_picker no tiene cámara/galería — directo al
@@ -301,18 +329,36 @@ class _AnticipoEditState extends State<AnticipoEdit> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: Icon(Icons.photo_camera_outlined, color: AppColors.textMain),
-              title: Text('Tomar foto', style: TextStyle(color: AppColors.textMain)),
+              leading: Icon(
+                Icons.photo_camera_outlined,
+                color: AppColors.textMain,
+              ),
+              title: Text(
+                'Tomar foto',
+                style: TextStyle(color: AppColors.textMain),
+              ),
               onTap: () => Navigator.pop(ctx, 'camera'),
             ),
             ListTile(
-              leading: Icon(Icons.photo_library_outlined, color: AppColors.textMain),
-              title: Text('Elegir de la galería', style: TextStyle(color: AppColors.textMain)),
+              leading: Icon(
+                Icons.photo_library_outlined,
+                color: AppColors.textMain,
+              ),
+              title: Text(
+                'Elegir de la galería',
+                style: TextStyle(color: AppColors.textMain),
+              ),
               onTap: () => Navigator.pop(ctx, 'gallery'),
             ),
             ListTile(
-              leading: Icon(Icons.insert_drive_file_outlined, color: AppColors.textMain),
-              title: Text('Elegir archivo (PDF o imagen)', style: TextStyle(color: AppColors.textMain)),
+              leading: Icon(
+                Icons.insert_drive_file_outlined,
+                color: AppColors.textMain,
+              ),
+              title: Text(
+                'Elegir archivo (PDF o imagen)',
+                style: TextStyle(color: AppColors.textMain),
+              ),
               onTap: () => Navigator.pop(ctx, 'file'),
             ),
           ],
@@ -333,7 +379,9 @@ class _AnticipoEditState extends State<AnticipoEdit> {
     if (xfile == null || !mounted) return;
 
     final size = await xfile.length();
-    _agregarSoporte([PlatformFile(path: xfile.path, name: xfile.name, size: size)]);
+    _agregarSoporte([
+      PlatformFile(path: xfile.path, name: xfile.name, size: size),
+    ]);
   }
 
   void _quitarSoporteNuevo(int index) {
@@ -348,6 +396,13 @@ class _AnticipoEditState extends State<AnticipoEdit> {
       _error = null;
     });
 
+    // Legalización tiene su propio flujo (soporte obligatorio, y se sube ANTES
+    // de mandar valorGastado, no después) — ver _guardarLegalizacion().
+    if (_enLegalizacion) {
+      await _guardarLegalizacion();
+      return;
+    }
+
     Map<String, dynamic> result;
     if (_isNew) {
       if (_idRuta == null || _idRuta!.isEmpty) {
@@ -357,7 +412,8 @@ class _AnticipoEditState extends State<AnticipoEdit> {
         });
         return;
       }
-      if (_idRutaVehiculoConductor == null || _idRutaVehiculoConductor!.isEmpty) {
+      if (_idRutaVehiculoConductor == null ||
+          _idRutaVehiculoConductor!.isEmpty) {
         setState(() {
           _saving = false;
           _error = 'Selecciona el vehículo y conductor de la ruta';
@@ -377,22 +433,11 @@ class _AnticipoEditState extends State<AnticipoEdit> {
         valorAnticipo: double.tryParse(_valorAnticipoCtrl.text) ?? 0,
         fechaEntrega: _isoDate(_fechaEntrega!),
       );
-    } else if (_enLegalizacion) {
-      final valorGastado = double.tryParse(_valorGastadoCtrl.text) ?? 0;
-      if (valorGastado == _valorGastadoOriginal && _soporteNuevo.isEmpty) {
-        setState(() {
-          _saving = false;
-          _error = 'No has realizado ningún cambio.';
-        });
-        return;
-      }
-      result = await _anticipoService.actualizarAnticipo(widget.anticipo!.id, {
-        'valorGastado': valorGastado,
-      });
     } else {
       // Entregado — solo admin llega aquí (ver _puedeEditar).
       final valorAnticipo = double.tryParse(_valorAnticipoCtrl.text) ?? 0;
-      final sinCambios = _idRuta == _idRutaOriginal &&
+      final sinCambios =
+          _idRuta == _idRutaOriginal &&
           _idRutaVehiculoConductor == _idRutaVehiculoConductorOriginal &&
           valorAnticipo == _valorAnticipoOriginal &&
           _fechaEntrega == _fechaEntregaOriginal;
@@ -411,7 +456,9 @@ class _AnticipoEditState extends State<AnticipoEdit> {
       });
     }
 
-    Anticipo? anticipo = result['success'] == true ? result['anticipo'] as Anticipo : null;
+    Anticipo? anticipo = result['success'] == true
+        ? result['anticipo'] as Anticipo
+        : null;
 
     // Si esta llamada falla (p. ej. el token venció justo entre esta petición
     // y la de arriba), _soporteNuevo se deja intacto para poder reintentar
@@ -419,16 +466,22 @@ class _AnticipoEditState extends State<AnticipoEdit> {
     // solo porque el resto del anticipo sí se guardó.
     String? soporteError;
     if (anticipo != null && _soporteNuevo.isNotEmpty) {
-      final subResult = await _anticipoService.subirSoporte(anticipo.id, _soporteNuevo);
+      final subResult = await _anticipoService.subirSoporte(
+        anticipo.id,
+        _soporteNuevo,
+      );
       // Se arma el anticipo actualizado con la respuesta de la propia subida
       // (ya trae el array `soporte` completo) en vez de volver a pedirlo con
       // GET /api/anticipos/:id — ese endpoint exige el permiso 'consultar_anticipo',
       // que el rol conductor no tiene, así que le daba 403 y la subida quedaba
       // "invisible" hasta la próxima vez que abrieras el detalle.
       if (subResult['success'] == true) {
-        anticipo = anticipo.copyWith(soporte: subResult['soporte'] as List<String>);
+        anticipo = anticipo.copyWith(
+          soporte: subResult['soporte'] as List<String>,
+        );
       } else {
-        soporteError = subResult['message'] as String? ?? 'Error al subir el soporte';
+        soporteError =
+            subResult['message'] as String? ?? 'Error al subir el soporte';
       }
     }
 
@@ -448,11 +501,77 @@ class _AnticipoEditState extends State<AnticipoEdit> {
     }
   }
 
+  // El comprobante (soporte) es obligatorio para legalizar (ver LOGICA.md,
+  // "Evidencia de entrega final obligatoria" / anticipoService.update) — a
+  // diferencia del flujo compartido de arriba (donde el soporte, si lo hay, se
+  // sube DESPUÉS de guardar), acá se sube ANTES: el backend exige que el
+  // anticipo YA tenga soporte en el momento de aceptar valorGastado.
+  Future<void> _guardarLegalizacion() async {
+    final valorGastado = double.tryParse(_valorGastadoCtrl.text) ?? 0;
+    if (valorGastado == _valorGastadoOriginal && _soporteNuevo.isEmpty) {
+      setState(() {
+        _saving = false;
+        _error = 'No has realizado ningún cambio.';
+      });
+      return;
+    }
+    if (_soporteActual.isEmpty && _soporteNuevo.isEmpty) {
+      setState(() {
+        _saving = false;
+        _error = 'Debes subir al menos un comprobante antes de legalizar.';
+      });
+      return;
+    }
+
+    if (_soporteNuevo.isNotEmpty) {
+      final subResult = await _anticipoService.subirSoporte(
+        widget.anticipo!.id,
+        _soporteNuevo,
+      );
+      if (!mounted) return;
+      if (subResult['success'] != true) {
+        setState(() {
+          _saving = false;
+          _error =
+              subResult['message'] as String? ?? 'Error al subir el soporte';
+        });
+        return;
+      }
+      // Ya quedó subido en el servidor -- se refleja acá y se limpia
+      // _soporteNuevo para no reintentar subir los mismos archivos otra vez
+      // si el paso siguiente (guardar valorGastado) falla y se reintenta.
+      setState(() {
+        _soporteActual = subResult['soporte'] as List<String>;
+        _soporteNuevo.clear();
+      });
+    }
+
+    final result = await _anticipoService.actualizarAnticipo(
+      widget.anticipo!.id,
+      {'valorGastado': valorGastado},
+    );
+
+    if (!mounted) return;
+    setState(() => _saving = false);
+
+    if (result['success'] == true) {
+      Navigator.pop(context, result['anticipo'] as Anticipo);
+    } else {
+      setState(() => _error = result['message'] ?? 'Error al guardar');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final gradStart = widget.isAdmin ? AppColors.adminGradStart : AppColors.driverGradStart;
-    final gradEnd = widget.isAdmin ? AppColors.adminGradEnd : AppColors.driverGradEnd;
-    final primary = widget.isAdmin ? AppColors.adminPrimary : AppColors.driverPrimary;
+    final gradStart = widget.isAdmin
+        ? AppColors.adminGradStart
+        : AppColors.driverGradStart;
+    final gradEnd = widget.isAdmin
+        ? AppColors.adminGradEnd
+        : AppColors.driverGradEnd;
+    final primary = widget.isAdmin
+        ? AppColors.adminPrimary
+        : AppColors.driverPrimary;
 
     return Scaffold(
       backgroundColor: AppColors.bgGray,
@@ -464,26 +583,44 @@ class _AnticipoEditState extends State<AnticipoEdit> {
               color: AppColors.cardBg,
               border: Border(bottom: BorderSide(color: AppColors.border)),
             ),
-            padding: EdgeInsets.fromLTRB(20, MediaQuery.of(context).padding.top + 12, 20, 20),
+            padding: EdgeInsets.fromLTRB(
+              20,
+              MediaQuery.of(context).padding.top + 12,
+              20,
+              20,
+            ),
             child: Row(
               children: [
                 TapArea(
                   onTap: () => Navigator.pop(context),
-                  child: Icon(Icons.arrow_back, color: AppColors.textMain, size: 22),
+                  child: Icon(
+                    Icons.arrow_back,
+                    color: AppColors.textMain,
+                    size: 22,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(_isNew ? 'Nuevo anticipo' : 'Editar anticipo',
-                        style: TextStyle(color: AppColors.textMain, fontSize: 18, fontWeight: FontWeight.w700)),
                     Text(
-                        _isNew
-                            ? 'Entrega un anticipo a un conductor'
-                            : (!_puedeEditar
+                      _isNew ? 'Nuevo anticipo' : 'Editar anticipo',
+                      style: TextStyle(
+                        color: AppColors.textMain,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      _isNew
+                          ? 'Entrega un anticipo a un conductor'
+                          : (!_puedeEditar
                                 ? 'Solo lectura'
-                                : (_enLegalizacion ? 'Registra el gasto para legalizar' : 'Ajusta los datos de entrega')),
-                        style: TextStyle(color: AppColors.textSub, fontSize: 12)),
+                                : (_enLegalizacion
+                                      ? 'Registra el gasto para legalizar'
+                                      : 'Ajusta los datos de entrega')),
+                      style: TextStyle(color: AppColors.textSub, fontSize: 12),
+                    ),
                   ],
                 ),
               ],
@@ -506,65 +643,127 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                                   _label('Ruta *'),
                                   const SizedBox(height: 8),
                                   _loadingRutas
-                                      ? Text('Cargando rutas...',
-                                          style: TextStyle(color: AppColors.textSub, fontSize: 13))
+                                      ? Text(
+                                          'Cargando rutas...',
+                                          style: TextStyle(
+                                            color: AppColors.textSub,
+                                            fontSize: 13,
+                                          ),
+                                        )
                                       : (_rutas.isEmpty
-                                          ? Row(
-                                              children: [
-                                                Expanded(
-                                                  child: Text(
+                                            ? Row(
+                                                children: [
+                                                  Expanded(
+                                                    child: Text(
                                                       _rutasError
                                                           ? 'No se pudieron cargar las rutas. Verifica tu conexión con el servidor.'
                                                           : 'No hay rutas disponibles.',
-                                                      style: TextStyle(color: AppColors.textSub, fontSize: 13)),
-                                                ),
-                                                TapArea(
-                                                  onTap: _loadRutas,
-                                                  child: Padding(
-                                                    padding: const EdgeInsets.only(left: 8),
-                                                    child: Icon(Icons.refresh_rounded, color: primary, size: 20),
+                                                      style: TextStyle(
+                                                        color:
+                                                            AppColors.textSub,
+                                                        fontSize: 13,
+                                                      ),
+                                                    ),
                                                   ),
-                                                ),
-                                              ],
-                                            )
-                                          : _dropdown(
-                                          value: _idRuta,
-                                          items: _rutas.map((r) {
-                                            final destino = r['destino'] as Map<String, dynamic>?;
-                                            final origen = (r['origen'] as String?) ?? 'Ruta #${r['idRuta']}';
-                                            final destinoTxt = destino?['municipio'] as String? ?? 'Sin destino';
-                                            return DropdownMenuItem<String>(
-                                                value: r['idRuta'].toString(),
-                                                child: Text('$origen → $destinoTxt'));
-                                          }).toList(),
-                                          // Cambiar de ruta invalida el par vehículo/conductor
-                                          // elegido — se autocompleta solo si la ruta tiene un
-                                          // único par, igual que en RegistrarAnticipoExcedente.jsx
-                                          // (web).
-                                          onChanged: (v) => setState(() {
-                                            _idRuta = v;
-                                            final pares = _paresDeRutaSeleccionada;
-                                            _idRutaVehiculoConductor =
-                                                pares.length == 1 ? pares.first['idRutaVehiculoConductor']?.toString() : null;
-                                          }),
-                                        )),
-                                  if (!_loadingRutas && _rutas.isNotEmpty && _idRuta != null) ...[
+                                                  TapArea(
+                                                    onTap: _loadRutas,
+                                                    child: Padding(
+                                                      padding:
+                                                          const EdgeInsets.only(
+                                                            left: 8,
+                                                          ),
+                                                      child: Icon(
+                                                        Icons.refresh_rounded,
+                                                        color: primary,
+                                                        size: 20,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              )
+                                            : _dropdown(
+                                                value: _idRuta,
+                                                items: _rutas.map((r) {
+                                                  final destino =
+                                                      r['destino']
+                                                          as Map<
+                                                            String,
+                                                            dynamic
+                                                          >?;
+                                                  final origen =
+                                                      (r['origen']
+                                                          as String?) ??
+                                                      'Ruta #${r['idRuta']}';
+                                                  final destinoTxt =
+                                                      destino?['municipio']
+                                                          as String? ??
+                                                      'Sin destino';
+                                                  return DropdownMenuItem<
+                                                    String
+                                                  >(
+                                                    value: r['idRuta']
+                                                        .toString(),
+                                                    child: Text(
+                                                      '$origen → $destinoTxt',
+                                                    ),
+                                                  );
+                                                }).toList(),
+                                                // Cambiar de ruta invalida el par vehículo/conductor
+                                                // elegido — se autocompleta solo si la ruta tiene un
+                                                // único par, igual que en RegistrarAnticipoExcedente.jsx
+                                                // (web).
+                                                onChanged: (v) => setState(() {
+                                                  _idRuta = v;
+                                                  final pares =
+                                                      _paresDeRutaSeleccionada;
+                                                  _idRutaVehiculoConductor =
+                                                      pares.length == 1
+                                                      ? pares
+                                                            .first['idRutaVehiculoConductor']
+                                                            ?.toString()
+                                                      : null;
+                                                }),
+                                              )),
+                                  if (!_loadingRutas &&
+                                      _rutas.isNotEmpty &&
+                                      _idRuta != null) ...[
                                     const SizedBox(height: 14),
                                     _label('Vehículo / Conductor *'),
                                     const SizedBox(height: 8),
                                     _paresDeRutaSeleccionada.isEmpty
-                                        ? Text('Esta ruta no tiene vehículo/conductor asignado.',
-                                            style: TextStyle(color: AppColors.textSub, fontSize: 13))
+                                        ? Text(
+                                            'Esta ruta no tiene vehículo/conductor asignado.',
+                                            style: TextStyle(
+                                              color: AppColors.textSub,
+                                              fontSize: 13,
+                                            ),
+                                          )
                                         : _dropdown(
                                             value: _idRutaVehiculoConductor,
-                                            items: _paresDeRutaSeleccionada.map((p) {
-                                              final placa = (p['vehiculo'] as Map<String, dynamic>?)?['placa'] as String? ?? 'Sin placa';
-                                              final nombre = _nombreConductorDePar(p);
+                                            items: _paresDeRutaSeleccionada.map((
+                                              p,
+                                            ) {
+                                              final placa =
+                                                  (p['vehiculo']
+                                                          as Map<
+                                                            String,
+                                                            dynamic
+                                                          >?)?['placa']
+                                                      as String? ??
+                                                  'Sin placa';
+                                              final nombre =
+                                                  _nombreConductorDePar(p);
                                               return DropdownMenuItem<String>(
-                                                  value: p['idRutaVehiculoConductor'].toString(),
-                                                  child: Text('$placa — $nombre'));
+                                                value:
+                                                    p['idRutaVehiculoConductor']
+                                                        .toString(),
+                                                child: Text('$placa — $nombre'),
+                                              );
                                             }).toList(),
-                                            onChanged: (v) => setState(() => _idRutaVehiculoConductor = v),
+                                            onChanged: (v) => setState(
+                                              () =>
+                                                  _idRutaVehiculoConductor = v,
+                                            ),
                                           ),
                                   ],
                                 ],
@@ -578,55 +777,100 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                                   Row(
                                     children: [
                                       Container(
-                                        width: 34, height: 34,
+                                        width: 34,
+                                        height: 34,
                                         decoration: BoxDecoration(
-                                            color: AppColors.activeBg,
-                                            borderRadius: BorderRadius.circular(10)),
-                                        child: Icon(Icons.payments_outlined, color: primary, size: 18),
+                                          color: AppColors.activeBg,
+                                          borderRadius: BorderRadius.circular(
+                                            10,
+                                          ),
+                                        ),
+                                        child: Icon(
+                                          Icons.payments_outlined,
+                                          color: primary,
+                                          size: 18,
+                                        ),
                                       ),
                                       const SizedBox(width: 10),
-                                      Text('Información',
-                                          style: TextStyle(
-                                              color: AppColors.textMain,
-                                              fontWeight: FontWeight.w700,
-                                              fontSize: 16)),
+                                      Text(
+                                        'Información',
+                                        style: TextStyle(
+                                          color: AppColors.textMain,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 16,
+                                        ),
+                                      ),
                                     ],
                                   ),
                                   const SizedBox(height: 16),
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text('Ruta', style: TextStyle(color: AppColors.textMain, fontSize: 14)),
+                                      Text(
+                                        'Ruta',
+                                        style: TextStyle(
+                                          color: AppColors.textMain,
+                                          fontSize: 14,
+                                        ),
+                                      ),
                                       const SizedBox(width: 12),
                                       Flexible(
                                         child: Text(
-                                            widget.anticipo!.nombreRuta ?? 'Anticipo #${widget.anticipo!.id}',
-                                            textAlign: TextAlign.right,
-                                            style: TextStyle(color: AppColors.textMain, fontSize: 15)),
+                                          widget.anticipo!.nombreRuta ??
+                                              'Anticipo #${widget.anticipo!.id}',
+                                          textAlign: TextAlign.right,
+                                          style: TextStyle(
+                                            color: AppColors.textMain,
+                                            fontSize: 15,
+                                          ),
+                                        ),
                                       ),
                                     ],
                                   ),
-                                  if (widget.anticipo!.destinoTexto != null) ...[
-                                    Divider(color: AppColors.border, height: 20),
+                                  if (widget.anticipo!.destinoTexto !=
+                                      null) ...[
+                                    Divider(
+                                      color: AppColors.border,
+                                      height: 20,
+                                    ),
                                     Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Text('Destino', style: TextStyle(color: AppColors.textMain, fontSize: 14)),
+                                        Text(
+                                          'Destino',
+                                          style: TextStyle(
+                                            color: AppColors.textMain,
+                                            fontSize: 14,
+                                          ),
+                                        ),
                                         const SizedBox(width: 12),
                                         Flexible(
                                           child: Text(
-                                              widget.anticipo!.destinoTexto!,
-                                              textAlign: TextAlign.right,
-                                              style: TextStyle(color: AppColors.textMain, fontSize: 15)),
+                                            widget.anticipo!.destinoTexto!,
+                                            textAlign: TextAlign.right,
+                                            style: TextStyle(
+                                              color: AppColors.textMain,
+                                              fontSize: 15,
+                                            ),
+                                          ),
                                         ),
                                       ],
                                     ),
                                   ],
                                   Divider(color: AppColors.border, height: 20),
                                   Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
                                     children: [
-                                      Text('Estado', style: TextStyle(color: AppColors.textMain, fontSize: 14)),
+                                      Text(
+                                        'Estado',
+                                        style: TextStyle(
+                                          color: AppColors.textMain,
+                                          fontSize: 14,
+                                        ),
+                                      ),
                                       EstadoBadge(widget.anticipo!.estado),
                                     ],
                                   ),
@@ -635,12 +879,15 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                             ),
                           ],
 
-                          if (widget.isAdmin && _conductorNombreActual.isNotEmpty)
+                          if (widget.isAdmin &&
+                              _conductorNombreActual.isNotEmpty)
                             SectionCard(
                               child: InfoRow(
                                 icon: Icons.person_outline_rounded,
                                 iconColor: primary,
-                                iconBg: widget.isAdmin ? AppColors.purpleBg : AppColors.blueBg,
+                                iconBg: widget.isAdmin
+                                    ? AppColors.purpleBg
+                                    : AppColors.blueBg,
                                 label: 'Conductor',
                                 value: _conductorNombreActual,
                               ),
@@ -652,70 +899,112 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                               children: [
                                 _label('Valor del anticipo'),
                                 const SizedBox(height: 8),
-                                _moneyField(_valorAnticipoCtrl, _valorAnticipoFocus,
-                                    readonly: !_isNew && !_entregado,
-                                    maxValue: () => _maxValorMonto,
-                                    validator: (v) {
-                                      if (v == null || v.isEmpty) return 'El valor del anticipo es obligatorio';
-                                      final n = double.tryParse(v);
-                                      if (n == null || n <= 0) return 'Ingresa un valor válido mayor a 0';
-                                      return null;
-                                    }),
+                                _moneyField(
+                                  _valorAnticipoCtrl,
+                                  _valorAnticipoFocus,
+                                  readonly: !_isNew && !_entregado,
+                                  maxValue: () => _maxValorMonto,
+                                  validator: (v) {
+                                    if (v == null || v.isEmpty)
+                                      return 'El valor del anticipo es obligatorio';
+                                    final n = double.tryParse(v);
+                                    if (n == null || n <= 0)
+                                      return 'Ingresa un valor válido mayor a 0';
+                                    return null;
+                                  },
+                                ),
                                 if (!_isNew && _enLegalizacion) ...[
                                   const SizedBox(height: 14),
                                   _label('Valor gastado *'),
                                   const SizedBox(height: 8),
-                                  _moneyField(_valorGastadoCtrl, _valorGastadoFocus,
-                                      requerido: true,
-                                      // El gasto puede superar el anticipo (queda un excedente
-                                      // negativo a favor del conductor) — el tope acá es solo la
-                                      // cota de sanidad fija, ya no depende de "Valor del anticipo".
-                                      maxValue: () => _maxValorGastado,
-                                      validator: (v) {
-                                        if (v == null || v.isEmpty) return 'El valor gastado es obligatorio';
-                                        final n = double.tryParse(v);
-                                        if (n == null || n < 0) return 'Ingresa un valor válido';
-                                        return null;
-                                      }),
+                                  _moneyField(
+                                    _valorGastadoCtrl,
+                                    _valorGastadoFocus,
+                                    requerido: true,
+                                    // El gasto puede superar el anticipo (queda un excedente
+                                    // negativo a favor del conductor) — el tope acá es solo la
+                                    // cota de sanidad fija, ya no depende de "Valor del anticipo".
+                                    maxValue: () => _maxValorGastado,
+                                    validator: (v) {
+                                      if (v == null || v.isEmpty)
+                                        return 'El valor gastado es obligatorio';
+                                      final n = double.tryParse(v);
+                                      if (n == null || n < 0)
+                                        return 'Ingresa un valor válido';
+                                      return null;
+                                    },
+                                  ),
                                   Container(
                                     margin: const EdgeInsets.only(top: 14),
                                     width: double.infinity,
                                     padding: const EdgeInsets.all(14),
                                     decoration: BoxDecoration(
-                                      color: _excedente < 0 ? AppColors.redBg : AppColors.greenBg,
+                                      color: _excedente < 0
+                                          ? AppColors.redBg
+                                          : AppColors.greenBg,
                                       borderRadius: BorderRadius.circular(12),
                                       border: Border.all(
-                                          color: (_excedente < 0 ? AppColors.red : AppColors.green)
-                                              .withValues(alpha: 0.3)),
+                                        color:
+                                            (_excedente < 0
+                                                    ? AppColors.red
+                                                    : AppColors.green)
+                                                .withValues(alpha: 0.3),
+                                      ),
                                     ),
                                     child: Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
-                                        Icon(Icons.attach_money_rounded,
-                                            color: _excedente < 0 ? AppColors.red : AppColors.green, size: 30),
+                                        Icon(
+                                          Icons.attach_money_rounded,
+                                          color: _excedente < 0
+                                              ? AppColors.red
+                                              : AppColors.green,
+                                          size: 30,
+                                        ),
                                         const SizedBox(width: 10),
                                         Expanded(
                                           child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
                                             children: [
-                                              Text(_excedente < 0 ? 'Faltante a Reponer' : 'Excedente a Devolver',
-                                                  style: TextStyle(
-                                                      color: _excedente < 0 ? AppColors.red : AppColors.green,
-                                                      fontWeight: FontWeight.w700,
-                                                      fontSize: 11,
-                                                      letterSpacing: 0.3)),
+                                              Text(
+                                                _excedente < 0
+                                                    ? 'Faltante a Reponer'
+                                                    : 'Excedente a Devolver',
+                                                style: TextStyle(
+                                                  color: _excedente < 0
+                                                      ? AppColors.red
+                                                      : AppColors.green,
+                                                  fontWeight: FontWeight.w700,
+                                                  fontSize: 11,
+                                                  letterSpacing: 0.3,
+                                                ),
+                                              ),
                                               const SizedBox(height: 2),
-                                              Text(formatCOP(_excedente),
-                                                  style: TextStyle(
-                                                      color: _excedente < 0 ? AppColors.red : AppColors.green,
-                                                      fontSize: 20,
-                                                      fontWeight: FontWeight.w800)),
+                                              Text(
+                                                formatCOP(_excedente),
+                                                style: TextStyle(
+                                                  color: _excedente < 0
+                                                      ? AppColors.red
+                                                      : AppColors.green,
+                                                  fontSize: 20,
+                                                  fontWeight: FontWeight.w800,
+                                                ),
+                                              ),
                                               if (_excedente < 0)
                                                 Padding(
-                                                  padding: const EdgeInsets.only(top: 4),
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                        top: 4,
+                                                      ),
                                                   child: Text(
-                                                      'La empresa deberá reponer este saldo',
-                                                      style: TextStyle(color: AppColors.red, fontSize: 11)),
+                                                    'La empresa deberá reponer este saldo',
+                                                    style: TextStyle(
+                                                      color: AppColors.red,
+                                                      fontSize: 11,
+                                                    ),
+                                                  ),
                                                 ),
                                             ],
                                           ),
@@ -740,24 +1029,43 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                                   _label('Fecha de legalización'),
                                   const SizedBox(height: 8),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 14,
+                                    ),
                                     decoration: BoxDecoration(
                                       color: AppColors.bgGray,
                                       borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: AppColors.border),
+                                      border: Border.all(
+                                        color: AppColors.border,
+                                      ),
                                     ),
                                     child: Row(
                                       children: [
-                                        Icon(Icons.event_available_outlined, color: AppColors.textSub, size: 18),
+                                        Icon(
+                                          Icons.event_available_outlined,
+                                          color: AppColors.textSub,
+                                          size: 18,
+                                        ),
                                         const SizedBox(width: 10),
-                                        Text(formatFecha(_isoDate(DateTime.now())),
-                                            style: TextStyle(color: AppColors.textMain, fontSize: 15)),
+                                        Text(
+                                          formatFecha(_isoDate(DateTime.now())),
+                                          style: TextStyle(
+                                            color: AppColors.textMain,
+                                            fontSize: 15,
+                                          ),
+                                        ),
                                       ],
                                     ),
                                   ),
                                   const SizedBox(height: 6),
-                                  Text('Se registra automáticamente con la fecha de hoy al guardar el valor gastado.',
-                                      style: TextStyle(color: AppColors.textSub, fontSize: 11)),
+                                  Text(
+                                    'Se registra automáticamente con la fecha de hoy al guardar el valor gastado.',
+                                    style: TextStyle(
+                                      color: AppColors.textSub,
+                                      fontSize: 11,
+                                    ),
+                                  ),
                                 ],
                               ],
                             ),
@@ -768,108 +1076,177 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                           // conductor al legalizar, nunca el admin al entregar el
                           // anticipo (todavía no se gastó nada en ese momento).
                           if (!widget.isAdmin)
-                          SectionCard(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _label('Soporte'),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Máx. ${_formatBytes(_maxSoporteBytes)} por archivo · hasta $_maxSoporteArchivos por vez',
-                                  style: TextStyle(color: AppColors.textSub, fontSize: 11.5),
-                                ),
-                                const SizedBox(height: 12),
-                                // Comprobantes ya subidos (quedan tal cual — esta pantalla
-                                // solo agrega, nunca reemplaza ni borra los anteriores).
-                                ..._soporteActual.asMap().entries.map((e) => Padding(
+                            SectionCard(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _label('Soporte *'),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Obligatorio para legalizar. Máx. ${_formatBytes(_maxSoporteBytes)} por archivo · hasta $_maxSoporteArchivos por vez',
+                                    style: TextStyle(
+                                      color: AppColors.textSub,
+                                      fontSize: 11.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  // Comprobantes ya subidos (quedan tal cual — esta pantalla
+                                  // solo agrega, nunca reemplaza ni borra los anteriores).
+                                  ..._soporteActual.asMap().entries.map(
+                                    (e) => Padding(
                                       padding: const EdgeInsets.only(bottom: 8),
                                       child: Row(
                                         children: [
-                                          Icon(Icons.insert_drive_file_outlined, color: AppColors.textSub, size: 18),
+                                          Icon(
+                                            Icons.insert_drive_file_outlined,
+                                            color: AppColors.textSub,
+                                            size: 18,
+                                          ),
                                           const SizedBox(width: 8),
                                           Expanded(
-                                            child: Text('Comprobante ${e.key + 1} (ya subido)',
-                                                style: TextStyle(color: AppColors.textSub, fontSize: 13)),
+                                            child: Text(
+                                              'Comprobante ${e.key + 1} (ya subido)',
+                                              style: TextStyle(
+                                                color: AppColors.textSub,
+                                                fontSize: 13,
+                                              ),
+                                            ),
                                           ),
                                         ],
                                       ),
-                                    )),
-                                // Archivos recién elegidos, todavía sin subir — se suben
-                                // junto con el resto del formulario al pulsar "Guardar".
-                                ..._soporteNuevo.asMap().entries.map((e) => Padding(
+                                    ),
+                                  ),
+                                  // Archivos recién elegidos, todavía sin subir — se suben
+                                  // junto con el resto del formulario al pulsar "Guardar".
+                                  ..._soporteNuevo.asMap().entries.map(
+                                    (e) => Padding(
                                       padding: const EdgeInsets.only(bottom: 8),
                                       child: Row(
                                         children: [
-                                          Icon(Icons.attach_file, color: primary, size: 18),
+                                          Icon(
+                                            Icons.attach_file,
+                                            color: primary,
+                                            size: 18,
+                                          ),
                                           const SizedBox(width: 8),
                                           Expanded(
-                                            child: Text(e.value.name,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(color: AppColors.textMain, fontSize: 13)),
+                                            child: Text(
+                                              e.value.name,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                color: AppColors.textMain,
+                                                fontSize: 13,
+                                              ),
+                                            ),
                                           ),
                                           const SizedBox(width: 6),
-                                          Text(_formatBytes(e.value.size),
-                                              style: TextStyle(color: AppColors.textSub, fontSize: 12)),
+                                          Text(
+                                            _formatBytes(e.value.size),
+                                            style: TextStyle(
+                                              color: AppColors.textSub,
+                                              fontSize: 12,
+                                            ),
+                                          ),
                                           const SizedBox(width: 6),
                                           TapArea(
-                                            onTap: () => _quitarSoporteNuevo(e.key),
-                                            child: Icon(Icons.close_rounded, color: AppColors.textSub, size: 18),
+                                            onTap: () =>
+                                                _quitarSoporteNuevo(e.key),
+                                            child: Icon(
+                                              Icons.close_rounded,
+                                              color: AppColors.textSub,
+                                              size: 18,
+                                            ),
                                           ),
                                         ],
                                       ),
-                                    )),
-                                // Contador en vivo: se actualiza al agregar/quitar un archivo
-                                // (setState del propio _soporteNuevo ya dispara el rebuild).
-                                if (_soporteNuevo.isNotEmpty)
-                                  Padding(
-                                    padding: const EdgeInsets.only(bottom: 8),
-                                    child: Text(
-                                      '${_soporteNuevo.length}/$_maxSoporteArchivos archivos · ${_formatBytes(_soporteNuevo.fold<int>(0, (s, f) => s + f.size))} en total',
-                                      style: TextStyle(color: AppColors.textSub, fontSize: 11.5, fontWeight: FontWeight.w600),
                                     ),
                                   ),
-                                TapArea(
-                                  onTap: _pickSoporte,
-                                  child: Container(
-                                    width: double.infinity,
-                                    padding: EdgeInsets.symmetric(
-                                        vertical: (_soporteActual.isEmpty && _soporteNuevo.isEmpty) ? 20 : 12),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.bgGray,
-                                      borderRadius: BorderRadius.circular(12),
-                                      border: Border.all(color: AppColors.border, width: 1.5),
+                                  // Contador en vivo: se actualiza al agregar/quitar un archivo
+                                  // (setState del propio _soporteNuevo ya dispara el rebuild).
+                                  if (_soporteNuevo.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: 8),
+                                      child: Text(
+                                        '${_soporteNuevo.length}/$_maxSoporteArchivos archivos · ${_formatBytes(_soporteNuevo.fold<int>(0, (s, f) => s + f.size))} en total',
+                                        style: TextStyle(
+                                          color: AppColors.textSub,
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
                                     ),
-                                    child: Column(
-                                      children: [
-                                        Icon(
-                                            (_soporteActual.isEmpty && _soporteNuevo.isEmpty)
+                                  TapArea(
+                                    onTap: _pickSoporte,
+                                    child: Container(
+                                      width: double.infinity,
+                                      padding: EdgeInsets.symmetric(
+                                        vertical:
+                                            (_soporteActual.isEmpty &&
+                                                _soporteNuevo.isEmpty)
+                                            ? 20
+                                            : 12,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.bgGray,
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(
+                                          color: AppColors.border,
+                                          width: 1.5,
+                                        ),
+                                      ),
+                                      child: Column(
+                                        children: [
+                                          Icon(
+                                            (_soporteActual.isEmpty &&
+                                                    _soporteNuevo.isEmpty)
                                                 ? Icons.upload_outlined
                                                 : Icons.check_circle,
-                                            color: (_soporteActual.isEmpty && _soporteNuevo.isEmpty)
+                                            color:
+                                                (_soporteActual.isEmpty &&
+                                                    _soporteNuevo.isEmpty)
                                                 ? AppColors.textSub
                                                 : AppColors.green,
-                                            size: (_soporteActual.isEmpty && _soporteNuevo.isEmpty) ? 28 : 20),
-                                        const SizedBox(height: 6),
-                                        Text(
-                                            (_soporteActual.isEmpty && _soporteNuevo.isEmpty)
+                                            size:
+                                                (_soporteActual.isEmpty &&
+                                                    _soporteNuevo.isEmpty)
+                                                ? 28
+                                                : 20,
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            (_soporteActual.isEmpty &&
+                                                    _soporteNuevo.isEmpty)
                                                 ? 'Seleccionar archivo(s)'
                                                 : 'Agregar otro archivo',
-                                            style: TextStyle(color: primary, fontWeight: FontWeight.w600)),
-                                      ],
+                                            style: TextStyle(
+                                              color: primary,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
 
                           if (_error != null) ...[
                             const SizedBox(height: 8),
                             Container(
                               width: double.infinity,
                               padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(color: AppColors.redBg, borderRadius: BorderRadius.circular(10)),
-                              child: Text(_error!, style: TextStyle(color: AppColors.red, fontSize: 13)),
+                              decoration: BoxDecoration(
+                                color: AppColors.redBg,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                _error!,
+                                style: TextStyle(
+                                  color: AppColors.red,
+                                  fontSize: 13,
+                                ),
+                              ),
                             ),
                           ],
                           const SizedBox(height: 16),
@@ -880,16 +1257,31 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                               width: double.infinity,
                               height: 52,
                               decoration: BoxDecoration(
-                                gradient: LinearGradient(colors: [gradStart, gradEnd], begin: Alignment.centerLeft, end: Alignment.centerRight),
+                                gradient: LinearGradient(
+                                  colors: [gradStart, gradEnd],
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight,
+                                ),
                                 borderRadius: BorderRadius.circular(14),
                               ),
                               child: Center(
                                 child: _saving
                                     ? const SizedBox(
-                                        height: 22, width: 22,
-                                        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
-                                    : Text(_isNew ? 'Crear anticipo' : 'Guardar',
-                                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+                                        height: 22,
+                                        width: 22,
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2.5,
+                                        ),
+                                      )
+                                    : Text(
+                                        _isNew ? 'Crear anticipo' : 'Guardar',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
                               ),
                             ),
                           ),
@@ -911,7 +1303,11 @@ class _AnticipoEditState extends State<AnticipoEdit> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.lock_outline_rounded, color: AppColors.textSub, size: 40),
+            Icon(
+              Icons.lock_outline_rounded,
+              color: AppColors.textSub,
+              size: 40,
+            ),
             const SizedBox(height: 12),
             Text(
               widget.anticipo!.estado == EstadoAnticipo.enLegalizacion
@@ -926,8 +1322,14 @@ class _AnticipoEditState extends State<AnticipoEdit> {
     );
   }
 
-  Widget _label(String text) =>
-      Text(text, style: TextStyle(color: AppColors.textMain, fontSize: 14, fontWeight: FontWeight.w600));
+  Widget _label(String text) => Text(
+    text,
+    style: TextStyle(
+      color: AppColors.textMain,
+      fontSize: 14,
+      fontWeight: FontWeight.w600,
+    ),
+  );
 
   Widget _dropdown({
     required String? value,
@@ -957,20 +1359,33 @@ class _AnticipoEditState extends State<AnticipoEdit> {
   // al enfocar. Cuando es de solo lectura, canRequestFocus se apaga para que
   // ni siquiera se pueda "entrar" al campo con el click — antes se podía
   // enfocar un campo bloqueado sin que eso sirviera para nada.
-  Widget _moneyField(TextEditingController ctrl, FocusNode focusNode,
-      {bool readonly = false,
-      bool requerido = false,
-      double Function()? maxValue,
-      String? Function(String?)? validator}) {
+  Widget _moneyField(
+    TextEditingController ctrl,
+    FocusNode focusNode, {
+    bool readonly = false,
+    bool requerido = false,
+    double Function()? maxValue,
+    String? Function(String?)? validator,
+  }) {
     focusNode.canRequestFocus = !readonly;
     final hasFocus = focusNode.hasFocus;
-    final primary = widget.isAdmin ? AppColors.adminPrimary : AppColors.driverPrimary;
+    final primary = widget.isAdmin
+        ? AppColors.adminPrimary
+        : AppColors.driverPrimary;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 150),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(12),
-        boxShadow: hasFocus ? [BoxShadow(color: AppColors.activeBg, blurRadius: 0, spreadRadius: 3)] : [],
+        boxShadow: hasFocus
+            ? [
+                BoxShadow(
+                  color: AppColors.activeBg,
+                  blurRadius: 0,
+                  spreadRadius: 3,
+                ),
+              ]
+            : [],
       ),
       child: TextFormField(
         controller: ctrl,
@@ -978,7 +1393,9 @@ class _AnticipoEditState extends State<AnticipoEdit> {
         readOnly: readonly,
         showCursor: !readonly,
         enableInteractiveSelection: !readonly,
-        mouseCursor: readonly ? SystemMouseCursors.basic : SystemMouseCursors.text,
+        mouseCursor: readonly
+            ? SystemMouseCursors.basic
+            : SystemMouseCursors.text,
         keyboardType: TextInputType.number,
         inputFormatters: [
           FilteringTextInputFormatter.digitsOnly,
@@ -986,28 +1403,47 @@ class _AnticipoEditState extends State<AnticipoEdit> {
         ],
         style: TextStyle(color: AppColors.textMain, fontSize: 15),
         cursorColor: AppColors.textMain,
-        validator: validator ??
+        validator:
+            validator ??
             (v) {
-              if (requerido && (v == null || v.isEmpty)) return 'Campo requerido';
+              if (requerido && (v == null || v.isEmpty))
+                return 'Campo requerido';
               return null;
             },
         decoration: InputDecoration(
           prefixIcon: Padding(
             padding: const EdgeInsets.only(left: 12, right: 8),
-            child: Text('\$', style: TextStyle(color: AppColors.textSub, fontSize: 16)),
+            child: Text(
+              '\$',
+              style: TextStyle(color: AppColors.textSub, fontSize: 16),
+            ),
           ),
-          prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+          prefixIconConstraints: const BoxConstraints(
+            minWidth: 0,
+            minHeight: 0,
+          ),
           filled: true,
           fillColor: readonly ? AppColors.bgGray : AppColors.cardBg,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 14,
+          ),
           border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.border)),
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: AppColors.border),
+          ),
           enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.border)),
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: AppColors.border),
+          ),
           focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: primary, width: 1.5)),
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: primary, width: 1.5),
+          ),
           errorBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.red)),
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: AppColors.red),
+          ),
         ),
       ),
     );
@@ -1019,21 +1455,39 @@ class _AnticipoEditState extends State<AnticipoEdit> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         decoration: BoxDecoration(
-          color: readonly ? AppColors.border.withValues(alpha: 0.25) : AppColors.bgGray,
+          color: readonly
+              ? AppColors.border.withValues(alpha: 0.25)
+              : AppColors.bgGray,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: AppColors.border),
         ),
         child: Row(
           children: [
-            Icon(Icons.calendar_today_outlined, color: AppColors.textSub, size: 18),
+            Icon(
+              Icons.calendar_today_outlined,
+              color: AppColors.textSub,
+              size: 18,
+            ),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                _fechaEntrega != null ? formatFecha(_isoDate(_fechaEntrega!)) : 'Seleccionar fecha',
-                style: TextStyle(color: _fechaEntrega != null ? AppColors.textMain : AppColors.textSub, fontSize: 15),
+                _fechaEntrega != null
+                    ? formatFecha(_isoDate(_fechaEntrega!))
+                    : 'Seleccionar fecha',
+                style: TextStyle(
+                  color: _fechaEntrega != null
+                      ? AppColors.textMain
+                      : AppColors.textSub,
+                  fontSize: 15,
+                ),
               ),
             ),
-            if (!readonly) Icon(Icons.calendar_month_outlined, color: AppColors.textSub, size: 18),
+            if (!readonly)
+              Icon(
+                Icons.calendar_month_outlined,
+                color: AppColors.textSub,
+                size: 18,
+              ),
           ],
         ),
       ),

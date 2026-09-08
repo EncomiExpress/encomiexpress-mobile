@@ -27,6 +27,20 @@ class _DriverHomeState extends State<DriverHome> {
   late UserModel _currentUser;
   int _itemsToShow = 5;
   int _tabIndex = 0;
+  final _scrollController = ScrollController();
+
+  // "Pendientes" (Entregado/En Legalización/Excedente pendiente -- falta algo
+  // por resolver) vs "Completados" (único estado terminal real de Anticipo --
+  // no existe "Cancelado" acá). Todo cliente-side: getMisAnticipos() ya trae
+  // todos los anticipos propios de una vez. Ver LOGICA.md, "Toggle
+  // Pendientes/Historial".
+  bool _verHistorial = false;
+  static const _estadosPendientes = [
+    EstadoAnticipo.entregado,
+    EstadoAnticipo.enLegalizacion,
+    EstadoAnticipo.excedentePendiente,
+  ];
+  static const _estadosCompletados = [EstadoAnticipo.completado];
 
   @override
   void initState() {
@@ -54,6 +68,7 @@ class _DriverHomeState extends State<DriverHome> {
     ThemeController().removeListener(_onThemeChanged);
     _searchCtrl.removeListener(_onSearchChanged);
     _searchCtrl.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -88,16 +103,32 @@ class _DriverHomeState extends State<DriverHome> {
   }
 
   List<Anticipo> get _filtrados {
+    final grupo = _verHistorial ? _estadosCompletados : _estadosPendientes;
     return _anticipos.where((a) {
+      if (!grupo.contains(a.estado)) return false;
       final query = _searchCtrl.text.trim().toLowerCase();
       final matchSearch =
           query.isEmpty ||
           (a.nombreRuta ?? '').toLowerCase().contains(query) ||
           a.id.toString().contains(query);
-      final matchEstado =
-          _filtroEstado == 'Estado' || a.estado == _filtroEstado;
+      final matchEstado = _matchFiltroEstado(a);
       return matchSearch && matchEstado;
     }).toList();
+  }
+
+  // "Excedente pendiente" y "Reposición pendiente" (ver EstadoAnticipo,
+  // core/models.dart) son el mismo estado real de BD, distinguidos solo por
+  // el signo de `excedente` -- cuando el select trae elegido uno de los dos,
+  // se filtra también por tieneDeficit para que de verdad queden separados.
+  bool _matchFiltroEstado(Anticipo a) {
+    if (_filtroEstado == 'Estado') return true;
+    if (_filtroEstado == EstadoAnticipo.reposicionPendiente) {
+      return a.estado == EstadoAnticipo.excedentePendiente && a.tieneDeficit;
+    }
+    if (_filtroEstado == EstadoAnticipo.excedentePendiente) {
+      return a.estado == EstadoAnticipo.excedentePendiente && !a.tieneDeficit;
+    }
+    return a.estado == _filtroEstado;
   }
 
   List<Anticipo> get _visibleAnticipos =>
@@ -165,7 +196,10 @@ class _DriverHomeState extends State<DriverHome> {
                           ),
                         ),
                         LiveDateTime(
-                          style: TextStyle(color: AppColors.textSub, fontSize: 13),
+                          style: TextStyle(
+                            color: AppColors.textSub,
+                            fontSize: 13,
+                          ),
                         ),
                       ],
                     ),
@@ -178,9 +212,11 @@ class _DriverHomeState extends State<DriverHome> {
             child: _tabIndex == 0
                 ? _buildMisAnticipos()
                 : _tabIndex == 1
-                    ? DriverPaquetes(user: _currentUser)
-                    : DriverProfile(
-                        user: _currentUser, onUserUpdated: _onUserUpdated),
+                ? DriverPaquetes(user: _currentUser)
+                : DriverProfile(
+                    user: _currentUser,
+                    onUserUpdated: _onUserUpdated,
+                  ),
           ),
         ],
       ),
@@ -219,6 +255,21 @@ class _DriverHomeState extends State<DriverHome> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+          child: TabPendientesHistorial(
+            verHistorial: _verHistorial,
+            labelHistorial: 'Completados',
+            onChanged: (v) => setState(() {
+              _verHistorial = v;
+              // El filtro de Estado fino solo tiene sentido dentro del grupo
+              // activo -- se resetea al cambiar de grupo (mismo criterio que
+              // admin_home.dart).
+              _filtroEstado = 'Estado';
+              _itemsToShow = 5;
+            }),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -232,7 +283,15 @@ class _DriverHomeState extends State<DriverHome> {
               FilterSelect(
                 label: 'Estado',
                 value: _filtroEstado,
-                items: ['Estado', ...EstadoAnticipo.todos],
+                items: [
+                  'Estado',
+                  ...(_verHistorial
+                      ? _estadosCompletados
+                      : [
+                          ..._estadosPendientes,
+                          EstadoAnticipo.reposicionPendiente,
+                        ]),
+                ],
                 onChanged: (v) => setState(() => _filtroEstado = v),
               ),
             ],
@@ -242,87 +301,121 @@ class _DriverHomeState extends State<DriverHome> {
         Expanded(
           child: _loading
               ? const Center(child: CircularProgressIndicator())
-              : RefreshIndicator(
-                  onRefresh: _loadAnticipos,
-                  // Lista vacía envuelta igual en un ListView (no un simple
-                  // Center) para que arrastrar hacia abajo siga refrescando
-                  // aunque no haya anticipos que mostrar.
-                  child: _filtrados.isEmpty
-                      ? ListView(
-                          children: [
-                            SizedBox(height: MediaQuery.of(context).size.height * 0.3),
-                            Center(
-                              child: Text(
-                                'Sin anticipos',
-                                style: TextStyle(color: AppColors.textSub, fontSize: 14),
-                              ),
-                            ),
-                          ],
-                        )
-                      : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-                    itemCount: _visibleAnticipos.length + (_hayMas ? 1 : 0),
-                    itemBuilder: (_, i) {
-                      if (i < _visibleAnticipos.length) {
-                        final a = _visibleAnticipos[i];
-                        return AnticipoCard(
-                          anticipo: a,
-                          isAdmin: false,
-                          onVer: () async {
-                            final updated = await Navigator.push<Anticipo>(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    AnticipoDetail(anticipo: a, isAdmin: false),
-                              ),
-                            );
-                            if (updated != null) _reemplazar(updated);
-                          },
-                          // El conductor solo legaliza, y solo cuando el anticipo
-                          // está "En Legalización" Y ya dejó todos los paquetes en
-                          // las sedes de la ruta (candado: no puede reunir los
-                          // soportes del viaje antes de llegar al destino final).
-                          onEditar: a.puedeLegalizar
-                              ? () async {
-                                  final updated =
-                                      await Navigator.push<Anticipo>(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) => AnticipoEdit(
-                                            anticipo: a,
-                                            isAdmin: false,
-                                          ),
-                                        ),
-                                      );
-                                  if (updated != null) _reemplazar(updated);
+              : Stack(
+                  children: [
+                    RefreshIndicator(
+                      onRefresh: _loadAnticipos,
+                      // Lista vacía envuelta igual en un ListView (no un simple
+                      // Center) para que arrastrar hacia abajo siga refrescando
+                      // aunque no haya anticipos que mostrar.
+                      child: _filtrados.isEmpty
+                          ? ListView(
+                              controller: _scrollController,
+                              children: [
+                                SizedBox(
+                                  height:
+                                      MediaQuery.of(context).size.height * 0.3,
+                                ),
+                                Center(
+                                  child: Text(
+                                    'Sin anticipos',
+                                    style: TextStyle(
+                                      color: AppColors.textSub,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            )
+                          : ListView.builder(
+                              controller: _scrollController,
+                              padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                              itemCount:
+                                  _visibleAnticipos.length + (_hayMas ? 1 : 0),
+                              itemBuilder: (_, i) {
+                                if (i < _visibleAnticipos.length) {
+                                  final a = _visibleAnticipos[i];
+                                  return AnticipoCard(
+                                    anticipo: a,
+                                    isAdmin: false,
+                                    onVer: () async {
+                                      final updated =
+                                          await Navigator.push<Anticipo>(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) => AnticipoDetail(
+                                                anticipo: a,
+                                                isAdmin: false,
+                                              ),
+                                            ),
+                                          );
+                                      if (updated != null) _reemplazar(updated);
+                                    },
+                                    // El conductor solo legaliza, y solo cuando el anticipo
+                                    // está "En Legalización" Y ya dejó todos los paquetes en
+                                    // las sedes de la ruta (candado: no puede reunir los
+                                    // soportes del viaje antes de llegar al destino final).
+                                    onEditar: a.puedeLegalizar
+                                        ? () async {
+                                            final updated =
+                                                await Navigator.push<Anticipo>(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                    builder: (_) =>
+                                                        AnticipoEdit(
+                                                          anticipo: a,
+                                                          isAdmin: false,
+                                                        ),
+                                                  ),
+                                                );
+                                            if (updated != null)
+                                              _reemplazar(updated);
+                                          }
+                                        : null,
+                                    // Textos cortos a propósito (pedido de la
+                                    // usuaria: los anteriores quedaban muy
+                                    // largos) -- solo en esta vista, el admin
+                                    // conserva sus propios 3 mensajes largos.
+                                    editDisabledReason: a.puedeLegalizar
+                                        ? null
+                                        : a.estado ==
+                                                  EstadoAnticipo
+                                                      .enLegalizacion &&
+                                              a.sedesPendientes
+                                        ? 'Aún no puedes legalizarlo (completa las sedes)'
+                                        : a.estado == EstadoAnticipo.entregado
+                                        ? 'Aún no puedes legalizarlo'
+                                        : 'Ya está legalizado',
+                                  );
                                 }
-                              : null,
-                          editDisabledReason:
-                              a.estado == EstadoAnticipo.enLegalizacion &&
-                                  a.sedesPendientes
-                              ? 'Deja todos los paquetes en las sedes de la ruta antes de legalizar'
-                              : null,
-                        );
-                      }
 
-                      return Padding(
-                        padding: const EdgeInsets.only(top: 10),
-                        child: OutlinedButton(
-                          onPressed: _mostrarMas,
-                          style: OutlinedButton.styleFrom(
-                            side: BorderSide(color: AppColors.border),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                                return Padding(
+                                  padding: const EdgeInsets.only(top: 10),
+                                  child: OutlinedButton(
+                                    onPressed: _mostrarMas,
+                                    style: OutlinedButton.styleFrom(
+                                      side: BorderSide(color: AppColors.border),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      'Mostrar 5 más',
+                                      style: TextStyle(
+                                        color: AppColors.textMain,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
-                          ),
-                          child: Text(
-                            'Mostrar 5 más',
-                            style: TextStyle(color: AppColors.textMain),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+                    ),
+                    Positioned(
+                      right: 16,
+                      bottom: 16,
+                      child: ScrollToTopButton(controller: _scrollController),
+                    ),
+                  ],
                 ),
         ),
       ],
