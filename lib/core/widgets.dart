@@ -1483,9 +1483,16 @@ class AnticipoCard extends StatelessWidget {
     this.editDisabledReason,
   });
 
-  // Por qué el conductor no puede editar todavía — el admin sigue siendo
-  // dueño del anticipo mientras la ruta no arranca (estado Entregado).
-  String get _editDisabledReason => editDisabledReason ?? 'Aún no lo puedes editar';
+  // Fallback neutral cuando la pantalla que arma la tarjeta no manda un
+  // motivo específico. A propósito NO dice "aún"/"todavía" -- esa palabra
+  // implica que más adelante sí se va a poder, y eso solo es cierto para
+  // Entregado (conductor) mientras la ruta no arranca; para el resto de
+  // estados donde el ícono queda deshabilitado (Excedente pendiente,
+  // Completado, y En Legalización del lado admin) nunca se vuelve a poder
+  // editar por esta vía — cada pantalla (driver_home.dart, admin_home.dart)
+  // ya manda su propio `editDisabledReason` para esos casos; esto solo cubre
+  // un olvido.
+  String get _editDisabledReason => editDisabledReason ?? 'No se puede editar';
 
   @override
   Widget build(BuildContext context) {
@@ -1623,7 +1630,9 @@ class AnticipoCard extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 14),
                 decoration: BoxDecoration(
-                  color: anticipo.tieneDeficit ? AppColors.red : AppColors.purple,
+                  color: anticipo.tieneDeficit
+                      ? AppColors.red
+                      : AppColors.purple,
                   borderRadius: BorderRadius.only(
                     bottomLeft: Radius.circular(16),
                     bottomRight: Radius.circular(16),
@@ -1639,7 +1648,9 @@ class AnticipoCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      anticipo.tieneDeficit ? 'Confirmar reposición al conductor' : 'Confirmar devolución de excedente',
+                      anticipo.tieneDeficit
+                          ? 'Confirmar reposición al conductor'
+                          : 'Confirmar devolución de excedente',
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.w700,
@@ -1669,6 +1680,175 @@ class AnticipoCard extends StatelessWidget {
               fontWeight: FontWeight.w700,
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+// Botón circular flotante "volver arriba" — para listas largas con paginación
+// "Mostrar 5 más" (Anticipos, Paquetes): sin esto, una vez se revelan varias
+// tandas la única forma de volver al inicio es hacer scroll a mano. Aparece solo
+// después de bajar lo suficiente (showAfter) y anima el scroll de vuelta a 0.
+// Mismos tokens que el resto del sistema para que se vea igual en cualquier
+// paleta/modo: fondo activeBg (tinte suave del color principal activo, rojo o
+// azul, ver AppColors) + ícono/borde en adminPrimary (== driverPrimary hoy, los
+// dos leen la misma paleta) — ambos ya vienen ajustados con más opacidad/brillo
+// en modo oscuro para seguir siendo legibles ahí.
+class ScrollToTopButton extends StatefulWidget {
+  final ScrollController controller;
+  final double showAfter;
+  const ScrollToTopButton({
+    super.key,
+    required this.controller,
+    this.showAfter = 280,
+  });
+
+  @override
+  State<ScrollToTopButton> createState() => _ScrollToTopButtonState();
+}
+
+class _ScrollToTopButtonState extends State<ScrollToTopButton> {
+  bool _visible = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onScroll);
+  }
+
+  @override
+  void didUpdateWidget(covariant ScrollToTopButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller.removeListener(_onScroll);
+      widget.controller.addListener(_onScroll);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onScroll);
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!widget.controller.hasClients) return;
+    final mostrar = widget.controller.offset > widget.showAfter;
+    if (mostrar != _visible) setState(() => _visible = mostrar);
+  }
+
+  void _scrollToTop() {
+    widget.controller.animateTo(
+      0,
+      duration: const Duration(milliseconds: 380),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      ignoring: !_visible,
+      child: AnimatedSlide(
+        offset: _visible ? Offset.zero : const Offset(0, 0.4),
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOut,
+        child: AnimatedOpacity(
+          opacity: _visible ? 1 : 0,
+          duration: const Duration(milliseconds: 200),
+          child: Material(
+            color: Colors.transparent,
+            shape: const CircleBorder(),
+            child: InkWell(
+              onTap: _scrollToTop,
+              customBorder: const CircleBorder(),
+              child: Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.activeBg,
+                  border: Border.all(
+                    color: AppColors.adminPrimary.withValues(alpha: 0.4),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.18),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  Icons.arrow_upward_rounded,
+                  color: AppColors.adminPrimary,
+                  size: 22,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// Segmento "Pendientes" / "Historial" (o "Completados", según la pantalla) --
+// mismo control en las 4 pantallas que lo usan (Paquetes de conductor y
+// distribuidor, Anticipos de conductor y admin). Antes vivía como
+// _TabPendientesHistorial, privado, dentro de distribuidor_paquetes.dart --
+// se movió acá al necesitarlo en más de una pantalla. Ver LOGICA.md, "Toggle
+// Pendientes/Historial".
+class TabPendientesHistorial extends StatelessWidget {
+  final bool verHistorial;
+  final ValueChanged<bool> onChanged;
+  final String labelHistorial;
+  const TabPendientesHistorial({
+    super.key,
+    required this.verHistorial,
+    required this.onChanged,
+    this.labelHistorial = 'Historial',
+  });
+
+  Widget _segmento(String label, bool activo, VoidCallback onTap) {
+    return Expanded(
+      child: TapArea(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 9),
+          decoration: BoxDecoration(
+            color: activo ? AppColors.adminPrimary : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: activo ? Colors.white : AppColors.textSub,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: AppColors.bgGray,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          _segmento('Pendientes', !verHistorial, () => onChanged(false)),
+          _segmento(labelHistorial, verHistorial, () => onChanged(true)),
         ],
       ),
     );

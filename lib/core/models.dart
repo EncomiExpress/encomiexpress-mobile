@@ -8,32 +8,32 @@ import 'theme/theme_tokens.dart';
 // de marca propios: los dos leen la misma paleta activa, como en la web.
 class AppColors {
   static Color adminGradStart = _initial.primary;
-  static Color adminGradEnd   = _initial.primaryDark;
-  static Color adminPrimary   = _initial.primary;
+  static Color adminGradEnd = _initial.primaryDark;
+  static Color adminPrimary = _initial.primary;
 
   static Color driverGradStart = _initial.primary;
-  static Color driverGradEnd   = _initial.primaryDark;
-  static Color driverPrimary   = _initial.primary;
+  static Color driverGradEnd = _initial.primaryDark;
+  static Color driverPrimary = _initial.primary;
 
   static Color loginGradStart = _initial.primary;
-  static Color loginGradEnd   = _initial.primaryDark;
+  static Color loginGradEnd = _initial.primaryDark;
 
-  static Color green    = _initial.success.color;
-  static Color greenBg  = _initial.success.bg;
-  static Color orange   = _initial.warning.color;
+  static Color green = _initial.success.color;
+  static Color greenBg = _initial.success.bg;
+  static Color orange = _initial.warning.color;
   static Color orangeBg = _initial.warning.bg;
-  static Color red      = _initial.error.color;
-  static Color redBg    = _initial.error.bg;
-  static Color blue     = _initial.info.color;
-  static Color blueBg   = _initial.info.bg;
-  static Color purple   = _initial.purple.color;
+  static Color red = _initial.error.color;
+  static Color redBg = _initial.error.bg;
+  static Color blue = _initial.info.color;
+  static Color blueBg = _initial.info.bg;
+  static Color purple = _initial.purple.color;
   static Color purpleBg = _initial.purple.bg;
 
-  static Color bgGray   = _initial.background;
-  static Color cardBg   = _initial.surface;
+  static Color bgGray = _initial.background;
+  static Color cardBg = _initial.surface;
   static Color textMain = _initial.textPrimary;
-  static Color textSub  = _initial.textSecondary;
-  static Color border   = _initial.border;
+  static Color textSub = _initial.textSecondary;
+  static Color border = _initial.border;
   static Color secondary = _initial.secondary;
   static Color activeBg = _initial.activeBg;
 
@@ -98,10 +98,28 @@ String greeting() {
   return 'Buenas noches,';
 }
 
-const _dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+const _dias = [
+  'Domingo',
+  'Lunes',
+  'Martes',
+  'Miércoles',
+  'Jueves',
+  'Viernes',
+  'Sábado',
+];
 const _meses = [
-  'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
-  'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
+  'enero',
+  'febrero',
+  'marzo',
+  'abril',
+  'mayo',
+  'junio',
+  'julio',
+  'agosto',
+  'septiembre',
+  'octubre',
+  'noviembre',
+  'diciembre',
 ];
 
 // 'Lunes, 18 de julio  •  09:41 a. m.' — igual que formatDateTime() en
@@ -123,7 +141,8 @@ class LicenciaCategoria {
 
   const LicenciaCategoria({required this.categoria, this.vencimiento});
 
-  factory LicenciaCategoria.fromJson(Map<String, dynamic> json) => LicenciaCategoria(
+  factory LicenciaCategoria.fromJson(Map<String, dynamic> json) =>
+      LicenciaCategoria(
         categoria: json['categoria']?.toString() ?? '',
         vencimiento: json['vencimiento']?.toString(),
       );
@@ -189,20 +208,45 @@ class UserModel {
       nombre: json['nombre'] ?? json['name'] ?? '',
       apellido: json['apellido'],
       email: json['email'] ?? '',
-      telefono: json['telefono'] ?? json['phone'] ?? json['celular'] ?? json['numeroTelefono'] ?? json['numeroCelular'] ?? json['mobile'] ?? '',
+      telefono:
+          json['telefono'] ??
+          json['phone'] ??
+          json['celular'] ??
+          json['numeroTelefono'] ??
+          json['numeroCelular'] ??
+          json['mobile'] ??
+          '',
       rol: json['rol'] ?? json['role'] ?? '',
-      conductorId: json['conductorId']?.toString() ?? json['conductor']?['idConductor']?.toString(),
-      documento: json['documento'] ?? json['numeroIdentificacion'] ?? json['numeroDocumento'] ?? json['cedula'],
+      conductorId:
+          json['conductorId']?.toString() ??
+          json['conductor']?['idConductor']?.toString(),
+      documento:
+          json['documento'] ??
+          json['numeroIdentificacion'] ??
+          json['numeroDocumento'] ??
+          json['cedula'],
       tipoDocumento: json['tipoIdentificacion'],
-      fechaNacimiento: json['fechaNacimiento'] ?? json['fecha_nacimiento'] ?? json['birthDate'],
-      direccion: json['direccion'] ?? json['address'] ?? json['direccionResidencia'],
-      fotoPerfil: json['fotoPerfil'] ?? json['foto_perfil'] ?? json['avatar'] ?? json['foto'],
+      fechaNacimiento:
+          json['fechaNacimiento'] ??
+          json['fecha_nacimiento'] ??
+          json['birthDate'],
+      direccion:
+          json['direccion'] ?? json['address'] ?? json['direccionResidencia'],
+      fotoPerfil:
+          json['fotoPerfil'] ??
+          json['foto_perfil'] ??
+          json['avatar'] ??
+          json['foto'],
       numeroLicencia: json['numeroLicencia'],
-      categoriasLicencia: (json['categoriasLicencia'] as List?)
-              ?.map((e) => LicenciaCategoria.fromJson(e as Map<String, dynamic>))
+      categoriasLicencia:
+          (json['categoriasLicencia'] as List?)
+              ?.map(
+                (e) => LicenciaCategoria.fromJson(e as Map<String, dynamic>),
+              )
               .toList() ??
           const [],
-      sedes: (json['sedes'] as List?)
+      sedes:
+          (json['sedes'] as List?)
               ?.map((e) => Map<String, dynamic>.from(e as Map))
               .toList() ??
           const [],
@@ -275,7 +319,22 @@ class EstadoAnticipo {
   static const excedentePendiente = 'Excedente pendiente';
   static const completado = 'Completado';
 
-  static const todos = [entregado, enLegalizacion, excedentePendiente, completado];
+  static const todos = [
+    entregado,
+    enLegalizacion,
+    excedentePendiente,
+    completado,
+  ];
+
+  // NO es un estado real de la BD -- "Excedente pendiente" cubre tanto el
+  // caso de excedente (el conductor gastó de menos, hay que devolverle) como
+  // el de faltante (gastó de más, hay que reponerle), distinguidos solo por
+  // el signo de Anticipo.excedente (ver tieneDeficit). Este valor es un
+  // filtro cliente-side puro, para que el select de Estado deje elegir el
+  // caso de faltante por separado sin que el chip de la tarjeta deje de decir
+  // "Excedente pendiente" (ese sigue siendo el estado real). Ver LOGICA.md,
+  // "Tooltip 'Aún no lo puedes editar' y filtro 'Reposición pendiente'".
+  static const reposicionPendiente = 'Reposición pendiente';
 }
 
 class Anticipo {
@@ -324,25 +383,25 @@ class Anticipo {
   });
 
   Anticipo copyWith({List<String>? soporte}) => Anticipo(
-        id: id,
-        idConductor: idConductor,
-        idRuta: idRuta,
-        valorAnticipo: valorAnticipo,
-        valorGastado: valorGastado,
-        excedente: excedente,
-        estado: estado,
-        habilitado: habilitado,
-        soporte: soporte ?? this.soporte,
-        fechaEntrega: fechaEntrega,
-        fechaLegalizacion: fechaLegalizacion,
-        fechaEntregaExcedente: fechaEntregaExcedente,
-        conductorNombre: conductorNombre,
-        nombreRuta: nombreRuta,
-        destinoTexto: destinoTexto,
-        rutaEstado: rutaEstado,
-        sedesTotales: sedesTotales,
-        sedesCompletadas: sedesCompletadas,
-      );
+    id: id,
+    idConductor: idConductor,
+    idRuta: idRuta,
+    valorAnticipo: valorAnticipo,
+    valorGastado: valorGastado,
+    excedente: excedente,
+    estado: estado,
+    habilitado: habilitado,
+    soporte: soporte ?? this.soporte,
+    fechaEntrega: fechaEntrega,
+    fechaLegalizacion: fechaLegalizacion,
+    fechaEntregaExcedente: fechaEntregaExcedente,
+    conductorNombre: conductorNombre,
+    nombreRuta: nombreRuta,
+    destinoTexto: destinoTexto,
+    rutaEstado: rutaEstado,
+    sedesTotales: sedesTotales,
+    sedesCompletadas: sedesCompletadas,
+  );
 
   // Forma real de una fila devuelta por GET /api/anticipos, GET /api/anticipos/:id
   // o GET /api/conductores/mis-anticipos (esta última sin `conductor` anidado,
@@ -359,7 +418,10 @@ class Anticipo {
     if (destinoJson != null) {
       final municipio = destinoJson['municipio'] ?? '';
       final departamento = destinoJson['departamento'] ?? '';
-      destinoTexto = [municipio, departamento].where((s) => (s as String).isNotEmpty).join(', ');
+      destinoTexto = [
+        municipio,
+        departamento,
+      ].where((s) => (s as String).isNotEmpty).join(', ');
     }
 
     return Anticipo(
@@ -374,18 +436,28 @@ class Anticipo {
       // Subidas viejas hechas antes de corregir el backend (guardaba `undefined`
       // en vez de la URL real) quedaron como `null` sueltos dentro del array —
       // se descartan acá para no mostrar tarjetas de "soporte" sin URL real.
-      soporte: (json['soporte'] as List?)?.where((e) => e != null).map((e) => e.toString()).toList() ?? const [],
+      soporte:
+          (json['soporte'] as List?)
+              ?.where((e) => e != null)
+              .map((e) => e.toString())
+              .toList() ??
+          const [],
       fechaEntrega: json['fechaEntrega']?.toString(),
       fechaLegalizacion: json['fechaLegalizacion']?.toString(),
       fechaEntregaExcedente: json['fechaEntregaExcedente']?.toString(),
       conductorNombre: usuarioJson != null
-          ? '${usuarioJson['nombre'] ?? ''} ${usuarioJson['apellido'] ?? ''}'.trim()
+          ? '${usuarioJson['nombre'] ?? ''} ${usuarioJson['apellido'] ?? ''}'
+                .trim()
           : '',
       nombreRuta: rutaJson?['origen'],
       destinoTexto: destinoTexto,
       rutaEstado: rutaJson?['estado']?.toString(),
-      sedesTotales: rutaJson?['sedesTotales'] is num ? (rutaJson!['sedesTotales'] as num).toInt() : null,
-      sedesCompletadas: rutaJson?['sedesCompletadas'] is num ? (rutaJson!['sedesCompletadas'] as num).toInt() : null,
+      sedesTotales: rutaJson?['sedesTotales'] is num
+          ? (rutaJson!['sedesTotales'] as num).toInt()
+          : null,
+      sedesCompletadas: rutaJson?['sedesCompletadas'] is num
+          ? (rutaJson!['sedesCompletadas'] as num).toInt()
+          : null,
     );
   }
 
@@ -428,7 +500,9 @@ String formatFecha(String? iso) {
 
 String formatCOP(double value) {
   final abs = value.abs();
-  final formatted = abs.toStringAsFixed(0).replaceAllMapped(
+  final formatted = abs
+      .toStringAsFixed(0)
+      .replaceAllMapped(
         RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
         (m) => '${m[1]}.',
       );
@@ -439,21 +513,31 @@ String formatCOP(double value) {
 // shared/utils/estadoColors.js), sobre los tokens ya existentes en AppColors.
 Color estadoColor(String estado) {
   switch (estado) {
-    case EstadoAnticipo.entregado:          return AppColors.purple;
-    case EstadoAnticipo.enLegalizacion:     return AppColors.blue;
-    case EstadoAnticipo.excedentePendiente: return AppColors.orange;
-    case EstadoAnticipo.completado:         return AppColors.green;
-    default:                                return AppColors.textSub;
+    case EstadoAnticipo.entregado:
+      return AppColors.purple;
+    case EstadoAnticipo.enLegalizacion:
+      return AppColors.blue;
+    case EstadoAnticipo.excedentePendiente:
+      return AppColors.orange;
+    case EstadoAnticipo.completado:
+      return AppColors.green;
+    default:
+      return AppColors.textSub;
   }
 }
 
 Color estadoBg(String estado) {
   switch (estado) {
-    case EstadoAnticipo.entregado:          return AppColors.purpleBg;
-    case EstadoAnticipo.enLegalizacion:     return AppColors.blueBg;
-    case EstadoAnticipo.excedentePendiente: return AppColors.orangeBg;
-    case EstadoAnticipo.completado:         return AppColors.greenBg;
-    default:                                return AppColors.bgGray;
+    case EstadoAnticipo.entregado:
+      return AppColors.purpleBg;
+    case EstadoAnticipo.enLegalizacion:
+      return AppColors.blueBg;
+    case EstadoAnticipo.excedentePendiente:
+      return AppColors.orangeBg;
+    case EstadoAnticipo.completado:
+      return AppColors.greenBg;
+    default:
+      return AppColors.bgGray;
   }
 }
 
@@ -462,18 +546,26 @@ Color estadoBg(String estado) {
 // Entregado, Devuelto.
 Color estadoPaqueteColor(String estado) {
   switch (estado) {
-    case 'Por entregar': return AppColors.blue;
-    case 'Entregado':    return AppColors.green;
-    case 'Devuelto':     return AppColors.red;
-    default:              return AppColors.textSub;
+    case 'Por entregar':
+      return AppColors.blue;
+    case 'Entregado':
+      return AppColors.green;
+    case 'Devuelto':
+      return AppColors.red;
+    default:
+      return AppColors.textSub;
   }
 }
 
 Color estadoPaqueteBg(String estado) {
   switch (estado) {
-    case 'Por entregar': return AppColors.blueBg;
-    case 'Entregado':    return AppColors.greenBg;
-    case 'Devuelto':     return AppColors.redBg;
-    default:              return AppColors.bgGray;
+    case 'Por entregar':
+      return AppColors.blueBg;
+    case 'Entregado':
+      return AppColors.greenBg;
+    case 'Devuelto':
+      return AppColors.redBg;
+    default:
+      return AppColors.bgGray;
   }
 }
