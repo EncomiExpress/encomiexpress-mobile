@@ -561,36 +561,6 @@ class _DistribuidorPaquetesState extends State<DistribuidorPaquetes> {
                 ),
               ),
             ),
-          if ((p['fotoEntrega'] as String?)?.isNotEmpty == true)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Builder(
-                builder: (ctx) => TapArea(
-                  onTap: () =>
-                      ImageViewer.show(ctx, [p['fotoEntrega'] as String]),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.photo_camera_outlined,
-                        size: 16,
-                        color: AppColors.adminPrimary,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Ver evidencia',
-                        style: TextStyle(
-                          color: AppColors.adminPrimary,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          decoration: TextDecoration.underline,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -641,7 +611,12 @@ class _DistribuidorPaquetesState extends State<DistribuidorPaquetes> {
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                     ),
                     child: Text(
-                      'Intento (${intentos + 1})',
+                      // Cuenta regresiva de intentos que quedan DISPONIBLES
+                      // (incluido este que se está a punto de registrar), no el
+                      // número de intento que sería -- a pedido de la usuaria,
+                      // para que el distribuidor vea de una cuánto margen le
+                      // queda sin tener que restar 5 - N mentalmente.
+                      'Intento (${_maxIntentosEntrega - intentos})',
                       style: TextStyle(color: AppColors.orange, fontSize: 12.5),
                     ),
                   ),

@@ -147,6 +147,36 @@ class PaqueteService {
     }
   }
 
+  // GET /api/paquetes/retorno — "Paquetes de retorno" (Parte B,
+  // plan-ventas-regreso-paquetes.md): solo trae algo cuando la ruta activa del
+  // conductor autenticado ahora mismo es un regreso "En Ruta". Lista vacía =
+  // no hay ninguna ruta de regreso activa, o no quedó nada por confirmar — en
+  // los dos casos la sección desaparece del todo en la UI.
+  Future<List<dynamic>> getParaRetorno() async {
+    final resp = await _api.get('/api/paquetes/retorno');
+    if (resp.statusCode == 200) return resp.data['data'] as List<dynamic>;
+    return [];
+  }
+
+  // PATCH /api/paquetes/:id/devolucion — confirma "Llegó a Medellín":
+  // Devuelto (No entregado) -> Devuelto a base. Sin body ni foto: es solo una
+  // confirmación de que el paquete físicamente volvió en el convoy.
+  Future<Map<String, dynamic>> registrarDevolucion(int idPaquete) async {
+    try {
+      final resp = await _api.patch('/api/paquetes/$idPaquete/devolucion');
+      if (resp.statusCode == 200) {
+        return {
+          'success': true,
+          'data': resp.data['data'],
+          'message': resp.data['message'],
+        };
+      }
+      return {'success': false, 'message': 'No se pudo confirmar la devolución'};
+    } catch (e) {
+      return {'success': false, 'message': _mensajeError(e)};
+    }
+  }
+
   String _mensajeError(dynamic e) {
     if (e is DioException && e.response?.data is Map) {
       return e.response?.data['message'] ?? 'Error de conexión';

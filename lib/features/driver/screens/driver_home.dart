@@ -376,13 +376,28 @@ class _DriverHomeState extends State<DriverHome> {
                                     // usuaria: los anteriores quedaban muy
                                     // largos) -- solo en esta vista, el admin
                                     // conserva sus propios 3 mensajes largos.
+                                    // Anticipo ida+retorno (2026-09-13, ver
+                                    // LOGICA.md): dos casos nuevos antes de
+                                    // llegar al de siempre -- sin regreso
+                                    // programado todavía (`esperandoRegreso`),
+                                    // o regreso programado pero con sedes
+                                    // propias sin completar (`sedesDelRegreso`,
+                                    // mismo texto de siempre pero aclarando que
+                                    // ya no son las sedes de la ida).
                                     editDisabledReason: a.puedeLegalizar
                                         ? null
                                         : a.estado ==
                                                   EstadoAnticipo
                                                       .enLegalizacion &&
+                                              a.esperandoRegreso
+                                        ? 'Aún no puedes legalizarlo (falta programar el regreso)'
+                                        : a.estado ==
+                                                  EstadoAnticipo
+                                                      .enLegalizacion &&
                                               a.sedesPendientes
-                                        ? 'Aún no puedes legalizarlo (completa las sedes)'
+                                        ? (a.sedesDelRegreso
+                                              ? 'Aún no puedes legalizarlo (completa las sedes del regreso)'
+                                              : 'Aún no puedes legalizarlo (completa las sedes)')
                                         : a.estado == EstadoAnticipo.entregado
                                         ? 'Aún no puedes legalizarlo'
                                         : 'Ya está legalizado',
