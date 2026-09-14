@@ -1469,6 +1469,10 @@ class AnticipoCard extends StatelessWidget {
   final VoidCallback? onEditar;
   // Solo aplica para admin cuando estado == 'Excedente pendiente'.
   final VoidCallback? onConfirmarDevolucion;
+  // Solo admin (mismo permiso que el ToggleSwitch de useAnticipoColumns.jsx,
+  // web) -- null oculta el ícono por completo (ej. en driver_home.dart, que
+  // nunca lo pasa).
+  final VoidCallback? onToggleHabilitado;
   // Texto del tooltip cuando el ícono de editar está deshabilitado (onEditar
   // null). Si no se pasa, se usa el motivo por defecto.
   final String? editDisabledReason;
@@ -1480,6 +1484,7 @@ class AnticipoCard extends StatelessWidget {
     required this.onVer,
     this.onEditar,
     this.onConfirmarDevolucion,
+    this.onToggleHabilitado,
     this.editDisabledReason,
   });
 
@@ -1501,167 +1506,198 @@ class AnticipoCard extends StatelessWidget {
         anticipo.estado == EstadoAnticipo.excedentePendiente &&
         onConfirmarDevolucion != null;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    EstadoBadge(anticipo.estado),
-                    const Spacer(),
-                    Tooltip(
-                      message: 'Ver detalle',
-                      child: IconButton(
-                        onPressed: onVer,
-                        icon: Icon(
-                          Icons.remove_red_eye_outlined,
-                          color: AppColors.textSub,
-                          size: 20,
-                        ),
-                        constraints: const BoxConstraints(),
-                        padding: const EdgeInsets.all(6),
-                      ),
-                    ),
-                    Tooltip(
-                      message: onEditar != null
-                          ? 'Editar'
-                          : _editDisabledReason,
-                      child: IconButton(
-                        onPressed: onEditar,
-                        icon: Icon(
-                          Icons.edit_outlined,
-                          color: onEditar != null
-                              ? AppColors.textSub
-                              : AppColors.border,
-                          size: 20,
-                        ),
-                        constraints: const BoxConstraints(),
-                        padding: const EdgeInsets.all(6),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  anticipo.nombreRuta != null
-                      ? '${anticipo.nombreRuta}${anticipo.destinoTexto != null ? ' → ${anticipo.destinoTexto}' : ''}'
-                      : 'Anticipo #${anticipo.id}',
-                  style: TextStyle(
-                    color: AppColors.textMain,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                if (isAdmin && anticipo.conductorNombre.isNotEmpty)
-                  Text(
-                    'Conductor: ${anticipo.conductorNombre}',
-                    style: TextStyle(color: AppColors.textSub, fontSize: 12),
-                  ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    _val(
-                      'Anticipo',
-                      formatCOP(anticipo.valorAnticipo),
-                      AppColors.blue,
-                    ),
-                    _val(
-                      'Gastado',
-                      anticipo.valorGastado == 0
-                          ? '—'
-                          : '-${formatCOP(anticipo.valorGastado)}',
-                      anticipo.valorGastado == 0
-                          ? AppColors.textSub
-                          : AppColors.orange,
-                    ),
-                    _val(
-                      'Excedente',
-                      anticipo.valorGastado == 0
-                          ? '—'
-                          : (anticipo.tieneDeficit
-                                ? formatCOP(anticipo.excedente)
-                                : '+${formatCOP(anticipo.excedente)}'),
-                      anticipo.valorGastado == 0
-                          ? AppColors.textSub
-                          : (anticipo.tieneDeficit
-                                ? AppColors.red
-                                : AppColors.green),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Text(
-                      'Entrega: ${formatFecha(anticipo.fechaEntrega)}',
-                      style: TextStyle(color: AppColors.textSub, fontSize: 11),
-                    ),
-                    const Spacer(),
-                    Text(
-                      'Legalización: ${formatFecha(anticipo.fechaLegalizacion)}',
-                      style: TextStyle(color: AppColors.textSub, fontSize: 11),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          if (mostrarConfirmarDevolucion) ...[
-            Divider(height: 1, color: AppColors.border),
-            TapArea(
-              onTap: onConfirmarDevolucion,
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                decoration: BoxDecoration(
-                  color: anticipo.tieneDeficit
-                      ? AppColors.red
-                      : AppColors.purple,
-                  borderRadius: BorderRadius.only(
-                    bottomLeft: Radius.circular(16),
-                    bottomRight: Radius.circular(16),
-                  ),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.check_circle_outline,
-                      color: Colors.white,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      anticipo.tieneDeficit
-                          ? 'Confirmar reposición al conductor'
-                          : 'Confirmar devolución de excedente',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+    // Mismo criterio que "Filas inhabilitadas tienen opacity: 0.55" en las
+    // tablas del frontend web (ver CLAUDE.md, "Patrón habilitado/inhabilitado").
+    return Opacity(
+      opacity: anticipo.habilitado ? 1 : 0.55,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: AppColors.cardBg,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
           ],
-        ],
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      EstadoBadge(anticipo.estado),
+                      const Spacer(),
+                      Tooltip(
+                        message: 'Ver detalle',
+                        child: IconButton(
+                          onPressed: onVer,
+                          icon: Icon(
+                            Icons.remove_red_eye_outlined,
+                            color: AppColors.textSub,
+                            size: 20,
+                          ),
+                          constraints: const BoxConstraints(),
+                          padding: const EdgeInsets.all(6),
+                        ),
+                      ),
+                      Tooltip(
+                        message: onEditar != null
+                            ? 'Editar'
+                            : _editDisabledReason,
+                        child: IconButton(
+                          onPressed: onEditar,
+                          icon: Icon(
+                            Icons.edit_outlined,
+                            color: onEditar != null
+                                ? AppColors.textSub
+                                : AppColors.border,
+                            size: 20,
+                          ),
+                          constraints: const BoxConstraints(),
+                          padding: const EdgeInsets.all(6),
+                        ),
+                      ),
+                      if (onToggleHabilitado != null)
+                        Tooltip(
+                          message: anticipo.habilitado
+                              ? 'Inhabilitar'
+                              : 'Habilitar',
+                          child: IconButton(
+                            onPressed: onToggleHabilitado,
+                            icon: Icon(
+                              anticipo.habilitado
+                                  ? Icons.block_outlined
+                                  : Icons.check_circle_outline,
+                              color: anticipo.habilitado
+                                  ? AppColors.red
+                                  : AppColors.green,
+                              size: 20,
+                            ),
+                            constraints: const BoxConstraints(),
+                            padding: const EdgeInsets.all(6),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    anticipo.nombreRuta != null
+                        ? '${anticipo.nombreRuta}${anticipo.destinoTexto != null ? ' → ${anticipo.destinoTexto}' : ''}'
+                        : 'Anticipo #${anticipo.id}',
+                    style: TextStyle(
+                      color: AppColors.textMain,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  if (isAdmin && anticipo.conductorNombre.isNotEmpty)
+                    Text(
+                      'Conductor: ${anticipo.conductorNombre}',
+                      style: TextStyle(color: AppColors.textSub, fontSize: 12),
+                    ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      _val(
+                        'Anticipo',
+                        formatCOP(anticipo.valorAnticipo),
+                        AppColors.blue,
+                      ),
+                      _val(
+                        'Gastado',
+                        anticipo.valorGastado == 0
+                            ? '—'
+                            : '-${formatCOP(anticipo.valorGastado)}',
+                        anticipo.valorGastado == 0
+                            ? AppColors.textSub
+                            : AppColors.orange,
+                      ),
+                      _val(
+                        'Excedente',
+                        anticipo.valorGastado == 0
+                            ? '—'
+                            : (anticipo.tieneDeficit
+                                  ? formatCOP(anticipo.excedente)
+                                  : '+${formatCOP(anticipo.excedente)}'),
+                        anticipo.valorGastado == 0
+                            ? AppColors.textSub
+                            : (anticipo.tieneDeficit
+                                  ? AppColors.red
+                                  : AppColors.green),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Text(
+                        'Entrega: ${formatFecha(anticipo.fechaEntrega)}',
+                        style: TextStyle(
+                          color: AppColors.textSub,
+                          fontSize: 11,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        'Legalización: ${formatFecha(anticipo.fechaLegalizacion)}',
+                        style: TextStyle(
+                          color: AppColors.textSub,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            if (mostrarConfirmarDevolucion) ...[
+              Divider(height: 1, color: AppColors.border),
+              TapArea(
+                onTap: onConfirmarDevolucion,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    color: anticipo.tieneDeficit
+                        ? AppColors.red
+                        : AppColors.purple,
+                    borderRadius: BorderRadius.only(
+                      bottomLeft: Radius.circular(16),
+                      bottomRight: Radius.circular(16),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.check_circle_outline,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        anticipo.tieneDeficit
+                            ? 'Confirmar reposición al conductor'
+                            : 'Confirmar devolución de excedente',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

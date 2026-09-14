@@ -15,6 +15,11 @@ const double _maxValorMonto = 9999999;
 // práctica un anticipo no se gasta ni de cerca hasta ese techo.
 const double _maxValorGastado = 999999;
 
+// Mismo horizonte que MAX_DIAS_ANTICIPACION (shared/utils/horarioLaboral.js,
+// frontend web) y el backend (utils/horarioLaboral.js) — acota qué tan vieja
+// puede ser la fecha de entrega del anticipo.
+const int _maxDiasAnticipacion = 90;
+
 // Mismos topes que exige el backend (config/cloudinary.js: multer `fileSize`,
 // y `upload.array('soporte', 5)` en routes/anticipos.js) — validados acá para
 // avisar antes de intentar subir, no solo cuando el backend ya rechazó.
@@ -72,11 +77,24 @@ class _AnticipoEditState extends State<AnticipoEdit> {
   String? _idRuta;
   String? _idRutaVehiculoConductor;
 
+  // Claves "idRuta-idConductor" con un anticipo Entregado/En Legalización ya
+  // activo -- igual que useAnticiposActivos.js (web), para no ofrecer en el
+  // buscador una ruta/par que el backend de todas formas iba a rechazar con
+  // 409 al guardar. Vacío mientras carga o si falla (no bloquea nada extra).
+  Set<String> _clavesActivas = {};
+
+  // Conteo de paquetes por par vehículo-conductor de la ruta ELEGIDA -- igual
+  // que usePaquetesPorPar.js (web), solo para el aviso "este vehículo no
+  // tiene paquetes asignados" (no bloquea guardar).
+  Map<int, int> _paquetesPorPar = {};
+  bool _cargandoPaquetesPorPar = false;
+
   late TextEditingController _valorAnticipoCtrl;
   late TextEditingController _valorGastadoCtrl;
   final _valorAnticipoFocus = FocusNode();
   final _valorGastadoFocus = FocusNode();
   DateTime? _fechaEntrega;
+  String? _fechaEntregaError;
   List<String> _soporteActual = [];
   final List<PlatformFile> _soporteNuevo = [];
 
@@ -120,6 +138,28 @@ class _AnticipoEditState extends State<AnticipoEdit> {
   List<Map<String, dynamic>> get _paresDeRutaSeleccionada =>
       ((_rutaSeleccionada['paresVehiculoConductor'] as List?) ?? [])
           .cast<Map<String, dynamic>>();
+
+  bool _tieneAnticipoActivo(dynamic idRuta, dynamic idConductor) =>
+      _clavesActivas.contains('$idRuta-$idConductor');
+
+  // Oculta del buscador de Ruta las que ya no tienen NINGÚN par disponible
+  // (todos sus conductores ya tienen anticipo activo en ella) -- igual que
+  // filtrarRutasDisponibles en useAnticiposActivos.js (frontend web). Si le
+  // queda al menos un par sin anticipo, la ruta se sigue mostrando normal.
+  List<Map<String, dynamic>> get _rutasDisponibles => _rutas.where((r) {
+    final pares = ((r['paresVehiculoConductor'] as List?) ?? [])
+        .cast<Map<String, dynamic>>();
+    return pares.any(
+      (p) => !_tieneAnticipoActivo(r['idRuta'], p['idConductor']),
+    );
+  }).toList();
+
+  // Del select de "Vehículo y conductor" de la ruta ya elegida, solo los
+  // pares sin anticipo activo -- igual que filtrarParesDisponibles (web). Los
+  // que ya tienen uno no aparecen ahí, ni deshabilitados.
+  List<Map<String, dynamic>> get _paresDisponibles => _paresDeRutaSeleccionada
+      .where((p) => !_tieneAnticipoActivo(_idRuta, p['idConductor']))
+      .toList();
 
   Map<String, dynamic> get _parSeleccionado =>
       _paresDeRutaSeleccionada.firstWhere(
@@ -195,10 +235,17 @@ class _AnticipoEditState extends State<AnticipoEdit> {
       _rutasError = false;
     });
     try {
-      final data = await _anticipoService.getRutas();
+      final resultados = await Future.wait([
+        _anticipoService.getRutas(),
+        _anticipoService.getClavesAnticiposActivos(
+          excluirId: widget.anticipo?.id,
+        ),
+      ]);
       if (!mounted) return;
+      final data = resultados[0] as List<Map<String, dynamic>>;
       setState(() {
         _rutas = data;
+        _clavesActivas = resultados[1] as Set<String>;
         _loadingRutas = false;
         // Al editar un anticipo "Entregado", preselecciona el par
         // vehículo/conductor que ya tenía (mismo idConductor) dentro de la
@@ -218,6 +265,7 @@ class _AnticipoEditState extends State<AnticipoEdit> {
           }
         }
       });
+      if (_idRuta != null) _cargarPaquetesPorPar(_idRuta!);
     } catch (_) {
       if (!mounted) return;
       setState(() {
@@ -228,18 +276,84 @@ class _AnticipoEditState extends State<AnticipoEdit> {
     }
   }
 
+  // Igual que usePaquetesPorPar.js (web): cuenta los paquetes de cada par de
+  // la ruta elegida, solo para el aviso "este vehículo no tiene paquetes
+  // asignados" -- nunca bloquea guardar.
+  Future<void> _cargarPaquetesPorPar(String idRuta) async {
+    setState(() => _cargandoPaquetesPorPar = true);
+    final conteo = await _anticipoService.getPaquetesPorPar(idRuta);
+    if (!mounted) return;
+    setState(() {
+      _paquetesPorPar = conteo;
+      _cargandoPaquetesPorPar = false;
+    });
+  }
+
   double get _excedente {
     final anticipo = double.tryParse(_valorAnticipoCtrl.text) ?? 0;
     final gastado = double.tryParse(_valorGastadoCtrl.text) ?? 0;
     return anticipo - gastado;
   }
 
+  // Fecha de la ruta elegida, si hay una -- tope superior de "Fecha de
+  // entrega" (no tiene sentido entregar el anticipo después de que la ruta ya
+  // salió). Sin ruta elegida no hay tope real, igual que en el formulario web.
+  DateTime? get _fechaSalidaRuta =>
+      _parseIso(_rutaSeleccionada['fechaSalida']?.toString());
+
+  // Mismo horizonte que MAX_DIAS_ANTICIPACION (web/backend): no puede ser una
+  // fecha absurdamente vieja.
+  DateTime get _fechaMinimaAnticipacion {
+    final hoy = DateTime.now();
+    return DateTime(
+      hoy.year,
+      hoy.month,
+      hoy.day,
+    ).subtract(const Duration(days: _maxDiasAnticipacion));
+  }
+
+  DateTime _clampFecha(DateTime d, DateTime min, DateTime max) {
+    if (d.isBefore(min)) return min;
+    if (d.isAfter(max)) return max;
+    return d;
+  }
+
+  // Igual que validarCampo('fechaEntrega', ...) en anticipoValidation.js
+  // (frontend web) -- no puede ser posterior a la salida de la ruta elegida,
+  // ni más de _maxDiasAnticipacion días en el pasado. El backend
+  // (anticipoService.validarFechaEntregaAnticipo) aplica exactamente la misma
+  // regla y la rechazaría igual sin este chequeo, solo que sin avisar antes.
+  String? _validarFechaEntrega() {
+    if (_fechaEntrega == null) return 'La fecha de entrega es obligatoria';
+    final fechaSalida = _fechaSalidaRuta;
+    if (fechaSalida != null &&
+        DateUtils.dateOnly(
+          _fechaEntrega!,
+        ).isAfter(DateUtils.dateOnly(fechaSalida))) {
+      return 'No puede ser posterior a la salida de la ruta (${formatFecha(_isoDate(fechaSalida))})';
+    }
+    if (DateUtils.dateOnly(
+      _fechaEntrega!,
+    ).isBefore(DateUtils.dateOnly(_fechaMinimaAnticipacion))) {
+      return 'No puede ser más de $_maxDiasAnticipacion días en el pasado';
+    }
+    return null;
+  }
+
   Future<void> _pickFecha() async {
+    final minDate = _fechaMinimaAnticipacion;
+    final maxDate =
+        _fechaSalidaRuta ?? DateTime.now().add(const Duration(days: 3650));
+    final initial = _clampFecha(
+      _fechaEntrega ?? DateTime.now(),
+      minDate,
+      maxDate,
+    );
     final picked = await showDatePicker(
       context: context,
-      initialDate: _fechaEntrega ?? DateTime.now(),
-      firstDate: DateTime(2024),
-      lastDate: DateTime(2030),
+      initialDate: initial,
+      firstDate: minDate,
+      lastDate: maxDate.isBefore(minDate) ? minDate : maxDate,
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
           colorScheme: ColorScheme.light(
@@ -251,7 +365,12 @@ class _AnticipoEditState extends State<AnticipoEdit> {
         child: child!,
       ),
     );
-    if (picked != null) setState(() => _fechaEntrega = picked);
+    if (picked != null) {
+      setState(() {
+        _fechaEntrega = picked;
+        _fechaEntregaError = _validarFechaEntrega();
+      });
+    }
   }
 
   // Filtra por tamaño y por el tope de cantidad antes de agregar — avisa qué
@@ -420,10 +539,12 @@ class _AnticipoEditState extends State<AnticipoEdit> {
         });
         return;
       }
-      if (_fechaEntrega == null) {
+      final errorFecha = _validarFechaEntrega();
+      if (errorFecha != null) {
         setState(() {
           _saving = false;
-          _error = 'La fecha de entrega es obligatoria';
+          _fechaEntregaError = errorFecha;
+          _error = errorFecha;
         });
         return;
       }
@@ -435,6 +556,15 @@ class _AnticipoEditState extends State<AnticipoEdit> {
       );
     } else {
       // Entregado — solo admin llega aquí (ver _puedeEditar).
+      final errorFecha = _validarFechaEntrega();
+      if (errorFecha != null) {
+        setState(() {
+          _saving = false;
+          _fechaEntregaError = errorFecha;
+          _error = errorFecha;
+        });
+        return;
+      }
       final valorAnticipo = double.tryParse(_valorAnticipoCtrl.text) ?? 0;
       final sinCambios =
           _idRuta == _idRutaOriginal &&
@@ -650,14 +780,17 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                                             fontSize: 13,
                                           ),
                                         )
-                                      : (_rutas.isEmpty
+                                      : ((_rutas.isEmpty ||
+                                                _rutasDisponibles.isEmpty)
                                             ? Row(
                                                 children: [
                                                   Expanded(
                                                     child: Text(
                                                       _rutasError
                                                           ? 'No se pudieron cargar las rutas. Verifica tu conexión con el servidor.'
-                                                          : 'No hay rutas disponibles.',
+                                                          : (_rutas.isEmpty
+                                                                ? 'No hay rutas disponibles.'
+                                                                : 'Todas las rutas Programadas ya tienen un anticipo activo para su conductor.'),
                                                       style: TextStyle(
                                                         color:
                                                             AppColors.textSub,
@@ -683,7 +816,9 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                                               )
                                             : _dropdown(
                                                 value: _idRuta,
-                                                items: _rutas.map((r) {
+                                                items: _rutasDisponibles.map((
+                                                  r,
+                                                ) {
                                                   final destino =
                                                       r['destino']
                                                           as Map<
@@ -710,29 +845,57 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                                                 }).toList(),
                                                 // Cambiar de ruta invalida el par vehículo/conductor
                                                 // elegido — se autocompleta solo si la ruta tiene un
-                                                // único par, igual que en RegistrarAnticipoExcedente.jsx
-                                                // (web).
+                                                // único par disponible, igual que en
+                                                // RegistrarAnticipoExcedente.jsx (web). También
+                                                // recalcula el tope de "Fecha de entrega" (la salida
+                                                // de la nueva ruta) y el conteo de paquetes por par.
                                                 onChanged: (v) => setState(() {
                                                   _idRuta = v;
                                                   final pares =
-                                                      _paresDeRutaSeleccionada;
+                                                      _paresDisponibles;
                                                   _idRutaVehiculoConductor =
                                                       pares.length == 1
                                                       ? pares
                                                             .first['idRutaVehiculoConductor']
                                                             ?.toString()
                                                       : null;
+                                                  if (_fechaEntrega != null) {
+                                                    _fechaEntregaError =
+                                                        _validarFechaEntrega();
+                                                  }
+                                                  _paquetesPorPar = {};
+                                                  if (v != null)
+                                                    _cargarPaquetesPorPar(v);
                                                 }),
                                               )),
+                                  // Anticipo ida+retorno: un anticipo sobre una IDA (idRutaIda
+                                  // == null) cubre también su regreso, aunque ese regreso
+                                  // todavía no exista -- se avisa acá, igual que en
+                                  // PasoRutaVehiculo.jsx (web).
+                                  if (!_loadingRutas &&
+                                      _rutaSeleccionada.isNotEmpty &&
+                                      _rutaSeleccionada['idRutaIda'] ==
+                                          null) ...[
+                                    const SizedBox(height: 10),
+                                    _buildAlert(
+                                      icon: Icons.info_outline,
+                                      color: AppColors.blue,
+                                      bg: AppColors.blueBg,
+                                      text:
+                                          'Este anticipo cubre ida y regreso de la ruta. El conductor solo podrá legalizarlo cuando también termine de entregar los paquetes asignados de regreso.',
+                                    ),
+                                  ],
                                   if (!_loadingRutas &&
                                       _rutas.isNotEmpty &&
                                       _idRuta != null) ...[
                                     const SizedBox(height: 14),
                                     _label('Vehículo / Conductor *'),
                                     const SizedBox(height: 8),
-                                    _paresDeRutaSeleccionada.isEmpty
+                                    _paresDisponibles.isEmpty
                                         ? Text(
-                                            'Esta ruta no tiene vehículo/conductor asignado.',
+                                            _paresDeRutaSeleccionada.isEmpty
+                                                ? 'Esta ruta no tiene vehículo/conductor asignado.'
+                                                : 'Todos los conductores de esta ruta ya tienen un anticipo activo.',
                                             style: TextStyle(
                                               color: AppColors.textSub,
                                               fontSize: 13,
@@ -740,9 +903,7 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                                           )
                                         : _dropdown(
                                             value: _idRutaVehiculoConductor,
-                                            items: _paresDeRutaSeleccionada.map((
-                                              p,
-                                            ) {
+                                            items: _paresDisponibles.map((p) {
                                               final placa =
                                                   (p['vehiculo']
                                                           as Map<
@@ -765,6 +926,26 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                                                   _idRutaVehiculoConductor = v,
                                             ),
                                           ),
+                                    // "Este vehículo no tiene paquetes asignados en esta ruta"
+                                    // -- igual que mostrarAdvertencia en PasoRutaVehiculo.jsx
+                                    // (web): no bloquea, solo pide confirmar a propósito.
+                                    if (!_cargandoPaquetesPorPar &&
+                                        _idRutaVehiculoConductor != null &&
+                                        (_paquetesPorPar[int.tryParse(
+                                                      _idRutaVehiculoConductor!,
+                                                    ) ??
+                                                    -1] ??
+                                                0) ==
+                                            0) ...[
+                                      const SizedBox(height: 10),
+                                      _buildAlert(
+                                        icon: Icons.warning_amber_outlined,
+                                        color: AppColors.orange,
+                                        bg: AppColors.orangeBg,
+                                        text:
+                                            'Este vehículo no tiene paquetes asignados en esta ruta — el anticipo se registrará igual, solo confírmalo a propósito.',
+                                      ),
+                                    ],
                                   ],
                                 ],
                               ),
@@ -1024,6 +1205,36 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                                 _label('Fecha de entrega'),
                                 const SizedBox(height: 8),
                                 _dateField(readonly: !_isNew && !_entregado),
+                                if ((_isNew || _entregado) &&
+                                    _fechaEntregaError != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      top: 6,
+                                      left: 4,
+                                    ),
+                                    child: Text(
+                                      _fechaEntregaError!,
+                                      style: TextStyle(
+                                        color: AppColors.red,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  )
+                                else if ((_isNew || _entregado) &&
+                                    _fechaSalidaRuta != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      top: 6,
+                                      left: 4,
+                                    ),
+                                    child: Text(
+                                      'Hasta el ${formatFecha(_isoDate(_fechaSalidaRuta!))} (salida de la ruta)',
+                                      style: TextStyle(
+                                        color: AppColors.textSub,
+                                        fontSize: 11,
+                                      ),
+                                    ),
+                                  ),
                                 if (!_isNew && _enLegalizacion) ...[
                                   const SizedBox(height: 14),
                                   _label('Fecha de legalización'),
@@ -1355,6 +1566,35 @@ class _AnticipoEditState extends State<AnticipoEdit> {
     );
   }
 
+  // Mismo patrón que los <Alert severity="..."> de MUI (PasoRutaVehiculo.jsx,
+  // web) -- fondo suave del color de la severidad, ícono + texto del mismo
+  // color, esquinas redondeadas.
+  Widget _buildAlert({
+    required IconData icon,
+    required Color color,
+    required Color bg,
+    required String text,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(text, style: TextStyle(color: color, fontSize: 12.5)),
+          ),
+        ],
+      ),
+    );
+  }
+
   // Mismo patrón que los campos del login: borde delgado + halo (boxShadow)
   // al enfocar. Cuando es de solo lectura, canRequestFocus se apaga para que
   // ni siquiera se pueda "entrar" al campo con el click — antes se podía
@@ -1450,6 +1690,7 @@ class _AnticipoEditState extends State<AnticipoEdit> {
   }
 
   Widget _dateField({bool readonly = false}) {
+    final hasError = !readonly && _fechaEntregaError != null;
     return TapArea(
       onTap: readonly ? null : _pickFecha,
       child: Container(
@@ -1459,13 +1700,15 @@ class _AnticipoEditState extends State<AnticipoEdit> {
               ? AppColors.border.withValues(alpha: 0.25)
               : AppColors.bgGray,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(
+            color: hasError ? AppColors.red : AppColors.border,
+          ),
         ),
         child: Row(
           children: [
             Icon(
               Icons.calendar_today_outlined,
-              color: AppColors.textSub,
+              color: hasError ? AppColors.red : AppColors.textSub,
               size: 18,
             ),
             const SizedBox(width: 10),

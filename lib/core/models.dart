@@ -318,12 +318,19 @@ class EstadoAnticipo {
   static const enLegalizacion = 'En Legalización';
   static const excedentePendiente = 'Excedente pendiente';
   static const completado = 'Completado';
+  // "Cerrar sin haberse entregado" (solo admin, ver ModalInhabilitarAnticipo.jsx
+  // en el frontend web): el conductor nunca recibió esta plata -- distinto de
+  // "Completado" (se entregó, gastó y se conciliaron cuentas). Se llega acá
+  // inhabilitando un anticipo que sigue Entregado/En Legalización, con un
+  // motivo obligatorio.
+  static const cerradoSinEntregar = 'Cerrado sin entregar';
 
   static const todos = [
     entregado,
     enLegalizacion,
     excedentePendiente,
     completado,
+    cerradoSinEntregar,
   ];
 
   // NO es un estado real de la BD -- "Excedente pendiente" cubre tanto el
@@ -355,11 +362,25 @@ class Anticipo {
   final String? nombreRuta;
   final String? destinoTexto;
   // Estado de la ruta y su avance por sedes — solo vienen en GET
-  // /conductores/mis-anticipos y solo cuando la ruta está "En Ruta". El móvil
-  // los usa para el candado de legalización (ver `sedesPendientes`).
+  // /conductores/mis-anticipos. El móvil los usa para el candado de
+  // legalización (ver `sedesPendientes`). Anticipo ida+retorno (2026-09-13,
+  // ver LOGICA.md): con la ruta ya "Completada", `sedesTotales`/
+  // `sedesCompletadas` pasan a describir el REGRESO (no la ida) —
+  // `sedesDelRegreso` distingue ese caso para poder avisarlo con un texto
+  // distinto; `esperandoRegreso` es el caso más temprano, cuando ni siquiera
+  // se ha programado el regreso todavía.
   final String? rutaEstado;
   final int? sedesTotales;
   final int? sedesCompletadas;
+  final bool sedesDelRegreso;
+  final bool esperandoRegreso;
+  // Huérfano (ver LOGICA.md, "Anticipos huérfanos al reasignar conductor"): el
+  // conductor de este anticipo ya no es par activo de su ruta -- se calcula en
+  // el backend (anticipoService.js) y viaja tal cual, no se deriva acá.
+  final bool esHuerfano;
+  // Motivo declarado al inhabilitar un anticipo que nunca se llegó a entregar
+  // (estado pasa a "Cerrado sin entregar") -- null en cualquier otro caso.
+  final String? motivoCierre;
 
   const Anticipo({
     required this.id,
@@ -380,17 +401,25 @@ class Anticipo {
     this.rutaEstado,
     this.sedesTotales,
     this.sedesCompletadas,
+    this.sedesDelRegreso = false,
+    this.esperandoRegreso = false,
+    this.esHuerfano = false,
+    this.motivoCierre,
   });
 
-  Anticipo copyWith({List<String>? soporte}) => Anticipo(
+  Anticipo copyWith({
+    List<String>? soporte,
+    String? estado,
+    bool? habilitado,
+  }) => Anticipo(
     id: id,
     idConductor: idConductor,
     idRuta: idRuta,
     valorAnticipo: valorAnticipo,
     valorGastado: valorGastado,
     excedente: excedente,
-    estado: estado,
-    habilitado: habilitado,
+    estado: estado ?? this.estado,
+    habilitado: habilitado ?? this.habilitado,
     soporte: soporte ?? this.soporte,
     fechaEntrega: fechaEntrega,
     fechaLegalizacion: fechaLegalizacion,
@@ -401,6 +430,10 @@ class Anticipo {
     rutaEstado: rutaEstado,
     sedesTotales: sedesTotales,
     sedesCompletadas: sedesCompletadas,
+    sedesDelRegreso: sedesDelRegreso,
+    esperandoRegreso: esperandoRegreso,
+    esHuerfano: esHuerfano,
+    motivoCierre: motivoCierre,
   );
 
   // Forma real de una fila devuelta por GET /api/anticipos, GET /api/anticipos/:id
@@ -458,6 +491,10 @@ class Anticipo {
       sedesCompletadas: rutaJson?['sedesCompletadas'] is num
           ? (rutaJson!['sedesCompletadas'] as num).toInt()
           : null,
+      sedesDelRegreso: rutaJson?['sedesDelRegreso'] == true,
+      esperandoRegreso: rutaJson?['esperandoRegreso'] == true,
+      esHuerfano: json['esHuerfano'] == true,
+      motivoCierre: json['motivoCierre']?.toString(),
     );
   }
 
@@ -480,14 +517,20 @@ class Anticipo {
   // dejar TODOS los paquetes en las sedes de la ruta (no puede reunir los
   // soportes del viaje antes de llegar al destino final). El backend
   // (anticipoService.update) rechaza igual con errorCode 'SEDES_INCOMPLETAS'.
+  // Ya no se filtra por `rutaEstado == 'En Ruta'` -- desde el anticipo
+  // ida+retorno (2026-09-13) el backend también manda `sedesTotales`/
+  // `sedesCompletadas` con la ida ya "Completada" (describiendo el REGRESO en
+  // ese caso, ver `sedesDelRegreso`); que el campo venga presente es de por sí
+  // la señal de que hay algo que completar.
   bool get sedesPendientes =>
-      rutaEstado == 'En Ruta' &&
       sedesTotales != null &&
       sedesTotales! > 0 &&
       (sedesCompletadas ?? 0) < sedesTotales!;
 
   bool get puedeLegalizar =>
-      estado == EstadoAnticipo.enLegalizacion && !sedesPendientes;
+      estado == EstadoAnticipo.enLegalizacion &&
+      !esperandoRegreso &&
+      !sedesPendientes;
 }
 
 // 'YYYY-MM-DD' (como llegan los campos DATEONLY del backend) -> 'DD/MM/YYYY'.
@@ -511,6 +554,11 @@ String formatCOP(double value) {
 
 // Misma paleta de estado que usa el frontend web (getAnticipoEstadoDot en
 // shared/utils/estadoColors.js), sobre los tokens ya existentes en AppColors.
+// Mismo tono stone-gray que getAnticipoEstadoDot('Cerrado sin entregar') en
+// estadoColors.js (web, #78716C) -- ningún token de AppColors coincide, así
+// que se declara literal como el resto de colores de un solo uso del proyecto.
+const Color _cerradoSinEntregarColor = Color(0xFF78716C);
+
 Color estadoColor(String estado) {
   switch (estado) {
     case EstadoAnticipo.entregado:
@@ -521,6 +569,8 @@ Color estadoColor(String estado) {
       return AppColors.orange;
     case EstadoAnticipo.completado:
       return AppColors.green;
+    case EstadoAnticipo.cerradoSinEntregar:
+      return _cerradoSinEntregarColor;
     default:
       return AppColors.textSub;
   }
@@ -536,6 +586,8 @@ Color estadoBg(String estado) {
       return AppColors.orangeBg;
     case EstadoAnticipo.completado:
       return AppColors.greenBg;
+    case EstadoAnticipo.cerradoSinEntregar:
+      return _cerradoSinEntregarColor.withValues(alpha: 0.13);
     default:
       return AppColors.bgGray;
   }

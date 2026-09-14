@@ -55,7 +55,10 @@ class _AdminHomeState extends State<AdminHome> {
     EstadoAnticipo.enLegalizacion,
     EstadoAnticipo.excedentePendiente,
   ];
-  static const _estadosCompletados = [EstadoAnticipo.completado];
+  static const _estadosCompletados = [
+    EstadoAnticipo.completado,
+    EstadoAnticipo.cerradoSinEntregar,
+  ];
 
   @override
   void initState() {
@@ -196,6 +199,182 @@ class _AdminHomeState extends State<AdminHome> {
         severity: 'error',
       );
     }
+  }
+
+  static const _motivoCierreMaxLength = 500;
+
+  // Igual que ModalInhabilitarAnticipo.jsx (frontend web): inhabilitar un
+  // anticipo que sigue Entregado/En Legalización (nunca se completó) exige un
+  // motivo obligatorio y lo cierra como "Cerrado sin entregar" en el mismo
+  // golpe; "Excedente pendiente" (hubo plata real de por medio) sigue
+  // bloqueado del todo hasta resolverse por "Confirmar devolución/reposición";
+  // huérfano o ya cerrado/completado se inhabilita directo, sin motivo.
+  Future<void> _toggleHabilitado(Anticipo a) async {
+    final habilitadoActual = a.habilitado;
+    final yaCerrado = [
+      EstadoAnticipo.completado,
+      EstadoAnticipo.cerradoSinEntregar,
+    ].contains(a.estado);
+    final puedeCerrarSinEntregar = [
+      EstadoAnticipo.entregado,
+      EstadoAnticipo.enLegalizacion,
+    ].contains(a.estado);
+    final necesitaMotivo =
+        habilitadoActual &&
+        !yaCerrado &&
+        !a.esHuerfano &&
+        puedeCerrarSinEntregar;
+    final bloqueadoDuro =
+        habilitadoActual &&
+        !yaCerrado &&
+        !a.esHuerfano &&
+        !puedeCerrarSinEntregar;
+    final nombreConductor = a.conductorNombre.isNotEmpty
+        ? a.conductorNombre
+        : 'el conductor';
+
+    if (bloqueadoDuro) {
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: AppColors.cardBg,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Text(
+            'No se puede inhabilitar',
+            style: TextStyle(
+              color: AppColors.textMain,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          content: Text(
+            a.tieneDeficit
+                ? 'Hay un faltante pendiente de reponerle al conductor. Resuélvelo primero con "Confirmar reposición".'
+                : 'El conductor tiene un excedente pendiente de devolución. Resuélvelo primero con "Confirmar devolución".',
+            style: TextStyle(color: AppColors.textSub, fontSize: 14),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Entendido'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    String? motivo;
+    if (necesitaMotivo) {
+      motivo = await _pedirMotivoCierre(nombreConductor);
+      if (motivo == null || !mounted) return;
+    } else {
+      final confirmado = await confirmarDialog(
+        context,
+        titulo: habilitadoActual
+            ? '¿Inhabilitar anticipo?'
+            : '¿Habilitar anticipo?',
+        mensaje: habilitadoActual
+            ? 'El anticipo de $nombreConductor quedará inhabilitado.'
+            : 'El anticipo de $nombreConductor volverá a estar activo.',
+        textoConfirmar: habilitadoActual ? 'Inhabilitar' : 'Habilitar',
+        colorConfirmar: habilitadoActual ? AppColors.red : AppColors.green,
+      );
+      if (!confirmado || !mounted) return;
+    }
+
+    final result = await _anticipoService.toggleHabilitado(
+      a.id,
+      motivo: motivo,
+    );
+    if (!mounted) return;
+
+    if (result['success'] == true) {
+      setState(() {
+        final idx = _anticipos.indexWhere((x) => x.id == a.id);
+        if (idx != -1) _anticipos[idx] = result['anticipo'] as Anticipo;
+      });
+      showAppSnackBar(
+        context,
+        habilitadoActual ? 'Anticipo inhabilitado' : 'Anticipo habilitado',
+      );
+    } else {
+      showAppSnackBar(
+        context,
+        result['message'] ?? 'Error al cambiar el estado del anticipo',
+        severity: 'error',
+      );
+    }
+  }
+
+  // Mismo campo "Motivo" (multilinea, obligatorio, tope 500) que
+  // ModalInhabilitarAnticipo.jsx (web) para el caso "necesitaMotivo". Devuelve
+  // el motivo ya recortado, o null si se canceló.
+  Future<String?> _pedirMotivoCierre(String nombreConductor) {
+    final ctrl = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          final motivoValido = ctrl.text.trim().isNotEmpty;
+          return AlertDialog(
+            backgroundColor: AppColors.cardBg,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: Text(
+              '¿Inhabilitar anticipo?',
+              style: TextStyle(
+                color: AppColors.textMain,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Este anticipo no ha sido completado. Para inhabilitarlo, confirma '
+                  'que $nombreConductor nunca recibió esta plata.',
+                  style: TextStyle(color: AppColors.textSub, fontSize: 13),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: ctrl,
+                  autofocus: true,
+                  maxLines: 3,
+                  maxLength: _motivoCierreMaxLength,
+                  onChanged: (_) => setDialogState(() {}),
+                  decoration: InputDecoration(
+                    labelText: 'Motivo',
+                    hintText:
+                        'Ej: se registró por error, el conductor nunca '
+                        'recibió el efectivo',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancelar'),
+              ),
+              FilledButton(
+                onPressed: motivoValido
+                    ? () => Navigator.pop(ctx, ctrl.text.trim())
+                    : null,
+                style: FilledButton.styleFrom(backgroundColor: AppColors.red),
+                child: const Text('Inhabilitar'),
+              ),
+            ],
+          );
+        },
+      ),
+    ).whenComplete(ctrl.dispose);
   }
 
   @override
@@ -466,11 +645,11 @@ class _AdminHomeState extends State<AdminHome> {
                                               _reemplazar(updated);
                                           }
                                         : null,
-                                    // Mismos 3 mensajes que useAnticipoColumns.jsx
+                                    // Mismos 4 mensajes que useAnticipoColumns.jsx
                                     // (web) -- el admin solo edita en "Entregado"
                                     // (esEditable); de ahí en adelante nunca vuelve
-                                    // a poder por esta vía, así que ninguno de los
-                                    // 3 dice "aún"/"todavía".
+                                    // a poder por esta vía, así que ninguno dice
+                                    // "aún"/"todavía".
                                     editDisabledReason: a.esEditable
                                         ? null
                                         : a.estado ==
@@ -479,9 +658,14 @@ class _AdminHomeState extends State<AdminHome> {
                                         : a.estado ==
                                               EstadoAnticipo.excedentePendiente
                                         ? 'Este anticipo ya está legalizado: no se puede editar'
+                                        : a.estado ==
+                                              EstadoAnticipo.cerradoSinEntregar
+                                        ? 'Este anticipo ya fue cerrado: no se puede editar'
                                         : 'Este anticipo ya está completado: no se puede editar',
                                     onConfirmarDevolucion: () =>
                                         _confirmarDevolucion(a),
+                                    onToggleHabilitado: () =>
+                                        _toggleHabilitado(a),
                                   ),
                                 ),
                               if (_hayMas)
