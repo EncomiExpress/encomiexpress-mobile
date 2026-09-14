@@ -23,13 +23,13 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _emailCtrl = TextEditingController();
-  final _passCtrl  = TextEditingController();
+  final _passCtrl = TextEditingController();
   final _emailFocus = FocusNode();
-  final _passFocus  = FocusNode();
+  final _passFocus = FocusNode();
   final _authService = AuthService();
 
-  bool _obscure  = true;
-  bool _loading  = false;
+  bool _obscure = true;
+  bool _loading = false;
   String? _error;
   // Como en Login.jsx (frontend web): nada se valida hasta el primer submit.
   // Después, cada error se limpia solo cuando el usuario vuelve a escribir
@@ -83,7 +83,10 @@ class _LoginScreenState extends State<LoginScreen> {
       });
       return;
     }
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
 
     final result = await _authService.login(
       _emailCtrl.text.trim(),
@@ -113,11 +116,18 @@ class _LoginScreenState extends State<LoginScreen> {
       final user = UserModel(
         id: usuario['idUsuario']?.toString() ?? '',
         nombre: usuario['nombre'] ?? '',
+        // El login del backend (authService.js) ya manda apellido/documento
+        // completos -- antes se descartaban acá, así que Admin y Distribuidor
+        // (que nunca vuelven a pedir el perfil, a diferencia del conductor)
+        // se quedaban sin esos datos toda la sesión.
+        apellido: usuario['apellido'],
         // El backend no devuelve el email en el login — se conserva el que se tipeó.
         email: _emailCtrl.text.trim(),
         telefono: usuario['telefono'] ?? '',
         rol: usuario['rol'] ?? '',
         conductorId: conductor?['idConductor']?.toString(),
+        documento: usuario['numeroIdentificacion']?.toString(),
+        tipoDocumento: usuario['tipoIdentificacion'],
         sedes: sedes ?? const [],
       );
 
@@ -134,12 +144,26 @@ class _LoginScreenState extends State<LoginScreen> {
         dest = DriverHome(user: user);
       } else if (rol == 'distribuidor') {
         dest = DistribuidorHome(user: user);
-      } else {
+      } else if (rol == 'admin') {
         dest = AdminHome(user: user);
+      } else {
+        // Rol sin pantalla propia en la app móvil (ej. operador_sede, que en
+        // la web tiene un panel recortado sin Dashboard/Anticipos) -- antes
+        // cualquier rol que no fuera conductor/distribuidor caía en
+        // AdminHome, aunque no tuviera el permiso que esa pantalla necesita
+        // (listar_anticipo) y terminara viendo errores 403 en vez de datos.
+        await _authService.logout();
+        if (!mounted) return;
+        setState(
+          () => _error = 'Esta cuenta no tiene acceso a la aplicación móvil.',
+        );
+        return;
       }
 
-      Navigator.pushReplacement(context,
-          MaterialPageRoute(builder: (_) => dest));
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => dest),
+      );
     } else {
       setState(() {
         _loading = false;
@@ -214,18 +238,29 @@ class _LoginScreenState extends State<LoginScreen> {
                             SizedBox(
                               width: 130,
                               height: 80,
-                              child: Image.asset('assets/images/logo.png', fit: BoxFit.contain),
+                              child: Image.asset(
+                                'assets/images/logo.png',
+                                fit: BoxFit.contain,
+                              ),
                             ),
                             const SizedBox(height: 12),
-                            Text('Bienvenido',
-                                style: TextStyle(
-                                    color: AppColors.textMain,
-                                    fontSize: 26,
-                                    fontWeight: FontWeight.w800,
-                                    fontFamily: 'Cambria')),
+                            Text(
+                              'Bienvenido',
+                              style: TextStyle(
+                                color: AppColors.textMain,
+                                fontSize: 26,
+                                fontWeight: FontWeight.w800,
+                                fontFamily: 'Cambria',
+                              ),
+                            ),
                             const SizedBox(height: 4),
-                            Text('Ingresa tus credenciales para acceder',
-                                style: TextStyle(color: AppColors.textSub, fontSize: 13)),
+                            Text(
+                              'Ingresa tus credenciales para acceder',
+                              style: TextStyle(
+                                color: AppColors.textSub,
+                                fontSize: 13,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -248,119 +283,181 @@ class _LoginScreenState extends State<LoginScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                    // Campos + botón, sin tarjeta/borde alrededor — directo
-                    // sobre el fondo de la página (solo limitado en ancho
-                    // para que no quede pegado de lado a lado en desktop).
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 420),
-                      child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              _field(
-                                controller: _emailCtrl,
-                                focusNode: _emailFocus,
-                                label: 'Correo electrónico *',
-                                hint: 'correo@ejemplo.com',
-                                icon: Icons.mail_outline_rounded,
-                                keyboard: TextInputType.emailAddress,
-                                errorText: _emailError,
+                      // Campos + botón, sin tarjeta/borde alrededor — directo
+                      // sobre el fondo de la página (solo limitado en ancho
+                      // para que no quede pegado de lado a lado en desktop).
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 420),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _field(
+                              controller: _emailCtrl,
+                              focusNode: _emailFocus,
+                              label: 'Correo electrónico *',
+                              hint: 'correo@ejemplo.com',
+                              icon: Icons.mail_outline_rounded,
+                              keyboard: TextInputType.emailAddress,
+                              errorText: _emailError,
+                            ),
+                            const SizedBox(height: 16),
+                            _field(
+                              controller: _passCtrl,
+                              focusNode: _passFocus,
+                              label: 'Contraseña *',
+                              icon: Icons.lock_outline_rounded,
+                              obscure: _obscure,
+                              suffix: IconButton(
+                                icon: Icon(
+                                  _obscure
+                                      ? Icons.visibility_outlined
+                                      : Icons.visibility_off_outlined,
+                                  color: AppColors.textSub,
+                                  size: 20,
+                                ),
+                                onPressed: () =>
+                                    setState(() => _obscure = !_obscure),
                               ),
+                              errorText: _passwordError,
+                            ),
+                            if (_error != null) ...[
                               const SizedBox(height: 16),
-                              _field(
-                                controller: _passCtrl,
-                                focusNode: _passFocus,
-                                label: 'Contraseña *',
-                                icon: Icons.lock_outline_rounded,
-                                obscure: _obscure,
-                                suffix: IconButton(
-                                  icon: Icon(
-                                      _obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                                      color: AppColors.textSub, size: 20),
-                                  onPressed: () => setState(() => _obscure = !_obscure),
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 10,
                                 ),
-                                errorText: _passwordError,
-                              ),
-                              if (_error != null) ...[
-                                const SizedBox(height: 16),
-                                Container(
-                                  width: double.infinity,
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.redBg,
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Text(_error!, style: TextStyle(color: AppColors.red, fontSize: 13)),
+                                decoration: BoxDecoration(
+                                  color: AppColors.redBg,
+                                  borderRadius: BorderRadius.circular(10),
                                 ),
-                              ],
-                              const SizedBox(height: 12),
-                              Align(
-                                alignment: Alignment.centerRight,
-                                child: TextButton(
-                                  onPressed: () {
-                                    showDialog(
-                                      context: context,
-                                      builder: (_) => const RecoverPasswordScreen(),
-                                    );
-                                  },
-                                  style: TextButton.styleFrom(
-                                    padding: EdgeInsets.zero,
-                                    minimumSize: Size.zero,
-                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                child: Text(
+                                  _error!,
+                                  style: TextStyle(
+                                    color: AppColors.red,
+                                    fontSize: 13,
                                   ),
-                                  child: Text('¿Olvidaste tu contraseña?',
-                                      style: TextStyle(color: AppColors.adminPrimary, fontWeight: FontWeight.w600, fontSize: 13)),
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              SizedBox(
-                                height: 50,
-                                child: ElevatedButton(
-                                  onPressed: _loading ? null : _login,
-                                  style: ButtonStyle(
-                                    shape: WidgetStateProperty.all(
-                                        RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                                    // Fondo más oscuro al pasar el mouse o al presionar —
-                                    // igual que '&:hover' en el botón de Login.jsx (frontend web).
-                                    backgroundColor: WidgetStateProperty.resolveWith((states) {
-                                      if (states.contains(WidgetState.disabled)) {
-                                        return AppColors.adminPrimary.withValues(alpha: 0.6);
-                                      }
-                                      if (states.contains(WidgetState.hovered) || states.contains(WidgetState.pressed)) {
-                                        return AppColors.adminGradEnd;
-                                      }
-                                      return AppColors.adminPrimary;
-                                    }),
-                                    elevation: WidgetStateProperty.resolveWith((states) =>
-                                        states.contains(WidgetState.hovered) || states.contains(WidgetState.pressed) ? 6 : 3),
-                                    shadowColor: WidgetStateProperty.all(AppColors.adminPrimary.withValues(alpha: 0.4)),
-                                    mouseCursor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.disabled)
-                                        ? SystemMouseCursors.basic
-                                        : SystemMouseCursors.click),
-                                  ),
-                                  child: _loading
-                                      ? const SizedBox(
-                                          height: 20, width: 20,
-                                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
-                                      : const Row(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            Text('Iniciar Sesión',
-                                                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
-                                            SizedBox(width: 8),
-                                            Icon(Icons.login_rounded, color: Colors.white, size: 20),
-                                          ],
-                                        ),
                                 ),
                               ),
                             ],
-                          ),
-                    ),
-                  ],
+                            const SizedBox(height: 12),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
+                                onPressed: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (_) =>
+                                        const RecoverPasswordScreen(),
+                                  );
+                                },
+                                style: TextButton.styleFrom(
+                                  padding: EdgeInsets.zero,
+                                  minimumSize: Size.zero,
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                child: Text(
+                                  '¿Olvidaste tu contraseña?',
+                                  style: TextStyle(
+                                    color: AppColors.adminPrimary,
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              height: 50,
+                              child: ElevatedButton(
+                                onPressed: _loading ? null : _login,
+                                style: ButtonStyle(
+                                  shape: WidgetStateProperty.all(
+                                    RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  // Fondo más oscuro al pasar el mouse o al presionar —
+                                  // igual que '&:hover' en el botón de Login.jsx (frontend web).
+                                  backgroundColor:
+                                      WidgetStateProperty.resolveWith((states) {
+                                        if (states.contains(
+                                          WidgetState.disabled,
+                                        )) {
+                                          return AppColors.adminPrimary
+                                              .withValues(alpha: 0.6);
+                                        }
+                                        if (states.contains(
+                                              WidgetState.hovered,
+                                            ) ||
+                                            states.contains(
+                                              WidgetState.pressed,
+                                            )) {
+                                          return AppColors.adminGradEnd;
+                                        }
+                                        return AppColors.adminPrimary;
+                                      }),
+                                  elevation: WidgetStateProperty.resolveWith(
+                                    (states) =>
+                                        states.contains(WidgetState.hovered) ||
+                                            states.contains(WidgetState.pressed)
+                                        ? 6
+                                        : 3,
+                                  ),
+                                  shadowColor: WidgetStateProperty.all(
+                                    AppColors.adminPrimary.withValues(
+                                      alpha: 0.4,
+                                    ),
+                                  ),
+                                  mouseCursor: WidgetStateProperty.resolveWith(
+                                    (states) =>
+                                        states.contains(WidgetState.disabled)
+                                        ? SystemMouseCursors.basic
+                                        : SystemMouseCursors.click,
+                                  ),
+                                ),
+                                child: _loading
+                                    ? const SizedBox(
+                                        height: 20,
+                                        width: 20,
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                          strokeWidth: 2.5,
+                                        ),
+                                      )
+                                    : const Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            'Iniciar Sesión',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                          SizedBox(width: 8),
+                                          Icon(
+                                            Icons.login_rounded,
+                                            color: Colors.white,
+                                            size: 20,
+                                          ),
+                                        ],
+                                      ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
           ),
-        ),
         ],
       ),
     );
@@ -424,14 +521,26 @@ class _LoginScreenState extends State<LoginScreen> {
               labelStyle: TextStyle(color: AppColors.textSub, fontSize: 13),
               // Gris normalmente, rojo si hay error, del color primario solo
               // cuando el campo tiene foco — igual que MUI (Mui-focused).
-              floatingLabelStyle: WidgetStateTextStyle.resolveWith((states) => TextStyle(
+              floatingLabelStyle: WidgetStateTextStyle.resolveWith(
+                (states) => TextStyle(
                   color: hasError
                       ? AppColors.red
-                      : (states.contains(WidgetState.focused) ? AppColors.adminPrimary : AppColors.textSub),
-                  fontSize: 13)),
-              prefixIcon: Icon(icon, color: hasError ? AppColors.red : AppColors.textSub, size: 20),
+                      : (states.contains(WidgetState.focused)
+                            ? AppColors.adminPrimary
+                            : AppColors.textSub),
+                  fontSize: 13,
+                ),
+              ),
+              prefixIcon: Icon(
+                icon,
+                color: hasError ? AppColors.red : AppColors.textSub,
+                size: 20,
+              ),
               suffixIcon: suffix,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 16,
+              ),
               // No se usa errorBorder/errorText de Flutter a propósito — esos
               // agregan el texto de error DENTRO del mismo widget del campo,
               // que es justo lo que hacía que el halo se estirara hasta el
@@ -447,7 +556,9 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
-                borderSide: BorderSide(color: hasError ? AppColors.red : AppColors.adminPrimary),
+                borderSide: BorderSide(
+                  color: hasError ? AppColors.red : AppColors.adminPrimary,
+                ),
               ),
             ),
           ),
@@ -455,7 +566,10 @@ class _LoginScreenState extends State<LoginScreen> {
         if (hasError)
           Padding(
             padding: const EdgeInsets.only(top: 6, left: 12),
-            child: Text(errorText, style: TextStyle(color: AppColors.red, fontSize: 11)),
+            child: Text(
+              errorText,
+              style: TextStyle(color: AppColors.red, fontSize: 11),
+            ),
           ),
       ],
     );
