@@ -18,8 +18,11 @@ final _emailRegex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
 // puede ir al principio, al final ni dos seguidos (se chequea aparte). Mismo criterio que
 // validarUsuarioCorreo en el frontend web (shared/validations/emailValidation.js).
 final _emailUsuarioRegex = RegExp(r'^[a-zA-Z0-9.]+$');
-final _passwordRegex = RegExp(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9\s]).{8,64}$');
-const _passwordHelp = '8-64 caracteres, con mayúsculas, minúsculas, números y un carácter especial';
+final _passwordRegex = RegExp(
+  r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z0-9\s]).{8,64}$',
+);
+const _passwordHelp =
+    '8-64 caracteres, con mayúsculas, minúsculas, números y un carácter especial';
 
 // Filtro en vivo del campo de correo: quita lo que no está permitido (letras, números,
 // punto, @ y guion) e impide teclear un punto al inicio de la parte anterior al @ o dos
@@ -28,7 +31,10 @@ const _passwordHelp = '8-64 caracteres, con mayúsculas, minúsculas, números y
 // (shared/validations/emailValidation.js).
 class _CorreoInputFormatter extends TextInputFormatter {
   @override
-  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
     final text = newValue.text.replaceAll(RegExp(r'[^a-zA-Z0-9.@-]'), '');
     final at = text.indexOf('@');
     final usuario = (at == -1 ? text : text.substring(0, at))
@@ -37,8 +43,14 @@ class _CorreoInputFormatter extends TextInputFormatter {
     final result = usuario + (at == -1 ? '' : text.substring(at));
     if (result == newValue.text) return newValue;
     final removed = newValue.text.length - result.length;
-    final offset = (newValue.selection.baseOffset - removed).clamp(0, result.length);
-    return TextEditingValue(text: result, selection: TextSelection.collapsed(offset: offset));
+    final offset = (newValue.selection.baseOffset - removed).clamp(
+      0,
+      result.length,
+    );
+    return TextEditingValue(
+      text: result,
+      selection: TextSelection.collapsed(offset: offset),
+    );
   }
 }
 
@@ -46,7 +58,11 @@ class DriverProfileEdit extends StatefulWidget {
   final UserModel user;
   final Function(UserModel) onSave;
 
-  const DriverProfileEdit({super.key, required this.user, required this.onSave});
+  const DriverProfileEdit({
+    super.key,
+    required this.user,
+    required this.onSave,
+  });
 
   @override
   State<DriverProfileEdit> createState() => _DriverProfileEditState();
@@ -85,7 +101,15 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
   bool _showPasswordNueva = false;
   bool _showConfirmarPassword = false;
 
-  bool get _esDocAlfanumerico => const ['CE', 'PAS'].contains(widget.user.tipoDocumento);
+  bool get _esDocAlfanumerico =>
+      const ['CE', 'PAS'].contains(widget.user.tipoDocumento);
+
+  // CC 7-10 dígitos, PPT 6-10 -- mismo REGLAS_DOC de commonRules.js (backend) /
+  // documento.js (frontend web). Antes esta pantalla exigía un mínimo fijo de 3
+  // para cualquier tipo numérico, más laxo que la regla real: un CC de 3-6
+  // dígitos pasaba la validación del cliente y el backend lo rechazaba igual,
+  // sin que el conductor viera el motivo en el campo.
+  int get _docMinDigitos => widget.user.tipoDocumento == 'PPT' ? 6 : 7;
 
   @override
   void initState() {
@@ -104,12 +128,28 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
       'email': _emailCtrl.text.trim(),
     };
 
-    for (final c in [_nombreCtrl, _apellidoCtrl, _documentoCtrl, _telefonoCtrl, _emailCtrl,
-        _passwordActualCtrl, _passwordNuevaCtrl, _confirmarPasswordCtrl]) {
+    for (final c in [
+      _nombreCtrl,
+      _apellidoCtrl,
+      _documentoCtrl,
+      _telefonoCtrl,
+      _emailCtrl,
+      _passwordActualCtrl,
+      _passwordNuevaCtrl,
+      _confirmarPasswordCtrl,
+    ]) {
       c.addListener(_onAnyChange);
     }
-    for (final f in [_nombreFocus, _apellidoFocus, _documentoFocus, _telefonoFocus, _emailFocus,
-        _passwordActualFocus, _passwordNuevaFocus, _confirmarPasswordFocus]) {
+    for (final f in [
+      _nombreFocus,
+      _apellidoFocus,
+      _documentoFocus,
+      _telefonoFocus,
+      _emailFocus,
+      _passwordActualFocus,
+      _passwordNuevaFocus,
+      _confirmarPasswordFocus,
+    ]) {
       f.addListener(() => setState(() {}));
     }
   }
@@ -146,7 +186,7 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
 
   String get _docHelper => _esDocAlfanumerico
       ? 'Alfanumérico, hasta 12 caracteres'
-      : 'Solo dígitos, entre 3 y 10';
+      : 'Solo dígitos, entre $_docMinDigitos y 10';
 
   Map<String, String> _validarPaso(int step) {
     final e = <String, String>{};
@@ -171,21 +211,22 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
         }
       } else if (!RegExp(r'^\d+$').hasMatch(doc)) {
         e['documento'] = 'Solo se permiten dígitos';
-      } else if (doc.length < 3 || doc.length > 10) {
-        e['documento'] = 'Debe tener entre 3 y 10 dígitos';
+      } else if (doc.length < _docMinDigitos || doc.length > 10) {
+        e['documento'] = 'Debe tener entre $_docMinDigitos y 10 dígitos';
       }
       final tel = _telefonoCtrl.text.trim();
       if (tel.isEmpty) {
         e['telefono'] = 'El teléfono es obligatorio';
-      } else if (!RegExp(r'^\d{10}$').hasMatch(tel)) {
-        e['telefono'] = 'El teléfono debe tener 10 dígitos';
+      } else if (!RegExp(r'^3\d{9}$').hasMatch(tel)) {
+        e['telefono'] = 'El teléfono debe tener 10 dígitos y empezar por 3';
       }
       final email = _emailCtrl.text.trim();
       final usuarioCorreo = email.split('@')[0];
       if (email.isEmpty) {
         e['email'] = 'El correo es obligatorio';
       } else if (usuarioCorreo.startsWith('.') || usuarioCorreo.endsWith('.')) {
-        e['email'] = 'Antes del @, el punto no puede ir al principio ni al final';
+        e['email'] =
+            'Antes del @, el punto no puede ir al principio ni al final';
       } else if (usuarioCorreo.contains('..')) {
         e['email'] = 'Antes del @ no puede haber dos puntos seguidos';
       } else if (!_emailUsuarioRegex.hasMatch(usuarioCorreo)) {
@@ -199,9 +240,11 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
       final actual = _passwordActualCtrl.text;
       final nueva = _passwordNuevaCtrl.text;
       final confirmar = _confirmarPasswordCtrl.text;
-      final algunaLlena = actual.isNotEmpty || nueva.isNotEmpty || confirmar.isNotEmpty;
+      final algunaLlena =
+          actual.isNotEmpty || nueva.isNotEmpty || confirmar.isNotEmpty;
       if (algunaLlena) {
-        if (actual.isEmpty) e['passwordActual'] = 'Ingresa tu contraseña actual';
+        if (actual.isEmpty)
+          e['passwordActual'] = 'Ingresa tu contraseña actual';
         if (nueva.isEmpty) {
           e['passwordNueva'] = 'La nueva contraseña es obligatoria';
         } else if (!_passwordRegex.hasMatch(nueva)) {
@@ -219,7 +262,8 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
   }
 
   bool get _hayCambios {
-    final cambiosSimples = _nombreCtrl.text.trim() != _original['nombre'] ||
+    final cambiosSimples =
+        _nombreCtrl.text.trim() != _original['nombre'] ||
         _apellidoCtrl.text.trim() != _original['apellido'] ||
         _documentoCtrl.text.trim() != _original['documento'] ||
         _telefonoCtrl.text.trim() != _original['telefono'] ||
@@ -288,7 +332,9 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
       if (passResult['success'] != true) {
         setState(() {
           _submitting = false;
-          _apiError = passResult['message'] ?? 'El perfil se actualizó, pero no se pudo cambiar la contraseña';
+          _apiError =
+              passResult['message'] ??
+              'El perfil se actualizó, pero no se pudo cambiar la contraseña';
         });
         return;
       }
@@ -329,12 +375,21 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
                 children: [
                   TapArea(
                     onTap: () => Navigator.pop(context),
-                    child: Icon(Icons.arrow_back, color: AppColors.textMain, size: 22),
+                    child: Icon(
+                      Icons.arrow_back,
+                      color: AppColors.textMain,
+                      size: 22,
+                    ),
                   ),
                   const SizedBox(width: 12),
-                  Text('Editar perfil',
-                      style: TextStyle(
-                          color: AppColors.textMain, fontSize: 18, fontWeight: FontWeight.w700)),
+                  Text(
+                    'Editar perfil',
+                    style: TextStyle(
+                      color: AppColors.textMain,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -343,9 +398,16 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
               child: Container(
                 width: 76,
                 height: 76,
-                decoration: BoxDecoration(color: AppColors.activeBg, shape: BoxShape.circle),
+                decoration: BoxDecoration(
+                  color: AppColors.activeBg,
+                  shape: BoxShape.circle,
+                ),
                 alignment: Alignment.center,
-                child: Icon(Icons.manage_accounts_outlined, color: AppColors.driverPrimary, size: 40),
+                child: Icon(
+                  Icons.manage_accounts_outlined,
+                  color: AppColors.driverPrimary,
+                  size: 40,
+                ),
               ),
             ),
             Padding(
@@ -371,56 +433,89 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
                       onPressed: _submitting ? null : _handleBack,
                       icon: const Icon(Icons.arrow_back, size: 16),
                       label: const Text('Anterior'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.textMain,
-                        side: BorderSide(color: AppColors.border),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ).copyWith(
-                        mouseCursor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.disabled)
-                            ? SystemMouseCursors.basic
-                            : SystemMouseCursors.click),
-                      ),
+                      style:
+                          OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.textMain,
+                            side: BorderSide(color: AppColors.border),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ).copyWith(
+                            mouseCursor: WidgetStateProperty.resolveWith(
+                              (states) => states.contains(WidgetState.disabled)
+                                  ? SystemMouseCursors.basic
+                                  : SystemMouseCursors.click,
+                            ),
+                          ),
                     )
                   else
                     TextButton(
-                      onPressed: _submitting ? null : () => Navigator.pop(context),
+                      onPressed: _submitting
+                          ? null
+                          : () => Navigator.pop(context),
                       style: TextButton.styleFrom().copyWith(
-                        mouseCursor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.disabled)
-                            ? SystemMouseCursors.basic
-                            : SystemMouseCursors.click),
+                        mouseCursor: WidgetStateProperty.resolveWith(
+                          (states) => states.contains(WidgetState.disabled)
+                              ? SystemMouseCursors.basic
+                              : SystemMouseCursors.click,
+                        ),
                       ),
-                      child: Text('Cancelar', style: TextStyle(color: AppColors.textSub)),
+                      child: Text(
+                        'Cancelar',
+                        style: TextStyle(color: AppColors.textSub),
+                      ),
                     ),
                   const Spacer(),
                   ElevatedButton(
                     onPressed: _submitting
                         ? null
-                        : (_activeStep < _steps.length - 1 ? _handleNext : _handleSubmit),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.driverPrimary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ).copyWith(
-                      mouseCursor: WidgetStateProperty.resolveWith((states) => states.contains(WidgetState.disabled)
-                          ? SystemMouseCursors.basic
-                          : SystemMouseCursors.click),
-                    ),
+                        : (_activeStep < _steps.length - 1
+                              ? _handleNext
+                              : _handleSubmit),
+                    style:
+                        ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.driverPrimary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 12,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ).copyWith(
+                          mouseCursor: WidgetStateProperty.resolveWith(
+                            (states) => states.contains(WidgetState.disabled)
+                                ? SystemMouseCursors.basic
+                                : SystemMouseCursors.click,
+                          ),
+                        ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(_activeStep < _steps.length - 1
-                            ? 'Siguiente'
-                            : (_sinCambios ? 'Sin cambios' : 'Guardar cambios')),
+                        Text(
+                          _activeStep < _steps.length - 1
+                              ? 'Siguiente'
+                              : (_sinCambios
+                                    ? 'Sin cambios'
+                                    : 'Guardar cambios'),
+                        ),
                         const SizedBox(width: 8),
                         _submitting
                             ? const SizedBox(
                                 width: 16,
                                 height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
                             : Icon(
-                                _activeStep < _steps.length - 1 ? Icons.arrow_forward : Icons.save_outlined,
-                                size: 16),
+                                _activeStep < _steps.length - 1
+                                    ? Icons.arrow_forward
+                                    : Icons.save_outlined,
+                                size: 16,
+                              ),
                       ],
                     ),
                   ),
@@ -442,7 +537,10 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
           return Expanded(
             child: Padding(
               padding: const EdgeInsets.only(top: 14),
-              child: Container(height: 2, color: leftDone ? AppColors.driverPrimary : AppColors.border),
+              child: Container(
+                height: 2,
+                color: leftDone ? AppColors.driverPrimary : AppColors.border,
+              ),
             ),
           );
         }
@@ -457,28 +555,40 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
               height: 28,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: (isActive || isDone) ? AppColors.driverPrimary : Colors.transparent,
+                color: (isActive || isDone)
+                    ? AppColors.driverPrimary
+                    : Colors.transparent,
                 border: Border.all(
-                    color: (isActive || isDone) ? AppColors.driverPrimary : AppColors.border, width: 1.5),
+                  color: (isActive || isDone)
+                      ? AppColors.driverPrimary
+                      : AppColors.border,
+                  width: 1.5,
+                ),
               ),
               alignment: Alignment.center,
               child: isDone
                   ? const Icon(Icons.check, color: Colors.white, size: 16)
-                  : Text('${stepIndex + 1}',
+                  : Text(
+                      '${stepIndex + 1}',
                       style: TextStyle(
-                          color: isActive ? Colors.white : AppColors.textSub,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700)),
+                        color: isActive ? Colors.white : AppColors.textSub,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
             ),
             const SizedBox(height: 6),
             SizedBox(
               width: 68,
-              child: Text(_steps[stepIndex],
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                      fontSize: 10,
-                      color: isActive ? AppColors.textMain : AppColors.textSub,
-                      fontWeight: isActive ? FontWeight.w700 : FontWeight.w400)),
+              child: Text(
+                _steps[stepIndex],
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: isActive ? AppColors.textMain : AppColors.textSub,
+                  fontWeight: isActive ? FontWeight.w700 : FontWeight.w400,
+                ),
+              ),
             ),
           ],
         );
@@ -531,11 +641,13 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
           errorText: _errores['documento'],
           helperText: _docHelper,
           maxLength: _esDocAlfanumerico ? 12 : 10,
-          keyboardType:
-              _esDocAlfanumerico ? TextInputType.text : TextInputType.number,
+          keyboardType: _esDocAlfanumerico
+              ? TextInputType.text
+              : TextInputType.number,
           inputFormatters: [
             FilteringTextInputFormatter.allow(
-                _esDocAlfanumerico ? RegExp(r'[a-zA-Z0-9]') : RegExp(r'[0-9]')),
+              _esDocAlfanumerico ? RegExp(r'[a-zA-Z0-9]') : RegExp(r'[0-9]'),
+            ),
           ],
         ),
         const SizedBox(height: 14),
@@ -545,7 +657,9 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
           label: 'Teléfono',
           icon: Icons.phone_outlined,
           errorText: _errores['telefono'],
-          helperText: _errores['telefono'] == null ? 'Número de 10 dígitos' : null,
+          helperText: _errores['telefono'] == null
+              ? 'Empieza por 3, 10 dígitos'
+              : null,
           keyboardType: TextInputType.phone,
           maxLength: 10,
           inputFormatters: [FilteringTextInputFormatter.digitsOnly],
@@ -575,16 +689,28 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
           decoration: BoxDecoration(
             color: AppColors.activeBg,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: AppColors.driverPrimary.withValues(alpha: 0.3)),
+            border: Border.all(
+              color: AppColors.driverPrimary.withValues(alpha: 0.3),
+            ),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.info_outline, color: AppColors.driverPrimary, size: 18),
+              Icon(
+                Icons.info_outline,
+                color: AppColors.driverPrimary,
+                size: 18,
+              ),
               const SizedBox(width: 8),
               Expanded(
-                child: Text('Deja estos campos vacíos si no quieres cambiar tu contraseña.',
-                    style: TextStyle(color: AppColors.driverPrimary, fontSize: 12, fontWeight: FontWeight.w500)),
+                child: Text(
+                  'Deja estos campos vacíos si no quieres cambiar tu contraseña.',
+                  style: TextStyle(
+                    color: AppColors.driverPrimary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
               ),
             ],
           ),
@@ -599,10 +725,15 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
           obscureText: !_showPasswordActual,
           maxLength: 64,
           suffixIcon: TapArea(
-            onTap: () => setState(() => _showPasswordActual = !_showPasswordActual),
+            onTap: () =>
+                setState(() => _showPasswordActual = !_showPasswordActual),
             child: Icon(
-                _showPasswordActual ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                color: AppColors.textSub, size: 20),
+              _showPasswordActual
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
+              color: AppColors.textSub,
+              size: 20,
+            ),
           ),
         ),
         const SizedBox(height: 14),
@@ -616,10 +747,15 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
           obscureText: !_showPasswordNueva,
           maxLength: 64,
           suffixIcon: TapArea(
-            onTap: () => setState(() => _showPasswordNueva = !_showPasswordNueva),
+            onTap: () =>
+                setState(() => _showPasswordNueva = !_showPasswordNueva),
             child: Icon(
-                _showPasswordNueva ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                color: AppColors.textSub, size: 20),
+              _showPasswordNueva
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
+              color: AppColors.textSub,
+              size: 20,
+            ),
           ),
         ),
         const SizedBox(height: 14),
@@ -632,10 +768,16 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
           obscureText: !_showConfirmarPassword,
           maxLength: 64,
           suffixIcon: TapArea(
-            onTap: () => setState(() => _showConfirmarPassword = !_showConfirmarPassword),
+            onTap: () => setState(
+              () => _showConfirmarPassword = !_showConfirmarPassword,
+            ),
             child: Icon(
-                _showConfirmarPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                color: AppColors.textSub, size: 20),
+              _showConfirmarPassword
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
+              color: AppColors.textSub,
+              size: 20,
+            ),
           ),
         ),
       ],
@@ -652,7 +794,8 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
             icon: Icons.edit_outlined,
             color: AppColors.blue,
             bg: AppColors.blueBg,
-            text: 'Se ${totalModificados == 1 ? 'modificó' : 'modificaron'} $totalModificados '
+            text:
+                'Se ${totalModificados == 1 ? 'modificó' : 'modificaron'} $totalModificados '
                 '${totalModificados == 1 ? 'campo' : 'campos'}: revísalo${totalModificados == 1 ? '' : 's'} antes de guardar.',
           ),
         if (_sinCambios)
@@ -660,7 +803,8 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
             icon: Icons.warning_amber_outlined,
             color: AppColors.orange,
             bg: AppColors.orangeBg,
-            text: 'No has realizado ningún cambio. Los datos ya están actualizados.',
+            text:
+                'No has realizado ningún cambio. Los datos ya están actualizados.',
           ),
         if (_apiError != null)
           _buildAlert(
@@ -675,19 +819,40 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
             children: [
               Row(
                 children: [
-                  Icon(Icons.person_outline_rounded, size: 18, color: AppColors.textMain),
+                  Icon(
+                    Icons.person_outline_rounded,
+                    size: 18,
+                    color: AppColors.textMain,
+                  ),
                   const SizedBox(width: 6),
-                  Text('Datos personales',
-                      style: TextStyle(color: AppColors.textMain, fontSize: 14, fontWeight: FontWeight.w700)),
+                  Text(
+                    'Datos personales',
+                    style: TextStyle(
+                      color: AppColors.textMain,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 12),
-              ConfirmRow(label: 'Nombres', value: _nombreCtrl.text.trim(), previousValue: _original['nombre']),
-              const Divider(height: 1),
-              ConfirmRow(label: 'Apellidos', value: _apellidoCtrl.text.trim(), previousValue: _original['apellido']),
+              ConfirmRow(
+                label: 'Nombres',
+                value: _nombreCtrl.text.trim(),
+                previousValue: _original['nombre'],
+              ),
               const Divider(height: 1),
               ConfirmRow(
-                  label: 'N° de documento', value: _documentoCtrl.text.trim(), previousValue: _original['documento']),
+                label: 'Apellidos',
+                value: _apellidoCtrl.text.trim(),
+                previousValue: _original['apellido'],
+              ),
+              const Divider(height: 1),
+              ConfirmRow(
+                label: 'N° de documento',
+                value: _documentoCtrl.text.trim(),
+                previousValue: _original['documento'],
+              ),
             ],
           ),
         ),
@@ -697,20 +862,40 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
             children: [
               Row(
                 children: [
-                  Icon(Icons.email_outlined, size: 18, color: AppColors.textMain),
+                  Icon(
+                    Icons.email_outlined,
+                    size: 18,
+                    color: AppColors.textMain,
+                  ),
                   const SizedBox(width: 6),
-                  Text('Contacto',
-                      style: TextStyle(color: AppColors.textMain, fontSize: 14, fontWeight: FontWeight.w700)),
+                  Text(
+                    'Contacto',
+                    style: TextStyle(
+                      color: AppColors.textMain,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 12),
-              ConfirmRow(label: 'Teléfono', value: _telefonoCtrl.text.trim(), previousValue: _original['telefono']),
+              ConfirmRow(
+                label: 'Teléfono',
+                value: _telefonoCtrl.text.trim(),
+                previousValue: _original['telefono'],
+              ),
               const Divider(height: 1),
-              ConfirmRow(label: 'Correo', value: _emailCtrl.text.trim(), previousValue: _original['email']),
+              ConfirmRow(
+                label: 'Correo',
+                value: _emailCtrl.text.trim(),
+                previousValue: _original['email'],
+              ),
               const Divider(height: 1),
               ConfirmRow(
                 label: 'Contraseña',
-                value: _passwordNuevaCtrl.text.isNotEmpty ? '••••••••' : 'Sin cambiar',
+                value: _passwordNuevaCtrl.text.isNotEmpty
+                    ? '••••••••'
+                    : 'Sin cambiar',
                 previousValue: 'Sin cambiar',
               ),
             ],
@@ -729,13 +914,18 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(10)),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(10),
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, color: color, size: 20),
           const SizedBox(width: 8),
-          Expanded(child: Text(text, style: TextStyle(color: color, fontSize: 13))),
+          Expanded(
+            child: Text(text, style: TextStyle(color: color, fontSize: 13)),
+          ),
         ],
       ),
     );
@@ -761,7 +951,9 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
   }) {
     final hasError = errorText != null;
     final hasFocus = focusNode.hasFocus;
-    final borderColor = hasError ? AppColors.red : (hasFocus ? AppColors.driverPrimary : AppColors.border);
+    final borderColor = hasError
+        ? AppColors.red
+        : (hasFocus ? AppColors.driverPrimary : AppColors.border);
     final radius = BorderRadius.circular(12);
 
     return Column(
@@ -772,7 +964,13 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
           decoration: BoxDecoration(
             borderRadius: radius,
             boxShadow: hasFocus
-                ? [BoxShadow(color: hasError ? AppColors.redBg : AppColors.activeBg, blurRadius: 0, spreadRadius: 3)]
+                ? [
+                    BoxShadow(
+                      color: hasError ? AppColors.redBg : AppColors.activeBg,
+                      blurRadius: 0,
+                      spreadRadius: 3,
+                    ),
+                  ]
                 : [],
           ),
           child: Container(
@@ -794,14 +992,21 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
                 labelText: label,
                 floatingLabelBehavior: FloatingLabelBehavior.auto,
                 counterText: '',
-                prefixIcon: Icon(icon, color: hasError ? AppColors.red : AppColors.textSub, size: 20),
+                prefixIcon: Icon(
+                  icon,
+                  color: hasError ? AppColors.red : AppColors.textSub,
+                  size: 20,
+                ),
                 suffixIcon: suffixIcon,
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,
                 errorBorder: InputBorder.none,
                 focusedErrorBorder: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 14,
+                ),
               ),
             ),
           ),
@@ -809,12 +1014,18 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
         if (errorText != null)
           Padding(
             padding: const EdgeInsets.only(top: 4, left: 4),
-            child: Text(errorText, style: TextStyle(color: AppColors.red, fontSize: 11)),
+            child: Text(
+              errorText,
+              style: TextStyle(color: AppColors.red, fontSize: 11),
+            ),
           )
         else if (helperText != null)
           Padding(
             padding: const EdgeInsets.only(top: 4, left: 4),
-            child: Text(helperText, style: TextStyle(color: AppColors.textSub, fontSize: 11)),
+            child: Text(
+              helperText,
+              style: TextStyle(color: AppColors.textSub, fontSize: 11),
+            ),
           ),
       ],
     );
