@@ -814,9 +814,11 @@ class _HexagonPainter extends CustomPainter {
 }
 
 // Equivalente al Popover "Personalizar" de Header.jsx (frontend web) — Tema
-// y Color. Se omite el selector Sidebar/Top Nav: es un concepto de layout
-// de escritorio que no tiene equivalente en mobile (acá ya usamos nav
-// inferior, que es el patrón correcto en un celular).
+// (claro/oscuro). El selector de paleta rojo/azul se retiró en los dos lados
+// (azul es el único color de marca, ver theme_tokens.dart) y el selector
+// Sidebar/Top Nav se omite: es un concepto de layout de escritorio que no
+// tiene equivalente en mobile (acá ya usamos nav inferior, que es el patrón
+// correcto en un celular).
 class PersonalizarSheet extends StatelessWidget {
   const PersonalizarSheet({super.key});
 
@@ -904,30 +906,6 @@ class PersonalizarSheet extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
-              _sectionLabel('COLOR'),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: _colorOption(
-                      color: const Color(0xFFCC1818),
-                      label: 'Rojo',
-                      active: controller.paletteKey == 'red',
-                      onTap: () => controller.setPalette('red'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _colorOption(
-                      color: const Color(0xFF1A2E6E),
-                      label: 'Azul',
-                      active: controller.paletteKey == 'blue',
-                      onTap: () => controller.setPalette('blue'),
-                    ),
-                  ),
-                ],
-              ),
             ],
           ),
         );
@@ -988,52 +966,6 @@ class PersonalizarSheet extends StatelessWidget {
     );
   }
 
-  Widget _colorOption({
-    required Color color,
-    required String label,
-    required bool active,
-    required VoidCallback onTap,
-  }) {
-    return TapArea(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: active ? color : AppColors.border,
-            width: 1.5,
-          ),
-          color: active ? color.withValues(alpha: 0.08) : Colors.transparent,
-        ),
-        child: Column(
-          children: [
-            Container(
-              width: 22,
-              height: 22,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-              child: active
-                  ? const Icon(
-                      Icons.check_rounded,
-                      size: 14,
-                      color: Colors.white,
-                    )
-                  : null,
-            ),
-            const SizedBox(height: 6),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                color: active ? color : AppColors.textSub,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 // Equivalente a useDateTime.js (frontend web) — se refresca cada minuto.

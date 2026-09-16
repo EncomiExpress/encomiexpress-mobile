@@ -40,10 +40,10 @@ class AppColors {
   static List<Color> gradientNavbar = _initial.gradientNavbar;
 
   static const _initial = ThemeTokens(
-    primary: Color(0xFFCC1818),
-    primaryLight: Color(0xFFFFE8E8),
-    primaryDark: Color(0xFFB91C1C),
-    primaryDarker: Color(0xFFA01212),
+    primary: Color(0xFF1A2E6E),
+    primaryLight: Color(0xFFE8EEFF),
+    primaryDark: Color(0xFF0F1C45),
+    primaryDarker: Color(0xFF091236),
     secondary: Color(0xFF1A2E6E),
     background: Color(0xFFF5F6FA),
     surface: Colors.white,
@@ -55,8 +55,8 @@ class AppColors {
     error: StatusColor(Color(0xFFFEE2E2), Color(0xFF991B1B)),
     info: StatusColor(Color(0xFFE3F2FD), Color(0xFF1565C0)),
     purple: StatusColor(Color(0xFFF3E5F5), Color(0xFF6A1B9A)),
-    gradientNavbar: [Color(0xFF1A2E6E), Color(0xFFCC1818), Color(0xFF1A2E6E)],
-    activeBg: Color.fromRGBO(204, 24, 24, 0.08),
+    gradientNavbar: [Color(0xFF0D9488), Color(0xFF1A2E6E), Color(0xFF0D9488)],
+    activeBg: Color.fromRGBO(26, 46, 110, 0.12),
   );
 
   static void apply(ThemeTokens t) {
