@@ -231,19 +231,37 @@ class _DriverHomeState extends State<DriverHome> {
             icon: Icons.monetization_on,
             label: 'Anticipos',
             active: _tabIndex == 0,
-            onTap: () => setState(() => _tabIndex = 0),
+            // Anticipos se pinta inline en este mismo State (nunca se
+            // desmonta al cambiar de pestaña, a diferencia de Paquetes/Perfil
+            // más abajo, que son widgets aparte y por eso ya se recargan
+            // solos) -- sin este refresh explícito, volver a esta pestaña
+            // seguía mostrando la foto del momento en que se abrió la app.
+            onTap: () {
+              setState(() => _tabIndex = 0);
+              _loadAnticipos();
+            },
           ),
           BottomMenuItem(
             icon: Icons.inventory_2_outlined,
             label: 'Paquetes',
             active: _tabIndex == 1,
+            // DriverPaquetes es un widget aparte: Flutter lo desmonta y
+            // remonta solo al cambiar de pestaña (tipos de widget distintos
+            // en el mismo slot), así que su propio initState ya recarga.
             onTap: () => setState(() => _tabIndex = 1),
           ),
           BottomMenuItem(
             icon: Icons.person_outline,
             label: 'Perfil',
             active: _tabIndex == 2,
-            onTap: () => setState(() => _tabIndex = 2),
+            onTap: () {
+              setState(() => _tabIndex = 2);
+              // DriverProfile remonta solo (mismo motivo que Paquetes), pero
+              // su initState no pide nada al backend -- solo copia
+              // widget.user, así que sin esto seguía mostrando el perfil
+              // desactualizado.
+              _loadPerfil();
+            },
           ),
         ],
       ),

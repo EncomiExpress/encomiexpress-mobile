@@ -15,14 +15,21 @@ void showAppSnackBar(
   late final Color bg;
   late final IconData icon;
   switch (severity) {
+    // bg usa los tokens de estado (sólidos), no los `actionXBg` (10% de opacidad,
+    // pensados para ir encima de blanco garantizado como un botón o chip) --
+    // este SnackBar flota sobre lo que sea que haya en pantalla, así que un fondo
+    // semitransparente se ve lavado/desvaído en vez de un color sólido (bug
+    // introducido el 2026-09-17 al cambiar de AppColors.green/red/orange a los
+    // tokens `action*`). El color del texto/ícono sí se queda en los tokens
+    // `action*`, que son opacos y ya reflejan la paleta de marca actualizada.
     case 'error':
       color = AppColors.actionDanger;
-      bg = AppColors.actionDangerBg;
+      bg = AppColors.redBg;
       icon = Icons.error_outline;
       break;
     case 'warning':
       color = AppColors.actionWarning;
-      bg = AppColors.actionWarningBg;
+      bg = AppColors.orangeBg;
       icon = Icons.warning_amber_outlined;
       break;
     case 'info':
@@ -32,7 +39,7 @@ void showAppSnackBar(
       break;
     default:
       color = AppColors.actionSuccess;
-      bg = AppColors.actionSuccessBg;
+      bg = AppColors.greenBg;
       icon = Icons.check_circle_outline;
   }
 

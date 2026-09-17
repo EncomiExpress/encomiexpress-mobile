@@ -721,13 +721,28 @@ class _AdminHomeState extends State<AdminHome> {
             icon: Icons.monetization_on,
             label: 'Anticipos',
             active: _tabIndex == 0,
-            onTap: () => setState(() => _tabIndex = 0),
+            // Igual que en driver_home.dart: Anticipos se pinta inline en
+            // este State (nunca se desmonta al cambiar de pestaña), así que
+            // sin este refresh explícito volver acá mostraba la foto del
+            // momento en que se abrió la app.
+            onTap: () {
+              setState(() => _tabIndex = 0);
+              _loadAnticipos();
+              _loadAniosDisponibles();
+            },
           ),
           BottomMenuItem(
             icon: Icons.person_outline,
             label: 'Perfil',
             active: _tabIndex == 1,
-            onTap: () => setState(() => _tabIndex = 1),
+            // AdminProfile es StatelessWidget: no pide nada por su cuenta,
+            // recibe `anticipos: _anticipos` tal cual -- sus contadores
+            // (pendientes/aprobados/conductores) quedaban con la misma foto
+            // vieja sin este refresh.
+            onTap: () {
+              setState(() => _tabIndex = 1);
+              _loadAnticipos();
+            },
           ),
           BottomMenuItem(
             icon: Icons.add_circle_outline,
