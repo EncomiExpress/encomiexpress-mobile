@@ -363,6 +363,7 @@ class _DistribuidorPaquetesState extends State<DistribuidorPaquetes> {
   }
 
   Widget _buildGrupo(_GrupoFecha grupo) {
+    final gruposGuia = _agruparPorGuia(grupo.paquetes);
     return SectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -394,24 +395,29 @@ class _DistribuidorPaquetesState extends State<DistribuidorPaquetes> {
             ],
           ),
           const SizedBox(height: 12),
-          for (final p in grupo.paquetes) ...[
-            _buildPaqueteCard(p),
-            if (p != grupo.paquetes.last) const SizedBox(height: 10),
+          for (final grupoGuia in gruposGuia) ...[
+            _buildGuiaGroup(grupoGuia),
+            if (grupoGuia != gruposGuia.last) const SizedBox(height: 10),
           ],
         ],
       ),
     );
   }
 
-  Widget _buildPaqueteCard(Map<String, dynamic> p) {
-    final encomienda = p['encomienda'] as Map<String, dynamic>?;
-    final destinatario = encomienda?['destinatario'] as Map<String, dynamic>?;
+  // Un solo numeroGuia por venta (P12) — agrupa los paquetes pendientes de una
+  // misma venta bajo su guía (identificador principal visible) y el
+  // destinatario (mismo para todos, es un dato de la venta) se muestra una
+  // sola vez. Cada paquete dentro es un ítem secundario con sus propios botones
+  // de acción (Entregado/No entregado/Intento), porque cada uno se cierra por
+  // separado.
+  Widget _buildGuiaGroup(_GrupoVenta grupoGuia) {
+    final primero = grupoGuia.paquetes.first;
+    final destinatario =
+        (primero['encomienda'] as Map<String, dynamic>?)?['destinatario']
+            as Map<String, dynamic>?;
     final nombre = (destinatario?['nombreDestinatario'] as String?) ?? '';
     final direccion = (destinatario?['direccionDestinatario'] as String?) ?? '';
     final telefono = (destinatario?['telefonoDestinatario'] as String?) ?? '';
-    final intentos = _toInt(p['intentosEntrega']) ?? 0;
-    final idPaquete = _toInt(p['idPaquete']);
-    final actualizando = idPaquete != null && _actualizando.contains(idPaquete);
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -424,32 +430,22 @@ class _DistribuidorPaquetesState extends State<DistribuidorPaquetes> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Icon(
+                Icons.local_shipping_outlined,
+                size: 15,
+                color: AppColors.textSub,
+              ),
+              const SizedBox(width: 6),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      p['numeroGuia'] ?? '—',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textMain,
-                      ),
-                    ),
-                    if ((p['descripcionContenido'] as String?)?.isNotEmpty ==
-                        true)
-                      Text(
-                        p['descripcionContenido'] as String,
-                        style: TextStyle(
-                          color: AppColors.textSub,
-                          fontSize: 13,
-                        ),
-                      ),
-                  ],
+                child: Text(
+                  grupoGuia.numeroGuia,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textMain,
+                  ),
                 ),
               ),
-              const SizedBox(width: 8),
               _estadoChip('En sede de destino'),
             ],
           ),
@@ -511,135 +507,167 @@ class _DistribuidorPaquetesState extends State<DistribuidorPaquetes> {
                 ),
               ),
           ],
-          if (intentos > 0) ...[
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(Icons.replay_rounded, size: 14, color: AppColors.orange),
-                const SizedBox(width: 4),
-                Text(
-                  intentos == 1
-                      ? 'Intentado 1 de $_maxIntentosEntrega veces'
-                      : 'Intentado $intentos de $_maxIntentosEntrega veces',
-                  style: TextStyle(
-                    color: AppColors.orange,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                if (idPaquete != null) ...[
-                  const Spacer(),
-                  TapArea(
-                    onTap: () => _HistorialEntregaSheet.show(
-                      context,
-                      service: _service,
-                      idPaquete: idPaquete,
-                    ),
-                    child: Text(
-                      'Ver historial',
-                      style: TextStyle(
-                        color: AppColors.adminPrimary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        decoration: TextDecoration.underline,
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
+          for (final p in grupoGuia.paquetes) ...[
+            const SizedBox(height: 10),
+            Divider(color: AppColors.border, height: 1),
+            const SizedBox(height: 10),
+            _buildPaqueteActionItem(p),
           ],
-          if ((p['observacionEstado'] as String?)?.isNotEmpty == true)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text(
-                p['observacionEstado'] as String,
-                style: TextStyle(
-                  color: AppColors.textSub,
-                  fontSize: 12,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-            ),
-          const SizedBox(height: 12),
+        ],
+      ),
+    );
+  }
+
+  // Ítem secundario de UN paquete dentro de su guía, pendiente de entrega final
+  // -- se distingue por contenido; conserva sus propios botones de acción
+  // porque cada paquete físico se cierra por separado.
+  // Ítem secundario de UN paquete dentro de su guía, pendiente de entrega final
+  // -- se distingue por contenido (el numeroGuia y el destinatario, iguales
+  // para todos los paquetes de esta venta, ya se muestran una sola vez en
+  // _buildGuiaGroup). Conserva sus propios botones de acción porque cada
+  // paquete físico se cierra por separado.
+  Widget _buildPaqueteActionItem(Map<String, dynamic> p) {
+    final intentos = _toInt(p['intentosEntrega']) ?? 0;
+    final idPaquete = _toInt(p['idPaquete']);
+    final actualizando = idPaquete != null && _actualizando.contains(idPaquete);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          (p['descripcionContenido'] as String?)?.isNotEmpty == true
+              ? p['descripcionContenido'] as String
+              : 'Sin descripción',
+          style: TextStyle(
+            fontWeight: FontWeight.w600,
+            color: AppColors.textMain,
+            fontSize: 13,
+          ),
+        ),
+        if (intentos > 0) ...[
+          const SizedBox(height: 8),
           Row(
             children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: actualizando
-                      ? null
-                      : () => _accion(p, 'Entregado'),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: AppColors.green),
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                  ),
-                  child: Text(
-                    'Entregado',
-                    style: TextStyle(color: AppColors.green, fontSize: 12.5),
-                  ),
+              Icon(Icons.replay_rounded, size: 14, color: AppColors.orange),
+              const SizedBox(width: 4),
+              Text(
+                intentos == 1
+                    ? 'Intentado 1 de $_maxIntentosEntrega veces'
+                    : 'Intentado $intentos de $_maxIntentosEntrega veces',
+                style: TextStyle(
+                  color: AppColors.orange,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: actualizando ? null : () => _accion(p, 'Devuelto'),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: AppColors.red),
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
+              if (idPaquete != null) ...[
+                const Spacer(),
+                TapArea(
+                  onTap: () => _HistorialEntregaSheet.show(
+                    context,
+                    service: _service,
+                    idPaquete: idPaquete,
                   ),
                   child: Text(
-                    'No entregado',
-                    style: TextStyle(color: AppColors.red, fontSize: 12.5),
-                  ),
-                ),
-              ),
-              // El tope de intentos (encomiendaService.MAX_INTENTOS_ENTREGA)
-              // solo limita seguir sumando 'Intento' -- "No entregado" (arriba)
-              // sigue disponible siempre, decisión explícita de la usuaria para
-              // no obligar a fingir intentos cuando ya se sabe que es
-              // imposible entregar (ej. dirección inexistente). Ver LOGICA.md,
-              // "Tope de intentos de entrega".
-              if (intentos < _maxIntentosEntrega) ...[
-                const SizedBox(width: 6),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: actualizando
-                        ? null
-                        : () => _accion(p, 'Intento'),
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: AppColors.orange),
-                      padding: const EdgeInsets.symmetric(horizontal: 4),
-                    ),
-                    child: Text(
-                      // Cuenta regresiva de intentos que quedan DISPONIBLES
-                      // (incluido este que se está a punto de registrar), no el
-                      // número de intento que sería -- a pedido de la usuaria,
-                      // para que el distribuidor vea de una cuánto margen le
-                      // queda sin tener que restar 5 - N mentalmente.
-                      'Intento (${_maxIntentosEntrega - intentos})',
-                      style: TextStyle(color: AppColors.orange, fontSize: 12.5),
+                    'Ver historial',
+                    style: TextStyle(
+                      color: AppColors.adminPrimary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      decoration: TextDecoration.underline,
                     ),
                   ),
                 ),
               ],
             ],
           ),
-          if (actualizando)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Center(
-                child: SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: AppColors.adminPrimary,
-                  ),
+        ],
+        if ((p['observacionEstado'] as String?)?.isNotEmpty == true)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              p['observacionEstado'] as String,
+              style: TextStyle(
+                color: AppColors.textSub,
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: actualizando ? null : () => _accion(p, 'Entregado'),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: AppColors.green),
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                ),
+                child: Text(
+                  'Entregado',
+                  style: TextStyle(color: AppColors.green, fontSize: 12.5),
                 ),
               ),
             ),
-        ],
-      ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: OutlinedButton(
+                onPressed: actualizando ? null : () => _accion(p, 'Devuelto'),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: AppColors.red),
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                ),
+                child: Text(
+                  'No entregado',
+                  style: TextStyle(color: AppColors.red, fontSize: 12.5),
+                ),
+              ),
+            ),
+            // El tope de intentos (encomiendaService.MAX_INTENTOS_ENTREGA)
+            // solo limita seguir sumando 'Intento' -- "No entregado" (arriba)
+            // sigue disponible siempre, decisión explícita de la usuaria para
+            // no obligar a fingir intentos cuando ya se sabe que es
+            // imposible entregar (ej. dirección inexistente). Ver LOGICA.md,
+            // "Tope de intentos de entrega".
+            if (intentos < _maxIntentosEntrega) ...[
+              const SizedBox(width: 6),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: actualizando ? null : () => _accion(p, 'Intento'),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: AppColors.orange),
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                  ),
+                  child: Text(
+                    // Cuenta regresiva de intentos que quedan DISPONIBLES
+                    // (incluido este que se está a punto de registrar), no el
+                    // número de intento que sería -- a pedido de la usuaria,
+                    // para que el distribuidor vea de una cuánto margen le
+                    // queda sin tener que restar 5 - N mentalmente.
+                    'Intento (${_maxIntentosEntrega - intentos})',
+                    style: TextStyle(color: AppColors.orange, fontSize: 12.5),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+        if (actualizando)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Center(
+              child: SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.adminPrimary,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 
@@ -662,6 +690,7 @@ class _DistribuidorPaquetesState extends State<DistribuidorPaquetes> {
   }
 
   Widget _buildGrupoHistorial(_GrupoFecha grupo) {
+    final gruposGuia = _agruparPorGuia(grupo.paquetes);
     return SectionCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -693,27 +722,26 @@ class _DistribuidorPaquetesState extends State<DistribuidorPaquetes> {
             ],
           ),
           const SizedBox(height: 12),
-          for (final p in grupo.paquetes) ...[
-            _buildPaqueteHistorialCard(p),
-            if (p != grupo.paquetes.last) const SizedBox(height: 10),
+          for (final grupoGuia in gruposGuia) ...[
+            _buildGuiaGroupHistorial(grupoGuia),
+            if (grupoGuia != gruposGuia.last) const SizedBox(height: 10),
           ],
         ],
       ),
     );
   }
 
-  // Card de solo lectura -- ya se cerró, no hay acciones que tomar. Muestra el
-  // estado final (Entregado/No entregado), la novedad y foto que quedaron
-  // guardadas en el paquete (la del cierre, ver LOGICA.md "Evidencia de entrega
-  // final obligatoria") y, si tuvo intentos antes de cerrarse, cuántos.
-  Widget _buildPaqueteHistorialCard(Map<String, dynamic> p) {
-    final encomienda = p['encomienda'] as Map<String, dynamic>?;
-    final destinatario = encomienda?['destinatario'] as Map<String, dynamic>?;
+  // Un solo numeroGuia por venta (P12) -- agrupa el historial de una misma
+  // venta bajo su guía y el destinatario (mismo para todos) una sola vez. Cada
+  // paquete conserva su propio estado final (Entregado/No entregado) porque
+  // cada uno se cierra por separado.
+  Widget _buildGuiaGroupHistorial(_GrupoVenta grupoGuia) {
+    final primero = grupoGuia.paquetes.first;
+    final destinatario =
+        (primero['encomienda'] as Map<String, dynamic>?)?['destinatario']
+            as Map<String, dynamic>?;
     final nombre = (destinatario?['nombreDestinatario'] as String?) ?? '';
     final direccion = (destinatario?['direccionDestinatario'] as String?) ?? '';
-    final estado = (p['estado'] as String?) ?? 'Entregado';
-    final intentos = _toInt(p['intentosEntrega']) ?? 0;
-    final idPaquete = _toInt(p['idPaquete']);
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -726,142 +754,190 @@ class _DistribuidorPaquetesState extends State<DistribuidorPaquetes> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Icon(
+                Icons.local_shipping_outlined,
+                size: 15,
+                color: AppColors.textSub,
+              ),
+              const SizedBox(width: 6),
               Expanded(
-                child: Column(
+                child: Text(
+                  grupoGuia.numeroGuia,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textMain,
+                  ),
+                ),
+              ),
+              if (grupoGuia.paquetes.length > 1)
+                Text(
+                  '${grupoGuia.paquetes.length} paquetes',
+                  style: TextStyle(color: AppColors.textSub, fontSize: 11.5),
+                ),
+            ],
+          ),
+          if (nombre.isNotEmpty || direccion.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            if (nombre.isNotEmpty)
+              Text(
+                nombre,
+                style: TextStyle(color: AppColors.textSub, fontSize: 13),
+              ),
+            if (direccion.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      p['numeroGuia'] ?? '—',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textMain,
-                      ),
+                    Icon(
+                      Icons.location_on_outlined,
+                      size: 15,
+                      color: AppColors.textSub,
                     ),
-                    if (nombre.isNotEmpty)
-                      Text(
-                        nombre,
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        direccion,
                         style: TextStyle(
                           color: AppColors.textSub,
                           fontSize: 13,
                         ),
                       ),
+                    ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              _estadoChip(
-                estado,
-                label: estado == 'Devuelto' ? 'No entregado' : estado,
-              ),
-            ],
-          ),
-          if (direccion.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(
-                    Icons.location_on_outlined,
-                    size: 15,
-                    color: AppColors.textSub,
-                  ),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      direccion,
-                      style: TextStyle(color: AppColors.textSub, fontSize: 13),
-                    ),
-                  ),
-                ],
+          ],
+          for (final p in grupoGuia.paquetes) ...[
+            const SizedBox(height: 10),
+            Divider(color: AppColors.border, height: 1),
+            const SizedBox(height: 10),
+            _buildPaqueteHistorialItem(p),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // Ítem secundario de UN paquete dentro de su guía, ya cerrado -- de solo
+  // lectura, no hay acciones que tomar. Muestra su propio estado final
+  // (Entregado/No entregado), la novedad y foto que quedaron guardadas (la del
+  // cierre, ver LOGICA.md "Evidencia de entrega final obligatoria") y, si tuvo
+  // intentos antes de cerrarse, cuántos.
+  Widget _buildPaqueteHistorialItem(Map<String, dynamic> p) {
+    final estado = (p['estado'] as String?) ?? 'Entregado';
+    final intentos = _toInt(p['intentosEntrega']) ?? 0;
+    final idPaquete = _toInt(p['idPaquete']);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Text(
+                (p['descripcionContenido'] as String?)?.isNotEmpty == true
+                    ? p['descripcionContenido'] as String
+                    : 'Sin descripción',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textMain,
+                  fontSize: 13,
+                ),
               ),
             ),
-          if (intentos > 0 || idPaquete != null) ...[
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                if (intentos > 0) ...[
-                  Icon(Icons.replay_rounded, size: 14, color: AppColors.orange),
-                  const SizedBox(width: 4),
-                  Text(
-                    intentos == 1
-                        ? 'Intentado 1 vez antes'
-                        : 'Intentado $intentos veces antes',
+            const SizedBox(width: 8),
+            _estadoChip(
+              estado,
+              label: estado == 'Devuelto' ? 'No entregado' : estado,
+            ),
+          ],
+        ),
+        if (intentos > 0 || idPaquete != null) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              if (intentos > 0) ...[
+                Icon(Icons.replay_rounded, size: 14, color: AppColors.orange),
+                const SizedBox(width: 4),
+                Text(
+                  intentos == 1
+                      ? 'Intentado 1 vez antes'
+                      : 'Intentado $intentos veces antes',
+                  style: TextStyle(
+                    color: AppColors.orange,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+              if (idPaquete != null) ...[
+                const Spacer(),
+                TapArea(
+                  onTap: () => _HistorialEntregaSheet.show(
+                    context,
+                    service: _service,
+                    idPaquete: idPaquete,
+                  ),
+                  child: Text(
+                    'Ver historial',
                     style: TextStyle(
-                      color: AppColors.orange,
+                      color: AppColors.adminPrimary,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
+                      decoration: TextDecoration.underline,
                     ),
                   ),
-                ],
-                if (idPaquete != null) ...[
-                  const Spacer(),
-                  TapArea(
-                    onTap: () => _HistorialEntregaSheet.show(
-                      context,
-                      service: _service,
-                      idPaquete: idPaquete,
+                ),
+              ],
+            ],
+          ),
+        ],
+        if ((p['observacionEstado'] as String?)?.isNotEmpty == true)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              p['observacionEstado'] as String,
+              style: TextStyle(
+                color: AppColors.textSub,
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ),
+        if ((p['fotoEntrega'] as String?)?.isNotEmpty == true)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Builder(
+              builder: (ctx) => TapArea(
+                onTap: () =>
+                    ImageViewer.show(ctx, [p['fotoEntrega'] as String]),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.photo_camera_outlined,
+                      size: 16,
+                      color: AppColors.adminPrimary,
                     ),
-                    child: Text(
-                      'Ver historial',
+                    const SizedBox(width: 6),
+                    Text(
+                      'Ver evidencia',
                       style: TextStyle(
                         color: AppColors.adminPrimary,
-                        fontSize: 12,
+                        fontSize: 13,
                         fontWeight: FontWeight.w600,
                         decoration: TextDecoration.underline,
                       ),
                     ),
-                  ),
-                ],
-              ],
-            ),
-          ],
-          if ((p['observacionEstado'] as String?)?.isNotEmpty == true)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text(
-                p['observacionEstado'] as String,
-                style: TextStyle(
-                  color: AppColors.textSub,
-                  fontSize: 12,
-                  fontStyle: FontStyle.italic,
+                  ],
                 ),
               ),
             ),
-          if ((p['fotoEntrega'] as String?)?.isNotEmpty == true)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Builder(
-                builder: (ctx) => TapArea(
-                  onTap: () =>
-                      ImageViewer.show(ctx, [p['fotoEntrega'] as String]),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.photo_camera_outlined,
-                        size: 16,
-                        color: AppColors.adminPrimary,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Ver evidencia',
-                        style: TextStyle(
-                          color: AppColors.adminPrimary,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          decoration: TextDecoration.underline,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
+          ),
+      ],
     );
   }
 }
@@ -870,6 +946,47 @@ class _GrupoFecha {
   final String etiqueta;
   final List<Map<String, dynamic>> paquetes = [];
   _GrupoFecha(this.etiqueta);
+}
+
+// Un solo numeroGuia por venta (P12) — dentro de cada tanda por fecha, agrupa
+// además por la venta (encomienda) dueña, para mostrar la guía una sola vez con
+// sus paquetes como ítems secundarios debajo (ver _buildGuiaGroup/
+// _buildGuiaGroupHistorial).
+class _GrupoVenta {
+  final int? idEncomiendaVenta;
+  final String numeroGuia;
+  final List<Map<String, dynamic>> paquetes = [];
+  _GrupoVenta({required this.idEncomiendaVenta, required this.numeroGuia});
+}
+
+List<_GrupoVenta> _agruparPorGuia(List<Map<String, dynamic>> paquetes) {
+  final Map<int, _GrupoVenta> mapa = {};
+  final sinVenta = <Map<String, dynamic>>[];
+  for (final p in paquetes) {
+    final encomienda = p['encomienda'] as Map<String, dynamic>?;
+    final idEncomiendaVenta = _DistribuidorPaquetesState._toInt(
+      encomienda?['idEncomiendaVenta'],
+    );
+    if (idEncomiendaVenta == null) {
+      sinVenta.add(p);
+      continue;
+    }
+    final grupo = mapa.putIfAbsent(
+      idEncomiendaVenta,
+      () => _GrupoVenta(
+        idEncomiendaVenta: idEncomiendaVenta,
+        numeroGuia: (encomienda?['numeroGuia'] as String?) ?? '—',
+      ),
+    );
+    grupo.paquetes.add(p);
+  }
+  final resultado = mapa.values.toList();
+  if (sinVenta.isNotEmpty) {
+    final suelto = _GrupoVenta(idEncomiendaVenta: null, numeroGuia: '—');
+    suelto.paquetes.addAll(sinVenta);
+    resultado.add(suelto);
+  }
+  return resultado;
 }
 
 // Chip por acción -- mismo criterio de color que la web (ModalHistorialEntrega.jsx,

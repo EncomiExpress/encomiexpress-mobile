@@ -468,8 +468,9 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
 
   Widget _buildRetornoItem(Map<String, dynamic> p) {
     final idPaquete = _toInt(p['idPaquete']);
-    final numeroGuia = (p['numeroGuia'] as String?) ?? '—';
     final encomienda = p['encomienda'] as Map<String, dynamic>?;
+    // numeroGuia es de la venta dueña (P12), no del paquete.
+    final numeroGuia = (encomienda?['numeroGuia'] as String?) ?? '—';
     final destinatario = encomienda?['destinatario'] as Map<String, dynamic>?;
     // El paquete ya va de vuelta en Medellín -- lo que le interesa al
     // conductor es el CLIENTE (quien lo envió, a quien se le resuelve acá),
@@ -493,7 +494,8 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
         ? '${usuarioDevolucion['nombre'] ?? ''} ${usuarioDevolucion['apellido'] ?? ''}'
               .trim()
         : null;
-    final confirmando = idPaquete != null && _confirmandoRetorno.contains(idPaquete);
+    final confirmando =
+        idPaquete != null && _confirmandoRetorno.contains(idPaquete);
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -674,7 +676,9 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
                     ? ListView(
                         controller: _scrollControllerHistorial,
                         children: [
-                          SizedBox(height: MediaQuery.of(context).size.height * 0.3),
+                          SizedBox(
+                            height: MediaQuery.of(context).size.height * 0.3,
+                          ),
                           Center(
                             child: Text(
                               'Todavía no has dejado ningún paquete en sede',
@@ -748,7 +752,8 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
     // saber si ya se dejaron todos sus paquetes en la sede o todavía falta algo.
     final sedes = grupo.sedes.values.toList();
     final entregaCompletada = sedes.every(
-      (s) => s.paquetes.every((p) => (p['estado'] as String?) != 'Por entregar'),
+      (s) =>
+          s.paquetes.every((p) => (p['estado'] as String?) != 'Por entregar'),
     );
 
     return SectionCard(
@@ -791,9 +796,13 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
                 )
               else
                 Text(
-                  entregaCompletada ? 'Entregado en sede' : 'Pendiente de entregar',
+                  entregaCompletada
+                      ? 'Entregado en sede'
+                      : 'Pendiente de entregar',
                   style: TextStyle(
-                    color: entregaCompletada ? AppColors.green : AppColors.textSub,
+                    color: entregaCompletada
+                        ? AppColors.green
+                        : AppColors.textSub,
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                   ),
@@ -817,6 +826,7 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
     final completada = pendientes.isEmpty;
     final key = '$idSalida-${sede.idDestino}';
     final actualizando = _sedesActualizando.contains(key);
+    final gruposGuia = _agruparPorGuia(sede.paquetes);
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -869,9 +879,9 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
             ),
           ],
           const SizedBox(height: 10),
-          for (final p in sede.paquetes) ...[
-            _buildPaqueteCard(p),
-            if (p != sede.paquetes.last) const SizedBox(height: 8),
+          for (final grupo in gruposGuia) ...[
+            _buildGuiaGroup(grupo),
+            if (grupo != gruposGuia.last) const SizedBox(height: 8),
           ],
           if (rutaEnRuta && !completada) ...[
             const SizedBox(height: 12),
@@ -918,16 +928,22 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
     );
   }
 
-  Widget _buildPaqueteCard(Map<String, dynamic> p) {
-    final encomienda = p['encomienda'] as Map<String, dynamic>?;
-    final destinatario = encomienda?['destinatario'] as Map<String, dynamic>?;
+  // Un solo numeroGuia por venta (P12) — esta tarjeta agrupa todos los paquetes
+  // de esa venta bajo su guía (identificador principal visible) y el
+  // destinatario (mismo para todos, es un dato de la venta, no del paquete) se
+  // muestra una sola vez. Cada paquete dentro es un ítem secundario,
+  // distinguido por su contenido/estado -- ya no tiene guía propia.
+  Widget _buildGuiaGroup(_GrupoVenta grupo) {
+    final primero = grupo.paquetes.first;
+    final destinatario =
+        (primero['encomienda'] as Map<String, dynamic>?)?['destinatario']
+            as Map<String, dynamic>?;
     final nombreDestinatario =
         (destinatario?['nombreDestinatario'] as String?) ?? '';
     final direccionDestinatario =
         (destinatario?['direccionDestinatario'] as String?) ?? '';
     final telefonoDestinatario =
         (destinatario?['telefonoDestinatario'] as String?) ?? '';
-    final estado = (p['estado'] as String?) ?? 'Por entregar';
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -940,52 +956,33 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Icon(
+                Icons.local_shipping_outlined,
+                size: 15,
+                color: AppColors.textSub,
+              ),
+              const SizedBox(width: 6),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      p['numeroGuia'] ?? '—',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textMain,
-                      ),
-                    ),
-                    if ((p['descripcionContenido'] as String?)?.isNotEmpty ==
-                        true)
-                      Text(
-                        p['descripcionContenido'] as String,
-                        style: TextStyle(
-                          color: AppColors.textSub,
-                          fontSize: 13,
-                        ),
-                      ),
-                  ],
+                child: Text(
+                  grupo.numeroGuia,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textMain,
+                  ),
                 ),
               ),
-              const SizedBox(width: 8),
-              // "Entregado"/"Devuelto" son el resultado de la entrega FINAL al
-              // destinatario, que hace el distribuidor de la sede -- no el
-              // conductor del tramo troncal (ver ../../../LOGICA.md, "Entrega en
-              // dos fases"). Para el conductor, un paquete solo tiene dos estados
-              // relevantes: falta dejarlo en la sede, o ya lo dejó -- lo que pase
-              // después ya no es asunto suyo, mostrárselo solo generaría ruido
-              // (o incluso confusión, ya que el backend reutiliza los mismos
-              // campos observacionEstado/fotoEntrega para la novedad y evidencia
-              // que deja el distribuidor al entregar, ver el condicional de más
-              // abajo).
-              if (estado == 'Por entregar' || estado == 'En sede de destino')
-                _estadoChip(estado),
+              if (grupo.paquetes.length > 1)
+                Text(
+                  '${grupo.paquetes.length} paquetes',
+                  style: TextStyle(color: AppColors.textSub, fontSize: 11.5),
+                ),
             ],
           ),
           if (nombreDestinatario.isNotEmpty ||
               direccionDestinatario.isNotEmpty ||
               telefonoDestinatario.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Divider(color: AppColors.border, height: 1),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             if (nombreDestinatario.isNotEmpty)
               Text(
                 nombreDestinatario,
@@ -1038,34 +1035,84 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
                 ),
               ),
           ],
-          // Mientras sigue "En sede de destino", el conductor puede volver a
-          // consultar la novedad y la foto que él mismo dejó al legalizar la
-          // sede (el backend ya no le deja cambiarlo). Una vez el distribuidor
-          // hace la entrega final (Entregado/Devuelto), esos MISMOS campos
-          // (observacionEstado/fotoEntrega) pasan a ser la novedad y evidencia
-          // que dejó el distribuidor al entregar -- ya no son del conductor, así
-          // que dejan de mostrarse acá.
-          if (estado == 'En sede de destino') ...[
-            if ((p['observacionEstado'] as String?)?.isNotEmpty == true ||
-                (p['fotoEntrega'] as String?)?.isNotEmpty == true) ...[
+          const SizedBox(height: 8),
+          Divider(color: AppColors.border, height: 1),
+          const SizedBox(height: 8),
+          for (final p in grupo.paquetes) ...[
+            _buildPaqueteItem(p),
+            if (p != grupo.paquetes.last) ...[
               const SizedBox(height: 8),
               Divider(color: AppColors.border, height: 1),
               const SizedBox(height: 8),
             ],
-            if ((p['observacionEstado'] as String?)?.isNotEmpty == true)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Text(
-                  p['observacionEstado'] as String,
-                  style: TextStyle(
-                    color: AppColors.textSub,
-                    fontSize: 12,
-                    fontStyle: FontStyle.italic,
-                  ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // Ítem secundario de UN paquete dentro de su guía -- se distingue por
+  // contenido/estado, ya no por un numeroGuia propio (P12).
+  Widget _buildPaqueteItem(Map<String, dynamic> p) {
+    final estado = (p['estado'] as String?) ?? 'Por entregar';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Text(
+                (p['descripcionContenido'] as String?)?.isNotEmpty == true
+                    ? p['descripcionContenido'] as String
+                    : 'Sin descripción',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textMain,
+                  fontSize: 13,
                 ),
               ),
-            if ((p['fotoEntrega'] as String?)?.isNotEmpty == true)
-              Builder(
+            ),
+            const SizedBox(width: 8),
+            // "Entregado"/"Devuelto" son el resultado de la entrega FINAL al
+            // destinatario, que hace el distribuidor de la sede -- no el
+            // conductor del tramo troncal (ver ../../../LOGICA.md, "Entrega en
+            // dos fases"). Para el conductor, un paquete solo tiene dos estados
+            // relevantes: falta dejarlo en la sede, o ya lo dejó -- lo que pase
+            // después ya no es asunto suyo, mostrárselo solo generaría ruido
+            // (o incluso confusión, ya que el backend reutiliza los mismos
+            // campos observacionEstado/fotoEntrega para la novedad y evidencia
+            // que deja el distribuidor al entregar, ver el condicional de más
+            // abajo).
+            if (estado == 'Por entregar' || estado == 'En sede de destino')
+              _estadoChip(estado),
+          ],
+        ),
+        // Mientras sigue "En sede de destino", el conductor puede volver a
+        // consultar la novedad y la foto que él mismo dejó al legalizar la
+        // sede (el backend ya no le deja cambiarlo). Una vez el distribuidor
+        // hace la entrega final (Entregado/Devuelto), esos MISMOS campos
+        // (observacionEstado/fotoEntrega) pasan a ser la novedad y evidencia
+        // que dejó el distribuidor al entregar -- ya no son del conductor, así
+        // que dejan de mostrarse acá.
+        if (estado == 'En sede de destino') ...[
+          if ((p['observacionEstado'] as String?)?.isNotEmpty == true)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                p['observacionEstado'] as String,
+                style: TextStyle(
+                  color: AppColors.textSub,
+                  fontSize: 12,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+            ),
+          if ((p['fotoEntrega'] as String?)?.isNotEmpty == true)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Builder(
                 builder: (ctx) => TapArea(
                   onTap: () =>
                       ImageViewer.show(ctx, [p['fotoEntrega'] as String]),
@@ -1091,9 +1138,9 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
                   ),
                 ),
               ),
-          ],
+            ),
         ],
-      ),
+      ],
     );
   }
 
@@ -1133,6 +1180,46 @@ class _GrupoSede {
     required this.municipio,
     this.direccion,
   });
+}
+
+// Un solo numeroGuia por venta (P12) — agrupa los paquetes de una misma sede
+// por la venta (encomienda) dueña, para mostrar la guía una sola vez con sus
+// paquetes como ítems secundarios debajo (ver _buildGuiaGroup).
+class _GrupoVenta {
+  final int? idEncomiendaVenta;
+  final String numeroGuia;
+  final List<Map<String, dynamic>> paquetes = [];
+  _GrupoVenta({required this.idEncomiendaVenta, required this.numeroGuia});
+}
+
+List<_GrupoVenta> _agruparPorGuia(List<Map<String, dynamic>> paquetes) {
+  final Map<int, _GrupoVenta> mapa = {};
+  final sinVenta = <Map<String, dynamic>>[];
+  for (final p in paquetes) {
+    final encomienda = p['encomienda'] as Map<String, dynamic>?;
+    final idEncomiendaVenta = _DriverPaquetesState._toInt(
+      encomienda?['idEncomiendaVenta'],
+    );
+    if (idEncomiendaVenta == null) {
+      sinVenta.add(p);
+      continue;
+    }
+    final grupo = mapa.putIfAbsent(
+      idEncomiendaVenta,
+      () => _GrupoVenta(
+        idEncomiendaVenta: idEncomiendaVenta,
+        numeroGuia: (encomienda?['numeroGuia'] as String?) ?? '—',
+      ),
+    );
+    grupo.paquetes.add(p);
+  }
+  final resultado = mapa.values.toList();
+  if (sinVenta.isNotEmpty) {
+    final suelto = _GrupoVenta(idEncomiendaVenta: null, numeroGuia: '—');
+    suelto.paquetes.addAll(sinVenta);
+    resultado.add(suelto);
+  }
+  return resultado;
 }
 
 class _DejarEnSedeResult {
