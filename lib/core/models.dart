@@ -347,7 +347,7 @@ class EstadoAnticipo {
 class Anticipo {
   final int id;
   final int idConductor;
-  final int idRuta;
+  final int idSalida;
   final double valorAnticipo;
   final double valorGastado;
   final double excedente;
@@ -361,18 +361,16 @@ class Anticipo {
   final String conductorNombre;
   final String? nombreRuta;
   final String? destinoTexto;
-  // Estado de la ruta y su avance por sedes — solo vienen en GET
+  // Estado de la salida y si le queda algo por entregar — solo vienen en GET
   // /conductores/mis-anticipos. El móvil los usa para el candado de
-  // legalización (ver `sedesPendientes`). Anticipo ida+retorno (2026-09-13,
-  // ver LOGICA.md): con la ruta ya "Completada", `sedesTotales`/
-  // `sedesCompletadas` pasan a describir el REGRESO (no la ida) —
-  // `sedesDelRegreso` distingue ese caso para poder avisarlo con un texto
-  // distinto; `esperandoRegreso` es el caso más temprano, cuando ni siquiera
-  // se ha programado el regreso todavía.
+  // legalización (ver `puedeLegalizar`). Anticipo ida+retorno (2026-09-13,
+  // ver LOGICA.md): con la ida ya "Completada", `entregaPendiente` pasa a
+  // describir el REGRESO (no la ida) — `esDelRegreso` distingue ese caso para
+  // poder avisarlo con un texto distinto; `esperandoRegreso` es el caso más
+  // temprano, cuando ni siquiera se ha programado el regreso todavía.
   final String? rutaEstado;
-  final int? sedesTotales;
-  final int? sedesCompletadas;
-  final bool sedesDelRegreso;
+  final bool? entregaPendiente;
+  final bool esDelRegreso;
   final bool esperandoRegreso;
   // Huérfano (ver LOGICA.md, "Anticipos huérfanos al reasignar conductor"): el
   // conductor de este anticipo ya no es par activo de su ruta -- se calcula en
@@ -385,7 +383,7 @@ class Anticipo {
   const Anticipo({
     required this.id,
     required this.idConductor,
-    required this.idRuta,
+    required this.idSalida,
     required this.valorAnticipo,
     required this.valorGastado,
     required this.excedente,
@@ -399,9 +397,8 @@ class Anticipo {
     this.nombreRuta,
     this.destinoTexto,
     this.rutaEstado,
-    this.sedesTotales,
-    this.sedesCompletadas,
-    this.sedesDelRegreso = false,
+    this.entregaPendiente,
+    this.esDelRegreso = false,
     this.esperandoRegreso = false,
     this.esHuerfano = false,
     this.motivoCierre,
@@ -414,7 +411,7 @@ class Anticipo {
   }) => Anticipo(
     id: id,
     idConductor: idConductor,
-    idRuta: idRuta,
+    idSalida: idSalida,
     valorAnticipo: valorAnticipo,
     valorGastado: valorGastado,
     excedente: excedente,
@@ -428,9 +425,8 @@ class Anticipo {
     nombreRuta: nombreRuta,
     destinoTexto: destinoTexto,
     rutaEstado: rutaEstado,
-    sedesTotales: sedesTotales,
-    sedesCompletadas: sedesCompletadas,
-    sedesDelRegreso: sedesDelRegreso,
+    entregaPendiente: entregaPendiente,
+    esDelRegreso: esDelRegreso,
     esperandoRegreso: esperandoRegreso,
     esHuerfano: esHuerfano,
     motivoCierre: motivoCierre,
@@ -438,13 +434,16 @@ class Anticipo {
 
   // Forma real de una fila devuelta por GET /api/anticipos, GET /api/anticipos/:id
   // o GET /api/conductores/mis-anticipos (esta última sin `conductor` anidado,
-  // porque ya se sabe de quién son). El anticipo cuelga directo de una `ruta`
-  // (ver anticipoService.js: ANTICIPO_INCLUDE) — no hay una "programación"
-  // separada; el nombre de ruta y el destino se leen de ruta / ruta.destino.
+  // porque ya se sabe de quién son). El anticipo cuelga de una `salida`
+  // (SalidaProgramada, ver anticipoService.js: ANTICIPO_INCLUDE) — la plantilla
+  // (Ruta) y su destino van anidados un nivel más adentro, en `salida.ruta` /
+  // `salida.ruta.destino`. El nombre de ruta que se muestra es el `origen` de
+  // la salida (ver salidaProgramada.js), no un nombre propio de la plantilla.
   factory Anticipo.fromJson(Map<String, dynamic> json) {
     final conductorJson = json['conductor'] as Map<String, dynamic>?;
     final usuarioJson = conductorJson?['usuario'] as Map<String, dynamic>?;
-    final rutaJson = json['ruta'] as Map<String, dynamic>?;
+    final salidaJson = json['salida'] as Map<String, dynamic>?;
+    final rutaJson = salidaJson?['ruta'] as Map<String, dynamic>?;
     final destinoJson = rutaJson?['destino'] as Map<String, dynamic>?;
 
     String? destinoTexto;
@@ -460,7 +459,7 @@ class Anticipo {
     return Anticipo(
       id: int.tryParse(json['idAnticipoExcedente']?.toString() ?? '') ?? 0,
       idConductor: int.tryParse(json['idConductor']?.toString() ?? '') ?? 0,
-      idRuta: int.tryParse(json['idRuta']?.toString() ?? '') ?? 0,
+      idSalida: int.tryParse(json['idSalida']?.toString() ?? '') ?? 0,
       valorAnticipo: _parseDouble(json['valorAnticipo']),
       valorGastado: _parseDouble(json['valorGastado']),
       excedente: _parseDouble(json['excedente']),
@@ -482,17 +481,14 @@ class Anticipo {
           ? '${usuarioJson['nombre'] ?? ''} ${usuarioJson['apellido'] ?? ''}'
                 .trim()
           : '',
-      nombreRuta: rutaJson?['origen'],
+      nombreRuta: salidaJson?['origen'],
       destinoTexto: destinoTexto,
-      rutaEstado: rutaJson?['estado']?.toString(),
-      sedesTotales: rutaJson?['sedesTotales'] is num
-          ? (rutaJson!['sedesTotales'] as num).toInt()
+      rutaEstado: salidaJson?['estado']?.toString(),
+      entregaPendiente: salidaJson?['entregaPendiente'] is bool
+          ? salidaJson!['entregaPendiente'] as bool
           : null,
-      sedesCompletadas: rutaJson?['sedesCompletadas'] is num
-          ? (rutaJson!['sedesCompletadas'] as num).toInt()
-          : null,
-      sedesDelRegreso: rutaJson?['sedesDelRegreso'] == true,
-      esperandoRegreso: rutaJson?['esperandoRegreso'] == true,
+      esDelRegreso: salidaJson?['esDelRegreso'] == true,
+      esperandoRegreso: salidaJson?['esperandoRegreso'] == true,
       esHuerfano: json['esHuerfano'] == true,
       motivoCierre: json['motivoCierre']?.toString(),
     );
@@ -514,23 +510,17 @@ class Anticipo {
   bool get esEditable => estado == EstadoAnticipo.entregado;
 
   // Candado de legalización: el conductor no puede legalizar el anticipo hasta
-  // dejar TODOS los paquetes en las sedes de la ruta (no puede reunir los
-  // soportes del viaje antes de llegar al destino final). El backend
-  // (anticipoService.update) rechaza igual con errorCode 'SEDES_INCOMPLETAS'.
-  // Ya no se filtra por `rutaEstado == 'En Ruta'` -- desde el anticipo
-  // ida+retorno (2026-09-13) el backend también manda `sedesTotales`/
-  // `sedesCompletadas` con la ida ya "Completada" (describiendo el REGRESO en
-  // ese caso, ver `sedesDelRegreso`); que el campo venga presente es de por sí
-  // la señal de que hay algo que completar.
-  bool get sedesPendientes =>
-      sedesTotales != null &&
-      sedesTotales! > 0 &&
-      (sedesCompletadas ?? 0) < sedesTotales!;
-
+  // dejar TODOS los paquetes en la sede de destino de la ruta (no puede reunir
+  // los soportes del viaje antes de llegar). El backend (anticipoService.update)
+  // rechaza igual con errorCode 'ENTREGA_PENDIENTE'. Ya no se filtra por
+  // `rutaEstado == 'En Ruta'` -- desde el anticipo ida+retorno (2026-09-13) el
+  // backend también manda `entregaPendiente` con la ida ya "Completada"
+  // (describiendo el REGRESO en ese caso, ver `esDelRegreso`); que el campo
+  // venga presente es de por sí la señal de que hay algo que completar.
   bool get puedeLegalizar =>
       estado == EstadoAnticipo.enLegalizacion &&
       !esperandoRegreso &&
-      !sedesPendientes;
+      entregaPendiente != true;
 }
 
 // 'YYYY-MM-DD' (como llegan los campos DATEONLY del backend) -> 'DD/MM/YYYY'.

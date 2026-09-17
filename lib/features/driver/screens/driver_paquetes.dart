@@ -36,7 +36,7 @@ String? _formatHora12(String? hora) {
 
 // Pantalla "Paquetes" del conductor — entrega en dos fases (ver ../../../LOGICA.md):
 // el conductor del tramo troncal NO entrega puerta a puerta, solo deja los
-// paquetes en la sede de cada municipio (parada intermedia o destino final).
+// paquetes en la sede del municipio de destino final.
 // Legaliza de una sola vez, por sede, con un único botón "Dejar N paquetes en
 // sede" — no hay marca por paquete individual. La entrega final al destinatario
 // (Entregado/Devuelto) la hace el distribuidor de esa sede desde su propio app.
@@ -75,7 +75,7 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
   int _itemsToShowHistorial = 5;
   final _scrollControllerHistorial = ScrollController();
 
-  // Clave "idRuta-idDestino" de la sede cuya legalización está en curso — bloquea
+  // Clave "idSalida-idDestino" de la sede cuya legalización está en curso — bloquea
   // ese botón mientras se espera la respuesta del backend.
   final Set<String> _sedesActualizando = {};
 
@@ -217,20 +217,21 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
     }
   }
 
-  // Agrupa primero por ruta (Paquete.asignacion.ruta) y, dentro de cada ruta, por
-  // sede/municipio real de la venta (encomienda.destinatario.destino). "fuente"
-  // ya viene filtrada (pendientes o historial) y recortada a lo "revelado".
+  // Agrupa primero por salida (Paquete.asignacion.salida) y, dentro de cada
+  // salida, por sede/municipio real de la venta
+  // (encomienda.destinatario.destino). "fuente" ya viene filtrada (pendientes
+  // o historial) y recortada a lo "revelado".
   List<_GrupoRuta> _agrupar(List<dynamic> fuente) {
     final Map<int, _GrupoRuta> mapa = {};
     for (final p in fuente) {
       final paquete = p as Map<String, dynamic>;
       final asignacion = paquete['asignacion'] as Map<String, dynamic>?;
-      final ruta = asignacion?['ruta'] as Map<String, dynamic>?;
-      final idRuta = ruta != null ? _toInt(ruta['idRuta']) : null;
-      final rutaKey = idRuta ?? -1;
+      final salida = asignacion?['salida'] as Map<String, dynamic>?;
+      final idSalida = salida != null ? _toInt(salida['idSalida']) : null;
+      final rutaKey = idSalida ?? -1;
       final grupoRuta = mapa.putIfAbsent(
         rutaKey,
-        () => _GrupoRuta(idRuta: idRuta, ruta: ruta),
+        () => _GrupoRuta(idSalida: idSalida, salida: salida),
       );
 
       final destinatario =
@@ -264,8 +265,8 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
   List<_GrupoRuta> get _gruposHistorial =>
       _agrupar(_paquetesHistorial.take(_itemsToShowHistorial).toList());
 
-  Future<void> _dejarEnSede(int? idRuta, _GrupoSede sede) async {
-    if (idRuta == null || sede.idDestino == null) return;
+  Future<void> _dejarEnSede(int? idSalida, _GrupoSede sede) async {
+    if (idSalida == null || sede.idDestino == null) return;
     final pendientes = sede.paquetes
         .where((p) => (p['estado'] as String?) == 'Por entregar')
         .length;
@@ -278,10 +279,10 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
     );
     if (resultado == null || !mounted) return; // el conductor canceló
 
-    final key = '$idRuta-${sede.idDestino}';
+    final key = '$idSalida-${sede.idDestino}';
     setState(() => _sedesActualizando.add(key));
     final res = await _service.dejarEnSede(
-      idRuta: idRuta,
+      idSalida: idSalida,
       idDestino: sede.idDestino!,
       novedades: resultado.novedades,
       foto: resultado.foto,
@@ -479,9 +480,7 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
         '${cliente?['nombre'] ?? ''} ${cliente?['apellido'] ?? ''}'.trim();
     final nombreMostrado = nombreCliente.isNotEmpty ? nombreCliente : '—';
     // Municipio donde quedó varado el paquete (destino original de la venta)
-    // -- corregido 2026-09-13: antes no se mostraba, y un convoy con paradas
-    // intermedias puede traer paquetes de más de un municipio a la vez sin
-    // forma de distinguirlos.
+    // -- corregido 2026-09-13: antes no se mostraba.
     final destino = destinatario?['destino'] as Map<String, dynamic>?;
     final municipio = destino?['municipio'] as String?;
     final intentos = _toInt(p['intentosEntrega']) ?? 0;
@@ -724,33 +723,33 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
   }
 
   Widget _buildGrupo(_GrupoRuta grupo) {
-    final ruta = grupo.ruta;
-    final destino = ruta?['destino'] as Map<String, dynamic>?;
+    final salida = grupo.salida;
+    final destino =
+        (salida?['ruta'] as Map<String, dynamic>?)?['destino']
+            as Map<String, dynamic>?;
     final destinoMunicipio = destino?['municipio'] as String?;
-    final rutaLabel = ruta != null
-        ? ((ruta['origen'] as String?)?.isNotEmpty == true
-              ? '${ruta['origen']}${(destinoMunicipio?.isNotEmpty ?? false) ? ' - $destinoMunicipio' : ''}'
-              : 'Ruta #${grupo.idRuta ?? '—'}')
+    final rutaLabel = salida != null
+        ? ((salida['origen'] as String?)?.isNotEmpty == true
+              ? '${salida['origen']}${(destinoMunicipio?.isNotEmpty ?? false) ? ' - $destinoMunicipio' : ''}'
+              : 'Ruta #${grupo.idSalida ?? '—'}')
         : 'Ruta desconocida';
     // horaSalida llega como "HH:mm:ss" (24h) del backend -- se muestra en 12h con
     // AM/PM, igual que en el listado de Rutas del panel web (formatHora12()).
-    final horaSalida = _formatHora12(ruta?['horaSalida'] as String?) ?? '';
-    final detalle = ruta != null
-        ? '${ruta['fechaSalida'] ?? '—'} $horaSalida'.trim()
+    final horaSalida = _formatHora12(salida?['horaSalida'] as String?) ?? '';
+    final detalle = salida != null
+        ? '${salida['fechaSalida'] ?? '—'} $horaSalida'.trim()
         : '';
-    // El conductor solo puede legalizar mientras la ruta está "En Ruta" — antes
-    // de eso no ha salido de bodega (misma validación en el backend,
+    // El conductor solo puede legalizar mientras la salida está "En Ruta" —
+    // antes de eso no ha salido de bodega (misma validación en el backend,
     // encomiendaService.dejarPaquetesEnSede).
-    final rutaEnRuta = ruta != null && ruta['estado'] == 'En Ruta';
+    final rutaEnRuta = salida != null && salida['estado'] == 'En Ruta';
 
+    // Rutas directas: esta salida entrega en un solo municipio, así que basta con
+    // saber si ya se dejaron todos sus paquetes en la sede o todavía falta algo.
     final sedes = grupo.sedes.values.toList();
-    final sedesCompletadas = sedes
-        .where(
-          (s) => s.paquetes.every(
-            (p) => (p['estado'] as String?) != 'Por entregar',
-          ),
-        )
-        .length;
+    final entregaCompletada = sedes.every(
+      (s) => s.paquetes.every((p) => (p['estado'] as String?) != 'Por entregar'),
+    );
 
     return SectionCard(
       child: Column(
@@ -792,9 +791,9 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
                 )
               else
                 Text(
-                  'Sedes: $sedesCompletadas de ${sedes.length}',
+                  entregaCompletada ? 'Entregado en sede' : 'Pendiente de entregar',
                   style: TextStyle(
-                    color: AppColors.textSub,
+                    color: entregaCompletada ? AppColors.green : AppColors.textSub,
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                   ),
@@ -804,19 +803,19 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
           const SizedBox(height: 6),
           for (final sede in sedes) ...[
             const SizedBox(height: 8),
-            _buildSede(grupo.idRuta, sede, rutaEnRuta),
+            _buildSede(grupo.idSalida, sede, rutaEnRuta),
           ],
         ],
       ),
     );
   }
 
-  Widget _buildSede(int? idRuta, _GrupoSede sede, bool rutaEnRuta) {
+  Widget _buildSede(int? idSalida, _GrupoSede sede, bool rutaEnRuta) {
     final pendientes = sede.paquetes
         .where((p) => (p['estado'] as String?) == 'Por entregar')
         .toList();
     final completada = pendientes.isEmpty;
-    final key = '$idRuta-${sede.idDestino}';
+    final key = '$idSalida-${sede.idDestino}';
     final actualizando = _sedesActualizando.contains(key);
 
     return Container(
@@ -881,7 +880,7 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
               child: OutlinedButton.icon(
                 onPressed: actualizando
                     ? null
-                    : () => _dejarEnSede(idRuta, sede),
+                    : () => _dejarEnSede(idSalida, sede),
                 icon: actualizando
                     ? SizedBox(
                         width: 15,
@@ -1118,10 +1117,10 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
 }
 
 class _GrupoRuta {
-  final int? idRuta;
-  final Map<String, dynamic>? ruta;
+  final int? idSalida;
+  final Map<String, dynamic>? salida;
   final Map<int, _GrupoSede> sedes = {};
-  _GrupoRuta({required this.idRuta, required this.ruta});
+  _GrupoRuta({required this.idSalida, required this.salida});
 }
 
 class _GrupoSede {

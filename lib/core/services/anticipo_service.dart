@@ -7,21 +7,22 @@ import '../models.dart';
 class AnticipoService {
   ApiClient get _api => ApiClient();
 
-  // Solo rutas que aún no han iniciado ('Programada') y habilitadas — el
+  // Solo salidas que aún no han iniciado ('Programada') y habilitadas — el
   // backend igual rechaza con 409 si el conductor elegido ya tiene un
-  // anticipo activo en esa ruta. Un anticipo cuelga de una Ruta (plantilla
-  // reutilizable) + el par vehículo/conductor del convoy que le corresponde
-  // (ver anticipoService.create() en el backend) — no hay una "programación"
-  // separada.
+  // anticipo activo en esa salida. Un anticipo cuelga de una SalidaProgramada
+  // (el viaje concreto, con fecha/hora/estado/convoy propios) + el par
+  // vehículo/conductor del convoy que le corresponde (ver
+  // anticipoService.create() en el backend) — la plantilla reutilizable
+  // (Ruta) va anidada dentro de cada salida como `salida.ruta`.
   //
   // Trae `paresVehiculoConductor` (con conductor/usuario y vehículo
   // anidados) para que la pantalla arme el segundo picker (vehículo +
-  // conductor de la ruta elegida) — igual que `rutasNormalizadas` en el
+  // conductor de la salida elegida) — igual que `rutasNormalizadas` en el
   // frontend web (AnticipoExcedenteContext.jsx).
-  Future<List<Map<String, dynamic>>> getRutas() async {
+  Future<List<Map<String, dynamic>>> getSalidas() async {
     try {
       final response = await _api.get(
-        '/api/rutas',
+        '/api/salidas',
         queryParams: {
           'estado': 'Programada',
           'habilitado': 'true',
@@ -34,7 +35,7 @@ class AnticipoService {
       }
       return [];
     } catch (e) {
-      debugPrint('getRutas() falló: $e');
+      debugPrint('getSalidas() falló: $e');
       rethrow;
     }
   }
@@ -120,13 +121,13 @@ class AnticipoService {
     }
   }
 
-  // Solo admin — POST /api/anticipos exige idRuta + idRutaVehiculoConductor.
+  // Solo admin — POST /api/anticipos exige idSalida + idSalidaVehiculoConductor.
   // El idConductor ya no se manda: el backend lo deriva solo del par
   // vehículo/conductor elegido (anticipoService.create()), para que nunca
   // queden desincronizados.
   Future<Map<String, dynamic>> crearAnticipo({
-    required String idRuta,
-    required String idRutaVehiculoConductor,
+    required String idSalida,
+    required String idSalidaVehiculoConductor,
     required double valorAnticipo,
     String? fechaEntrega,
   }) async {
@@ -134,8 +135,8 @@ class AnticipoService {
       final response = await _api.post(
         '/api/anticipos',
         data: {
-          'idRuta': int.tryParse(idRuta),
-          'idRutaVehiculoConductor': int.tryParse(idRutaVehiculoConductor),
+          'idSalida': int.tryParse(idSalida),
+          'idSalidaVehiculoConductor': int.tryParse(idSalidaVehiculoConductor),
           'valorAnticipo': valorAnticipo,
           'fechaEntrega': ?fechaEntrega,
         },
@@ -154,7 +155,7 @@ class AnticipoService {
 
   // PUT /api/anticipos/:id — qué campos se aceptan depende del estado actual
   // (ver anticipoService.update() en el backend):
-  //   Entregado        -> idRuta / idRutaVehiculoConductor / valorAnticipo / fechaEntrega / soporte
+  //   Entregado        -> idSalida / idSalidaVehiculoConductor / valorAnticipo / fechaEntrega / soporte
   //   En Legalización   -> solo valorGastado (obligatorio) / soporte
   // El caller decide qué mandar; este método no filtra nada por su cuenta.
   Future<Map<String, dynamic>> actualizarAnticipo(
@@ -178,9 +179,9 @@ class AnticipoService {
   // Igual que useAnticiposActivos.js (frontend web): anticipos "activos" =
   // habilitado:true + estado en {Entregado, En Legalización} -- mismo criterio
   // que anticipoService.js del backend (create()/update()) para decidir si un
-  // conductor "ya tiene anticipo" en una ruta. Devuelve las claves
-  // "idRuta-idConductor" ya activas, para que el wizard de Registrar/Editar no
-  // ofrezca una ruta o un par vehículo-conductor que el backend de todas
+  // conductor "ya tiene anticipo" en una salida. Devuelve las claves
+  // "idSalida-idConductor" ya activas, para que el wizard de Registrar/Editar no
+  // ofrezca una salida o un par vehículo-conductor que el backend de todas
   // formas iba a rechazar con 409 -- antes solo se sabía al final, al guardar.
   // `excluirId`: en Editar, el propio anticipo que se está editando no debe
   // contar contra sí mismo (mismo criterio que el backend con
@@ -200,7 +201,7 @@ class AnticipoService {
         final datos = result['data'] as List<Anticipo>;
         total = result['total'] as int? ?? datos.length;
         for (final a in datos) {
-          if (a.id != excluirId) claves.add('${a.idRuta}-${a.idConductor}');
+          if (a.id != excluirId) claves.add('${a.idSalida}-${a.idConductor}');
         }
         acumulados += datos.length;
         if (datos.isEmpty) break;
@@ -214,21 +215,21 @@ class AnticipoService {
   }
 
   // Igual que usePaquetesPorPar.js (frontend web): cuántos paquetes tiene
-  // asignados cada par vehículo+conductor de la ruta elegida -- solo para
+  // asignados cada par vehículo+conductor de la salida elegida -- solo para
   // avisar (no bloquear) si el par elegido para el anticipo va a salir vacío.
-  Future<Map<int, int>> getPaquetesPorPar(String idRuta) async {
+  Future<Map<int, int>> getPaquetesPorPar(String idSalida) async {
     final conteo = <int, int>{};
     try {
       final response = await _api.get(
         '/api/encomiendas',
-        queryParams: {'idRuta': idRuta, 'limit': 100},
+        queryParams: {'idSalida': idSalida, 'limit': 100},
       );
       final data = (response.data['data'] as List?) ?? [];
       for (final venta in data) {
         final paquetes = (venta['paquetes'] as List?) ?? [];
         for (final p in paquetes) {
           final id = int.tryParse(
-            p['idRutaVehiculoConductor']?.toString() ?? '',
+            p['idSalidaVehiculoConductor']?.toString() ?? '',
           );
           if (id != null) conteo[id] = (conteo[id] ?? 0) + 1;
         }

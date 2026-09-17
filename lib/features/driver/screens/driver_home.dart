@@ -380,10 +380,9 @@ class _DriverHomeState extends State<DriverHome> {
                                     // LOGICA.md): dos casos nuevos antes de
                                     // llegar al de siempre -- sin regreso
                                     // programado todavía (`esperandoRegreso`),
-                                    // o regreso programado pero con sedes
-                                    // propias sin completar (`sedesDelRegreso`,
-                                    // mismo texto de siempre pero aclarando que
-                                    // ya no son las sedes de la ida).
+                                    // o regreso programado pero sin terminar de
+                                    // entregar (`esDelRegreso`, mismo texto de
+                                    // siempre pero aclarando que ya no es la ida).
                                     editDisabledReason: a.puedeLegalizar
                                         ? null
                                         : a.estado ==
@@ -394,10 +393,10 @@ class _DriverHomeState extends State<DriverHome> {
                                         : a.estado ==
                                                   EstadoAnticipo
                                                       .enLegalizacion &&
-                                              a.sedesPendientes
-                                        ? (a.sedesDelRegreso
-                                              ? 'Aún no puedes legalizarlo (completa las sedes del regreso)'
-                                              : 'Aún no puedes legalizarlo (completa las sedes)')
+                                              a.entregaPendiente == true
+                                        ? (a.esDelRegreso
+                                              ? 'Aún no puedes legalizarlo (termina de entregar el regreso)'
+                                              : 'Aún no puedes legalizarlo (termina de entregar)')
                                         : a.estado == EstadoAnticipo.entregado
                                         ? 'Aún no puedes legalizarlo'
                                         : 'Ya está legalizado',

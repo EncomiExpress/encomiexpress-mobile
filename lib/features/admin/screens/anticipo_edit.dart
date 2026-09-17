@@ -77,7 +77,7 @@ class _AnticipoEditState extends State<AnticipoEdit> {
   String? _idRuta;
   String? _idRutaVehiculoConductor;
 
-  // Claves "idRuta-idConductor" con un anticipo Entregado/En Legalización ya
+  // Claves "idSalida-idConductor" con un anticipo Entregado/En Legalización ya
   // activo -- igual que useAnticiposActivos.js (web), para no ofrecer en el
   // buscador una ruta/par que el backend de todas formas iba a rechazar con
   // 409 al guardar. Vacío mientras carga o si falla (no bloquea nada extra).
@@ -131,7 +131,7 @@ class _AnticipoEditState extends State<AnticipoEdit> {
   // demás casos (solo consulta) se muestra el conductor que ya traía el
   // anticipo.
   Map<String, dynamic> get _rutaSeleccionada => _rutas.firstWhere(
-    (r) => r['idRuta']?.toString() == _idRuta,
+    (r) => r['idSalida']?.toString() == _idRuta,
     orElse: () => <String, dynamic>{},
   );
 
@@ -139,8 +139,8 @@ class _AnticipoEditState extends State<AnticipoEdit> {
       ((_rutaSeleccionada['paresVehiculoConductor'] as List?) ?? [])
           .cast<Map<String, dynamic>>();
 
-  bool _tieneAnticipoActivo(dynamic idRuta, dynamic idConductor) =>
-      _clavesActivas.contains('$idRuta-$idConductor');
+  bool _tieneAnticipoActivo(dynamic idSalida, dynamic idConductor) =>
+      _clavesActivas.contains('$idSalida-$idConductor');
 
   // Oculta del buscador de Ruta las que ya no tienen NINGÚN par disponible
   // (todos sus conductores ya tienen anticipo activo en ella) -- igual que
@@ -150,7 +150,7 @@ class _AnticipoEditState extends State<AnticipoEdit> {
     final pares = ((r['paresVehiculoConductor'] as List?) ?? [])
         .cast<Map<String, dynamic>>();
     return pares.any(
-      (p) => !_tieneAnticipoActivo(r['idRuta'], p['idConductor']),
+      (p) => !_tieneAnticipoActivo(r['idSalida'], p['idConductor']),
     );
   }).toList();
 
@@ -164,7 +164,7 @@ class _AnticipoEditState extends State<AnticipoEdit> {
   Map<String, dynamic> get _parSeleccionado =>
       _paresDeRutaSeleccionada.firstWhere(
         (p) =>
-            p['idRutaVehiculoConductor']?.toString() ==
+            p['idSalidaVehiculoConductor']?.toString() ==
             _idRutaVehiculoConductor,
         orElse: () => <String, dynamic>{},
       );
@@ -187,7 +187,7 @@ class _AnticipoEditState extends State<AnticipoEdit> {
   void initState() {
     super.initState();
     final a = widget.anticipo;
-    _idRuta = a?.idRuta.toString();
+    _idRuta = a?.idSalida.toString();
     _valorAnticipoCtrl = TextEditingController(
       text: a != null ? a.valorAnticipo.toStringAsFixed(0) : '',
     );
@@ -199,7 +199,7 @@ class _AnticipoEditState extends State<AnticipoEdit> {
 
     _valorAnticipoOriginal = a?.valorAnticipo ?? 0;
     _valorGastadoOriginal = a?.valorGastado ?? 0;
-    _idRutaOriginal = a?.idRuta.toString();
+    _idRutaOriginal = a?.idSalida.toString();
     _fechaEntregaOriginal = _fechaEntrega;
 
     if (widget.isAdmin && (_isNew || _entregado)) {
@@ -236,7 +236,7 @@ class _AnticipoEditState extends State<AnticipoEdit> {
     });
     try {
       final resultados = await Future.wait([
-        _anticipoService.getRutas(),
+        _anticipoService.getSalidas(),
         _anticipoService.getClavesAnticiposActivos(
           excluirId: widget.anticipo?.id,
         ),
@@ -259,7 +259,7 @@ class _AnticipoEditState extends State<AnticipoEdit> {
             orElse: () => <String, dynamic>{},
           );
           if (par.isNotEmpty) {
-            _idRutaVehiculoConductor = par['idRutaVehiculoConductor']
+            _idRutaVehiculoConductor = par['idSalidaVehiculoConductor']
                 ?.toString();
             _idRutaVehiculoConductorOriginal = _idRutaVehiculoConductor;
           }
@@ -549,8 +549,8 @@ class _AnticipoEditState extends State<AnticipoEdit> {
         return;
       }
       result = await _anticipoService.crearAnticipo(
-        idRuta: _idRuta!,
-        idRutaVehiculoConductor: _idRutaVehiculoConductor!,
+        idSalida: _idRuta!,
+        idSalidaVehiculoConductor: _idRutaVehiculoConductor!,
         valorAnticipo: double.tryParse(_valorAnticipoCtrl.text) ?? 0,
         fechaEntrega: _isoDate(_fechaEntrega!),
       );
@@ -579,8 +579,8 @@ class _AnticipoEditState extends State<AnticipoEdit> {
         return;
       }
       result = await _anticipoService.actualizarAnticipo(widget.anticipo!.id, {
-        'idRuta': int.tryParse(_idRuta ?? ''),
-        'idRutaVehiculoConductor': int.tryParse(_idRutaVehiculoConductor ?? ''),
+        'idSalida': int.tryParse(_idRuta ?? ''),
+        'idSalidaVehiculoConductor': int.tryParse(_idRutaVehiculoConductor ?? ''),
         'valorAnticipo': valorAnticipo,
         if (_fechaEntrega != null) 'fechaEntrega': _isoDate(_fechaEntrega!),
       });
@@ -820,7 +820,11 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                                                   r,
                                                 ) {
                                                   final destino =
-                                                      r['destino']
+                                                      (r['ruta']
+                                                              as Map<
+                                                                String,
+                                                                dynamic
+                                                              >?)?['destino']
                                                           as Map<
                                                             String,
                                                             dynamic
@@ -828,7 +832,7 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                                                   final origen =
                                                       (r['origen']
                                                           as String?) ??
-                                                      'Ruta #${r['idRuta']}';
+                                                      'Ruta #${r['idSalida']}';
                                                   final destinoTxt =
                                                       destino?['municipio']
                                                           as String? ??
@@ -836,7 +840,7 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                                                   return DropdownMenuItem<
                                                     String
                                                   >(
-                                                    value: r['idRuta']
+                                                    value: r['idSalida']
                                                         .toString(),
                                                     child: Text(
                                                       '$origen → $destinoTxt',
@@ -856,7 +860,7 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                                                   _idRutaVehiculoConductor =
                                                       pares.length == 1
                                                       ? pares
-                                                            .first['idRutaVehiculoConductor']
+                                                            .first['idSalidaVehiculoConductor']
                                                             ?.toString()
                                                       : null;
                                                   if (_fechaEntrega != null) {
@@ -868,13 +872,13 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                                                     _cargarPaquetesPorPar(v);
                                                 }),
                                               )),
-                                  // Anticipo ida+retorno: un anticipo sobre una IDA (idRutaIda
+                                  // Anticipo ida+retorno: un anticipo sobre una IDA (idSalidaIda
                                   // == null) cubre también su regreso, aunque ese regreso
                                   // todavía no exista -- se avisa acá, igual que en
                                   // PasoRutaVehiculo.jsx (web).
                                   if (!_loadingRutas &&
                                       _rutaSeleccionada.isNotEmpty &&
-                                      _rutaSeleccionada['idRutaIda'] ==
+                                      _rutaSeleccionada['idSalidaIda'] ==
                                           null) ...[
                                     const SizedBox(height: 10),
                                     _buildAlert(
@@ -916,7 +920,7 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                                                   _nombreConductorDePar(p);
                                               return DropdownMenuItem<String>(
                                                 value:
-                                                    p['idRutaVehiculoConductor']
+                                                    p['idSalidaVehiculoConductor']
                                                         .toString(),
                                                 child: Text('$placa — $nombre'),
                                               );

@@ -44,17 +44,17 @@ class PaqueteService {
   }
 
   // PATCH /api/paquetes/sede — el conductor del tramo troncal marca DE UNA VEZ
-  // todos los paquetes "Por entregar" de una sede (parada o destino final) como
-  // "En sede de destino". Foto y novedades son opcionales (ver dejarPaquetesEnSede).
+  // todos los paquetes "Por entregar" de la sede del destino final como "En
+  // sede de destino". Foto y novedades son opcionales (ver dejarPaquetesEnSede).
   Future<Map<String, dynamic>> dejarEnSede({
-    required int idRuta,
+    required int idSalida,
     required int idDestino,
     String novedades = '',
     PlatformFile? foto,
   }) async {
     try {
       final map = <String, dynamic>{
-        'idRuta': idRuta.toString(),
+        'idSalida': idSalida.toString(),
         'idDestino': idDestino.toString(),
         'novedades': novedades,
       };
