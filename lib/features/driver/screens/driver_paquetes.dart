@@ -749,13 +749,22 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
     // encomiendaService.dejarPaquetesEnSede).
     final rutaEnRuta = salida != null && salida['estado'] == 'En Ruta';
 
-    // Rutas directas: esta salida entrega en un solo municipio, así que basta con
-    // saber si ya se dejaron todos sus paquetes en la sede o todavía falta algo.
+    // Rutas directas: esta salida entrega en un solo municipio, así que
+    // `sedes` en la práctica siempre trae un único elemento -- se aplana
+    // directo en vez de envolverlo en su propia tarjeta "por sede" (ese nivel
+    // solo tenía sentido cuando una ida podía repartir en varias paradas
+    // distintas). La dirección de la sede (si el destino la tiene registrada)
+    // se sigue mostrando, como dato útil de dónde dejar los paquetes.
     final sedes = grupo.sedes.values.toList();
-    final entregaCompletada = sedes.every(
-      (s) =>
-          s.paquetes.every((p) => (p['estado'] as String?) != 'Por entregar'),
-    );
+    final todosPaquetes = sedes.expand((s) => s.paquetes).toList();
+    final pendientes = todosPaquetes
+        .where((p) => (p['estado'] as String?) == 'Por entregar')
+        .toList();
+    final entregaCompletada = pendientes.isEmpty;
+    final sedeUnica = sedes.isNotEmpty ? sedes.first : null;
+    final key = '${grupo.idSalida}-${sedeUnica?.idDestino}';
+    final actualizando = _sedesActualizando.contains(key);
+    final gruposGuia = _agruparPorGuia(todosPaquetes);
 
     return SectionCard(
       child: Column(
@@ -799,7 +808,7 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
                 Text(
                   entregaCompletada
                       ? 'Entregado en sede'
-                      : 'Pendiente de entregar',
+                      : 'Pendiente de entregar (${pendientes.length})',
                   style: TextStyle(
                     color: entregaCompletada
                         ? AppColors.green
@@ -810,88 +819,27 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
                 ),
             ],
           ),
-          const SizedBox(height: 6),
-          for (final sede in sedes) ...[
-            const SizedBox(height: 8),
-            _buildSede(grupo.idSalida, sede, rutaEnRuta),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSede(int? idSalida, _GrupoSede sede, bool rutaEnRuta) {
-    final pendientes = sede.paquetes
-        .where((p) => (p['estado'] as String?) == 'Por entregar')
-        .toList();
-    final completada = pendientes.isEmpty;
-    final key = '$idSalida-${sede.idDestino}';
-    final actualizando = _sedesActualizando.contains(key);
-    final gruposGuia = _agruparPorGuia(sede.paquetes);
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.bgGray,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.location_city_outlined,
-                size: 16,
-                color: AppColors.textSub,
-              ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  sede.municipio,
-                  style: TextStyle(
-                    color: AppColors.textMain,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-              Text(
-                completada
-                    ? '${sede.paquetes.length} en sede'
-                    : '${pendientes.length} por dejar',
-                style: TextStyle(
-                  color: completada ? AppColors.green : AppColors.textSub,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          if (sede.direccion != null && sede.direccion!.isNotEmpty) ...[
+          if (sedeUnica?.direccion != null &&
+              sedeUnica!.direccion!.isNotEmpty) ...[
             const SizedBox(height: 2),
-            Padding(
-              padding: const EdgeInsets.only(left: 22),
-              child: Text(
-                sede.direccion!,
-                style: TextStyle(color: AppColors.textSub, fontSize: 12),
-              ),
+            Text(
+              sedeUnica.direccion!,
+              style: TextStyle(color: AppColors.textSub, fontSize: 12),
             ),
           ],
           const SizedBox(height: 10),
-          for (final grupo in gruposGuia) ...[
-            _buildGuiaGroup(grupo),
-            if (grupo != gruposGuia.last) const SizedBox(height: 8),
+          for (final g in gruposGuia) ...[
+            _buildGuiaGroup(g),
+            if (g != gruposGuia.last) const SizedBox(height: 8),
           ],
-          if (rutaEnRuta && !completada) ...[
+          if (rutaEnRuta && !entregaCompletada && sedeUnica != null) ...[
             const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: actualizando
                     ? null
-                    : () => _dejarEnSede(idSalida, sede),
+                    : () => _dejarEnSede(grupo.idSalida, sedeUnica),
                 icon: actualizando
                     ? SizedBox(
                         width: 15,
