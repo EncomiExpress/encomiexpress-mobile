@@ -140,6 +140,7 @@ class _DriverPaquetesState extends State<DriverPaquetes> {
       mensaje:
           'El paquete $numeroGuia quedará marcado como devuelto a Medellín. Esta acción no se puede deshacer.',
       textoConfirmar: 'Llegó a Medellín',
+      colorConfirmar: AppColors.actionDanger,
     );
     if (!confirmado || !mounted) return;
 

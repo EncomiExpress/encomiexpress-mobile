@@ -146,7 +146,7 @@ class _RecoverPasswordScreenState extends State<RecoverPasswordScreen> {
                 children: [
                   TextButton(
                     onPressed: _loading ? null : () => Navigator.pop(context),
-                    style: TextButton.styleFrom(foregroundColor: AppColors.textSub)
+                    style: TextButton.styleFrom(foregroundColor: AppColors.actionNeutral)
                         .copyWith(
                       mouseCursor: WidgetStateProperty.resolveWith((states) =>
                           states.contains(WidgetState.disabled)

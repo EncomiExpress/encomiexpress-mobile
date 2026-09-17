@@ -368,8 +368,9 @@ class _DriverHomeState extends State<DriverHome> {
                                                         ),
                                                   ),
                                                 );
-                                            if (updated != null)
+                                            if (updated != null) {
                                               _reemplazar(updated);
+                                            }
                                           }
                                         : null,
                                     // Textos cortos a propósito (pedido de la

@@ -21,6 +21,7 @@ class ThemeTokens {
   final Color primaryLight;
   final Color primaryDark;
   final Color primaryDarker;
+  final Color primaryDim;
   final Color secondary;
   final Color background;
   final Color surface;
@@ -32,6 +33,14 @@ class ThemeTokens {
   final StatusColor error;
   final StatusColor info;
   final StatusColor purple;
+  // Paleta de acciones estandarizada (botones, alertas, iconos) — puerto
+  // directo de shared/styles/theme/palette.js (frontend web): mismo hex en
+  // claro/oscuro a propósito, distinta de `success`/`warning`/`error` de
+  // arriba (esas son para chips/badges de estado, no para botones).
+  final StatusColor actionSuccess;
+  final StatusColor actionWarning;
+  final StatusColor actionDanger;
+  final StatusColor actionNeutral;
   final List<Color> gradientNavbar;
   final Color activeBg;
 
@@ -40,6 +49,7 @@ class ThemeTokens {
     required this.primaryLight,
     required this.primaryDark,
     required this.primaryDarker,
+    required this.primaryDim,
     required this.secondary,
     required this.background,
     required this.surface,
@@ -51,16 +61,27 @@ class ThemeTokens {
     required this.error,
     required this.info,
     required this.purple,
+    required this.actionSuccess,
+    required this.actionWarning,
+    required this.actionDanger,
+    required this.actionNeutral,
     required this.gradientNavbar,
     required this.activeBg,
   });
 }
+
+// Mismos valores que ACTION en palette.js (frontend web).
+const _actionSuccess = StatusColor(Color(0x1A10B981), Color(0xFF10B981));
+const _actionWarning = StatusColor(Color(0x1AF59E0B), Color(0xFFF59E0B));
+const _actionDanger = StatusColor(Color(0x1ACC1818), Color(0xFFCC1818));
+const _actionNeutral = StatusColor(Color(0x1A64748B), Color(0xFF64748B));
 
 const _blueLight = ThemeTokens(
   primary: Color(0xFF1A2E6E),
   primaryLight: Color(0xFFE8EEFF),
   primaryDark: Color(0xFF0F1C45),
   primaryDarker: Color(0xFF091236),
+  primaryDim: Color.fromRGBO(26, 46, 110, 0.1),
   secondary: Color(0xFF1A2E6E),
   background: Color(0xFFF5F6FA),
   surface: Color(0xFFFFFFFF),
@@ -72,6 +93,10 @@ const _blueLight = ThemeTokens(
   error: StatusColor(Color(0xFFFEE2E2), Color(0xFF991B1B)),
   info: StatusColor(Color(0xFFE3F2FD), Color(0xFF1565C0)),
   purple: StatusColor(Color(0xFFF3E5F5), Color(0xFF6A1B9A)),
+  actionSuccess: _actionSuccess,
+  actionWarning: _actionWarning,
+  actionDanger: _actionDanger,
+  actionNeutral: _actionNeutral,
   // Complemento no-semántico (verde azulado) en vez del rojo de la paleta
   // retirada -- se evita rojo/verde a propósito (reservados para status).
   gradientNavbar: [Color(0xFF0D9488), Color(0xFF1A2E6E), Color(0xFF0D9488)],
@@ -83,6 +108,7 @@ const _blueDark = ThemeTokens(
   primaryLight: Color(0xFFBCE2F3),
   primaryDark: Color(0xFF257EAE),
   primaryDarker: Color(0xFF155587),
+  primaryDim: Color.fromRGBO(100, 187, 226, 0.1),
   // Mismo azul que primary (antes era un rojo fijo #C62828) -- ver
   // comentario equivalente en palette.js del frontend web.
   secondary: Color(0xFF64BBE2),
@@ -96,6 +122,10 @@ const _blueDark = ThemeTokens(
   error: StatusColor(Color(0xFF4A1515), Color(0xFFEF5350)),
   info: StatusColor(Color(0xFF0D2B4E), Color(0xFF90CAF9)),
   purple: StatusColor(Color(0xFF2D1458), Color(0xFFCE93D8)),
+  actionSuccess: _actionSuccess,
+  actionWarning: _actionWarning,
+  actionDanger: _actionDanger,
+  actionNeutral: _actionNeutral,
   gradientNavbar: [Color(0xFF2DD4BF), Color(0xFF64BBE2), Color(0xFF2DD4BF)],
   activeBg: Color.fromRGBO(100, 187, 226, 0.15),
 );

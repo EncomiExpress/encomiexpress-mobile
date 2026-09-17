@@ -279,7 +279,9 @@ class _AdminHomeState extends State<AdminHome> {
             ? 'El anticipo de $nombreConductor quedará inhabilitado.'
             : 'El anticipo de $nombreConductor volverá a estar activo.',
         textoConfirmar: habilitadoActual ? 'Inhabilitar' : 'Habilitar',
-        colorConfirmar: habilitadoActual ? AppColors.red : AppColors.green,
+        colorConfirmar: habilitadoActual
+            ? AppColors.actionWarning
+            : AppColors.actionSuccess,
       );
       if (!confirmado || !mounted) return;
     }
@@ -361,13 +363,18 @@ class _AdminHomeState extends State<AdminHome> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.actionNeutral,
+                ),
                 child: const Text('Cancelar'),
               ),
               FilledButton(
                 onPressed: motivoValido
                     ? () => Navigator.pop(ctx, ctrl.text.trim())
                     : null,
-                style: FilledButton.styleFrom(backgroundColor: AppColors.red),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.actionWarning,
+                ),
                 child: const Text('Inhabilitar'),
               ),
             ],
@@ -641,8 +648,9 @@ class _AdminHomeState extends State<AdminHome> {
                                                         ),
                                                   ),
                                                 );
-                                            if (updated != null)
+                                            if (updated != null) {
                                               _reemplazar(updated);
+                                            }
                                           }
                                         : null,
                                     // Mismos 4 mensajes que useAnticipoColumns.jsx

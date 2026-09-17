@@ -41,6 +41,9 @@ class _AnticipoDetailState extends State<AnticipoDetail> {
           : '¿El conductor devolvió el excedente? El anticipo pasará a Completado '
               'y la fecha de entrega del excedente quedará registrada a la de hoy.',
       textoConfirmar: 'Confirmar',
+      colorConfirmar: esFaltante
+          ? AppColors.actionDanger
+          : AppColors.actionSuccess,
     );
     if (!confirmado || !mounted) return;
 

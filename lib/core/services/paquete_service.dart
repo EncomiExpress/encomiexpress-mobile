@@ -35,8 +35,9 @@ class PaqueteService {
         '/api/paquetes/$idPaquete/evidencia',
         data: formData,
       );
-      if (resp.statusCode == 200)
+      if (resp.statusCode == 200) {
         return {'success': true, 'data': resp.data['data']};
+      }
       return {'success': false, 'message': 'No se pudo actualizar el paquete'};
     } catch (e) {
       return {'success': false, 'message': _mensajeError(e)};

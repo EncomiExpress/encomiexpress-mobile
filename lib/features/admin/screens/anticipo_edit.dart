@@ -868,8 +868,9 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                                                         _validarFechaEntrega();
                                                   }
                                                   _paquetesPorPar = {};
-                                                  if (v != null)
+                                                  if (v != null) {
                                                     _cargarPaquetesPorPar(v);
+                                                  }
                                                 }),
                                               )),
                                   // Anticipo ida+retorno: un anticipo sobre una IDA (idSalidaIda
@@ -1090,11 +1091,13 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                                   readonly: !_isNew && !_entregado,
                                   maxValue: () => _maxValorMonto,
                                   validator: (v) {
-                                    if (v == null || v.isEmpty)
+                                    if (v == null || v.isEmpty) {
                                       return 'El valor del anticipo es obligatorio';
+                                    }
                                     final n = double.tryParse(v);
-                                    if (n == null || n <= 0)
+                                    if (n == null || n <= 0) {
                                       return 'Ingresa un valor válido mayor a 0';
+                                    }
                                     return null;
                                   },
                                 ),
@@ -1111,11 +1114,13 @@ class _AnticipoEditState extends State<AnticipoEdit> {
                                     // cota de sanidad fija, ya no depende de "Valor del anticipo".
                                     maxValue: () => _maxValorGastado,
                                     validator: (v) {
-                                      if (v == null || v.isEmpty)
+                                      if (v == null || v.isEmpty) {
                                         return 'El valor gastado es obligatorio';
+                                      }
                                       final n = double.tryParse(v);
-                                      if (n == null || n < 0)
+                                      if (n == null || n < 0) {
                                         return 'Ingresa un valor válido';
+                                      }
                                       return null;
                                     },
                                   ),
@@ -1650,8 +1655,9 @@ class _AnticipoEditState extends State<AnticipoEdit> {
         validator:
             validator ??
             (v) {
-              if (requerido && (v == null || v.isEmpty))
+              if (requerido && (v == null || v.isEmpty)) {
                 return 'Campo requerido';
+              }
               return null;
             },
         decoration: InputDecoration(

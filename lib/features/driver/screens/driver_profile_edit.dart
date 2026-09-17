@@ -243,8 +243,9 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
       final algunaLlena =
           actual.isNotEmpty || nueva.isNotEmpty || confirmar.isNotEmpty;
       if (algunaLlena) {
-        if (actual.isEmpty)
+        if (actual.isEmpty) {
           e['passwordActual'] = 'Ingresa tu contraseña actual';
+        }
         if (nueva.isEmpty) {
           e['passwordNueva'] = 'La nueva contraseña es obligatoria';
         } else if (!_passwordRegex.hasMatch(nueva)) {
@@ -462,7 +463,7 @@ class _DriverProfileEditState extends State<DriverProfileEdit> {
                       ),
                       child: Text(
                         'Cancelar',
-                        style: TextStyle(color: AppColors.textSub),
+                        style: TextStyle(color: AppColors.actionNeutral),
                       ),
                     ),
                   const Spacer(),

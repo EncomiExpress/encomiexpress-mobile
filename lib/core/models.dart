@@ -29,6 +29,20 @@ class AppColors {
   static Color purple = _initial.purple.color;
   static Color purpleBg = _initial.purple.bg;
 
+  // Paleta de acciones estandarizada (botones, alertas, iconos) — distinta
+  // de green/orange/red de arriba (esos son para chips/badges de estado).
+  // Ver comentario en theme_tokens.dart y shared/styles/theme/palette.js
+  // (frontend web).
+  static Color actionSuccess = _initial.actionSuccess.color;
+  static Color actionSuccessBg = _initial.actionSuccess.bg;
+  static Color actionWarning = _initial.actionWarning.color;
+  static Color actionWarningBg = _initial.actionWarning.bg;
+  static Color actionDanger = _initial.actionDanger.color;
+  static Color actionDangerBg = _initial.actionDanger.bg;
+  static Color actionNeutral = _initial.actionNeutral.color;
+  static Color actionNeutralBg = _initial.actionNeutral.bg;
+  static Color primaryDim = _initial.primaryDim;
+
   static Color bgGray = _initial.background;
   static Color cardBg = _initial.surface;
   static Color textMain = _initial.textPrimary;
@@ -44,6 +58,7 @@ class AppColors {
     primaryLight: Color(0xFFE8EEFF),
     primaryDark: Color(0xFF0F1C45),
     primaryDarker: Color(0xFF091236),
+    primaryDim: Color.fromRGBO(26, 46, 110, 0.1),
     secondary: Color(0xFF1A2E6E),
     background: Color(0xFFF5F6FA),
     surface: Colors.white,
@@ -55,6 +70,10 @@ class AppColors {
     error: StatusColor(Color(0xFFFEE2E2), Color(0xFF991B1B)),
     info: StatusColor(Color(0xFFE3F2FD), Color(0xFF1565C0)),
     purple: StatusColor(Color(0xFFF3E5F5), Color(0xFF6A1B9A)),
+    actionSuccess: StatusColor(Color(0x1A10B981), Color(0xFF10B981)),
+    actionWarning: StatusColor(Color(0x1AF59E0B), Color(0xFFF59E0B)),
+    actionDanger: StatusColor(Color(0x1ACC1818), Color(0xFFCC1818)),
+    actionNeutral: StatusColor(Color(0x1A64748B), Color(0xFF64748B)),
     gradientNavbar: [Color(0xFF0D9488), Color(0xFF1A2E6E), Color(0xFF0D9488)],
     activeBg: Color.fromRGBO(26, 46, 110, 0.12),
   );
@@ -78,6 +97,15 @@ class AppColors {
     blueBg = t.info.bg;
     purple = t.purple.color;
     purpleBg = t.purple.bg;
+    actionSuccess = t.actionSuccess.color;
+    actionSuccessBg = t.actionSuccess.bg;
+    actionWarning = t.actionWarning.color;
+    actionWarningBg = t.actionWarning.bg;
+    actionDanger = t.actionDanger.color;
+    actionDangerBg = t.actionDanger.bg;
+    actionNeutral = t.actionNeutral.color;
+    actionNeutralBg = t.actionNeutral.bg;
+    primaryDim = t.primaryDim;
     bgGray = t.background;
     cardBg = t.surface;
     textMain = t.textPrimary;

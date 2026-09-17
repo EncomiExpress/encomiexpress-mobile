@@ -16,13 +16,13 @@ void showAppSnackBar(
   late final IconData icon;
   switch (severity) {
     case 'error':
-      color = AppColors.red;
-      bg = AppColors.redBg;
+      color = AppColors.actionDanger;
+      bg = AppColors.actionDangerBg;
       icon = Icons.error_outline;
       break;
     case 'warning':
-      color = AppColors.orange;
-      bg = AppColors.orangeBg;
+      color = AppColors.actionWarning;
+      bg = AppColors.actionWarningBg;
       icon = Icons.warning_amber_outlined;
       break;
     case 'info':
@@ -31,8 +31,8 @@ void showAppSnackBar(
       icon = Icons.info_outline;
       break;
     default:
-      color = AppColors.green;
-      bg = AppColors.greenBg;
+      color = AppColors.actionSuccess;
+      bg = AppColors.actionSuccessBg;
       icon = Icons.check_circle_outline;
   }
 
@@ -99,7 +99,7 @@ Future<bool> confirmarDialog(
           child: Text(
             'Cancelar',
             style: TextStyle(
-              color: AppColors.textSub,
+              color: AppColors.actionNeutral,
               fontWeight: FontWeight.w600,
             ),
           ),
