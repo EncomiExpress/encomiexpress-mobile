@@ -1514,9 +1514,13 @@ class AnticipoCard extends StatelessWidget {
                               anticipo.habilitado
                                   ? Icons.block_outlined
                                   : Icons.check_circle_outline,
+                              // Paleta de acciones estandarizada (igual que el
+                              // colorConfirmar del diálogo en admin_home.dart
+                              // para esta misma acción) -- no la de status
+                              // (AppColors.red/green) que es para chips.
                               color: anticipo.habilitado
-                                  ? AppColors.red
-                                  : AppColors.green,
+                                  ? AppColors.actionWarning
+                                  : AppColors.actionSuccess,
                               size: 20,
                             ),
                             constraints: const BoxConstraints(),
