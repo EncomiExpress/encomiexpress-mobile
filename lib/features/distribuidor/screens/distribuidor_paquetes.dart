@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/models.dart';
 import '../../../../core/platform_utils.dart';
+import '../../../../core/recaudo.dart';
 import '../../../../core/services/paquete_service.dart';
 import '../../../../core/widgets.dart';
 import '../../../../core/image_viewer.dart';
@@ -200,7 +201,15 @@ class _DistribuidorPaquetesState extends State<DistribuidorPaquetes> {
         ? 'Marcar como no entregado'
         : 'Registrar intento fallido';
 
-    final resultado = await _EntregaFinalSheet.show(context, titulo: titulo);
+    final resultado = await _EntregaFinalSheet.show(
+      context,
+      titulo: titulo,
+      aviso: avisoCobro(
+        p['encomienda'] as Map<String, dynamic>?,
+        accion,
+        valorDelPaquete(p),
+      ),
+    );
     if (resultado == null || !mounted) return;
 
     setState(() => _actualizando.add(idPaquete));
@@ -221,7 +230,13 @@ class _DistribuidorPaquetesState extends State<DistribuidorPaquetes> {
               : 'No se pudo registrar la entrega'),
       severity: res['success'] == true ? 'success' : 'error',
     );
-    if (res['success'] == true) _load();
+    if (res['success'] == true) {
+      // El historial ya no está al día (este paquete acaba de cerrarse o sumó un
+      // intento): se vuelve a cargar la próxima vez que se abra esa pestaña, en
+      // vez de mostrar lo que se cargó antes hasta que se jale para refrescar.
+      _historialCargado = false;
+      _load();
+    }
   }
 
   @override
@@ -412,12 +427,29 @@ class _DistribuidorPaquetesState extends State<DistribuidorPaquetes> {
   // separado.
   Widget _buildGuiaGroup(_GrupoVenta grupoGuia) {
     final primero = grupoGuia.paquetes.first;
-    final destinatario =
-        (primero['encomienda'] as Map<String, dynamic>?)?['destinatario']
-            as Map<String, dynamic>?;
+    final encomienda = primero['encomienda'] as Map<String, dynamic>?;
+    final destinatario = encomienda?['destinatario'] as Map<String, dynamic>?;
     final nombre = (destinatario?['nombreDestinatario'] as String?) ?? '';
     final direccion = (destinatario?['direccionDestinatario'] as String?) ?? '';
     final telefono = (destinatario?['telefonoDestinatario'] as String?) ?? '';
+    final pillModalidad = _pillModalidad(encomienda);
+    // Todos los paquetes pendientes de esta guía, no solo los que caen en la
+    // página visible ("Mostrar 5 más" pagina por paquete y puede cortar una
+    // guía a la mitad): de ahí sale lo que falta por cobrar.
+    final idVenta = _toInt(encomienda?['idEncomiendaVenta']);
+    final pendientesDeLaGuia = idVenta == null
+        ? grupoGuia.paquetes
+        : _paquetes
+              .whereType<Map<String, dynamic>>()
+              .where(
+                (q) =>
+                    _toInt(
+                      (q['encomienda']
+                          as Map<String, dynamic>?)?['idEncomiendaVenta'],
+                    ) ==
+                    idVenta,
+              )
+              .toList();
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -449,6 +481,21 @@ class _DistribuidorPaquetesState extends State<DistribuidorPaquetes> {
               _estadoChip('En sede de destino'),
             ],
           ),
+          // Contraentrega: aviso grande con lo que FALTA por cobrar de esta guía
+          // (la suma de sus paquetes todavía por entregar, así que baja a medida
+          // que se van entregando) -- es lo primero que el distribuidor necesita
+          // saber antes de entregar. Pago inmediato: solo una etiqueta ("ya
+          // pagado, no cobres nada").
+          if (esContraentrega(encomienda)) ...[
+            const SizedBox(height: 10),
+            _bannerCobro(
+              monto: montoPorCobrar(pendientesDeLaGuia),
+              totalGuia: totalDeLaGuia(encomienda),
+            ),
+          ] else if (pillModalidad != null) ...[
+            const SizedBox(height: 8),
+            Align(alignment: Alignment.centerLeft, child: pillModalidad),
+          ],
           if (nombre.isNotEmpty ||
               direccion.isNotEmpty ||
               telefono.isNotEmpty) ...[
@@ -511,7 +558,13 @@ class _DistribuidorPaquetesState extends State<DistribuidorPaquetes> {
             const SizedBox(height: 10),
             Divider(color: AppColors.border, height: 1),
             const SizedBox(height: 10),
-            _buildPaqueteActionItem(p),
+            _buildPaqueteActionItem(
+              p,
+              // Con varios paquetes por entregar en la misma guía, cada uno
+              // muestra su parte del total: es lo que cobra al entregarlo.
+              mostrarValor:
+                  esContraentrega(encomienda) && pendientesDeLaGuia.length > 1,
+            ),
           ],
         ],
       ),
@@ -526,10 +579,14 @@ class _DistribuidorPaquetesState extends State<DistribuidorPaquetes> {
   // para todos los paquetes de esta venta, ya se muestran una sola vez en
   // _buildGuiaGroup). Conserva sus propios botones de acción porque cada
   // paquete físico se cierra por separado.
-  Widget _buildPaqueteActionItem(Map<String, dynamic> p) {
+  Widget _buildPaqueteActionItem(
+    Map<String, dynamic> p, {
+    bool mostrarValor = false,
+  }) {
     final intentos = _toInt(p['intentosEntrega']) ?? 0;
     final idPaquete = _toInt(p['idPaquete']);
     final actualizando = idPaquete != null && _actualizando.contains(idPaquete);
+    final valor = mostrarValor ? valorDelPaquete(p) : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -544,6 +601,18 @@ class _DistribuidorPaquetesState extends State<DistribuidorPaquetes> {
             fontSize: 13,
           ),
         ),
+        if (valor != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              'Valor a cobrar: ${formatCOP(valor)}',
+              style: TextStyle(
+                color: AppColors.textSub,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
         if (intentos > 0) ...[
           const SizedBox(height: 8),
           Row(
@@ -737,11 +806,11 @@ class _DistribuidorPaquetesState extends State<DistribuidorPaquetes> {
   // cada uno se cierra por separado.
   Widget _buildGuiaGroupHistorial(_GrupoVenta grupoGuia) {
     final primero = grupoGuia.paquetes.first;
-    final destinatario =
-        (primero['encomienda'] as Map<String, dynamic>?)?['destinatario']
-            as Map<String, dynamic>?;
+    final encomienda = primero['encomienda'] as Map<String, dynamic>?;
+    final destinatario = encomienda?['destinatario'] as Map<String, dynamic>?;
     final nombre = (destinatario?['nombreDestinatario'] as String?) ?? '';
     final direccion = (destinatario?['direccionDestinatario'] as String?) ?? '';
+    final pillModalidad = _pillModalidad(encomienda);
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -777,6 +846,10 @@ class _DistribuidorPaquetesState extends State<DistribuidorPaquetes> {
                 ),
             ],
           ),
+          if (pillModalidad != null) ...[
+            const SizedBox(height: 8),
+            Align(alignment: Alignment.centerLeft, child: pillModalidad),
+          ],
           if (nombre.isNotEmpty || direccion.isNotEmpty) ...[
             const SizedBox(height: 6),
             if (nombre.isNotEmpty)
@@ -855,6 +928,31 @@ class _DistribuidorPaquetesState extends State<DistribuidorPaquetes> {
             ),
           ],
         ),
+        // Resultado del cobro de ESTE paquete (Paquete.estadoPago, fuente de
+        // verdad del recaudo): en Contraentrega 'Pagado' solo si se entregó. El
+        // monto es su parte del total de la venta (los de la guía suman el
+        // total del chip de arriba).
+        if (esContraentrega(p['encomienda'] as Map<String, dynamic>?)) ...[
+          const SizedBox(height: 6),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: p['estadoPago'] == 'Pagado'
+                ? _pill(
+                    label: conMonto('Cobrado', valorDelPaquete(p)),
+                    color: AppColors.green,
+                    bg: AppColors.greenBg,
+                    icon: Icons.check_circle_outline,
+                  )
+                : _pill(
+                    label: conMonto('Sin cobro', valorDelPaquete(p)),
+                    color: AppColors.textSub,
+                    // bgGray sería del mismo color que la tarjeta y la etiqueta
+                    // se vería como texto suelto con sangría.
+                    bg: AppColors.border,
+                    icon: Icons.money_off_outlined,
+                  ),
+          ),
+        ],
         if (intentos > 0 || idPaquete != null) ...[
           const SizedBox(height: 8),
           Row(
@@ -987,6 +1085,165 @@ List<_GrupoVenta> _agruparPorGuia(List<Map<String, dynamic>> paquetes) {
     resultado.add(suelto);
   }
   return resultado;
+}
+
+// ── Recaudo (widgets) ────────────────────────────────────────────────────────
+// La lógica (qué es Contraentrega, montos por guía/paquete, textos de la hoja de
+// confirmación) vive en core/recaudo.dart; acá solo se dibuja.
+// Mismas proporciones que _DistribuidorPaquetesState._estadoChip, con ícono
+// opcional.
+Widget _pill({
+  required String label,
+  required Color color,
+  required Color bg,
+  IconData? icon,
+}) {
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+    decoration: BoxDecoration(
+      color: bg,
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (icon != null) ...[
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 4),
+        ],
+        Flexible(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+// Etiqueta con la modalidad de recaudo de la venta; null si la venta no la
+// trae.
+Widget? _pillModalidad(Map<String, dynamic>? encomienda) {
+  switch (encomienda?['modalidadRecaudo']) {
+    case modalidadContraentrega:
+      final monto = totalDeLaGuia(encomienda);
+      return _pill(
+        label: monto == null
+            ? 'Contraentrega'
+            : 'Contraentrega · ${formatCOP(monto)}',
+        color: AppColors.orange,
+        bg: AppColors.orangeBg,
+        icon: Icons.payments_outlined,
+      );
+    case modalidadPagoInmediato:
+      return _pill(
+        label: 'Pago inmediato · ya pagado',
+        color: AppColors.green,
+        bg: AppColors.greenBg,
+        icon: Icons.check_circle_outline,
+      );
+    default:
+      return null;
+  }
+}
+
+// Aviso destacado de la lista de pendientes: le dice al distribuidor, ANTES de
+// entregar, que hay dinero por cobrar y cuánto. `monto` es lo que falta por
+// cobrar de la guía (ver montoPorCobrar); si ya es menos que el total de la
+// guía (`totalGuia`) es porque parte ya se entregó/cerró, y se aclara para que la
+// baja del número no confunda.
+Widget _bannerCobro({required double? monto, required double? totalGuia}) {
+  final resta = monto != null && totalGuia != null && totalGuia - monto >= 1;
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    decoration: BoxDecoration(
+      color: AppColors.orangeBg,
+      borderRadius: BorderRadius.circular(10),
+      border: Border.all(color: AppColors.orange.withValues(alpha: 0.4)),
+    ),
+    child: Row(
+      children: [
+        Icon(Icons.payments_outlined, size: 22, color: AppColors.orange),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Contraentrega · cobrar al entregar',
+                style: TextStyle(
+                  color: AppColors.orange,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              if (monto != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  formatCOP(monto),
+                  style: TextStyle(
+                    color: AppColors.textMain,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                Text(
+                  resta
+                      ? 'Resta por cobrar · total de la guía ${formatCOP(totalGuia)}'
+                      : 'Total de la guía',
+                  style: TextStyle(color: AppColors.textSub, fontSize: 11.5),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+Widget _cajaAviso(AvisoCobro aviso) {
+  final color = aviso.destacado ? AppColors.orange : AppColors.textSub;
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: aviso.destacado ? AppColors.orangeBg : AppColors.bgGray,
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(
+        color: aviso.destacado
+            ? AppColors.orange.withValues(alpha: 0.4)
+            : AppColors.border,
+      ),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          aviso.destacado ? Icons.payments_outlined : Icons.info_outline,
+          size: 18,
+          color: color,
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            aviso.texto,
+            style: TextStyle(
+              color: AppColors.textMain,
+              fontSize: 13,
+              fontWeight: aviso.destacado ? FontWeight.w600 : FontWeight.w400,
+            ),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 // Chip por acción -- mismo criterio de color que la web (ModalHistorialEntrega.jsx,
@@ -1233,19 +1490,24 @@ class _EntregaFinalResult {
 // sin evidencia propia, un "Entregado" se guardaba heredando en silencio la nota/
 // foto que el conductor dejó al llegar a la sede (dos pasos del proceso
 // mezclados bajo el mismo campo). Exigir siempre evidencia acá elimina ese caso.
+//
+// `aviso` (solo Contraentrega): qué pasa con el cobro según la acción elegida —
+// ver avisoCobro. Es informativo: no agrega ningún paso ni campo a confirmar.
 class _EntregaFinalSheet extends StatefulWidget {
   final String titulo;
-  const _EntregaFinalSheet({required this.titulo});
+  final AvisoCobro? aviso;
+  const _EntregaFinalSheet({required this.titulo, this.aviso});
 
   static Future<_EntregaFinalResult?> show(
     BuildContext context, {
     required String titulo,
+    AvisoCobro? aviso,
   }) {
     return showModalBottomSheet<_EntregaFinalResult>(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => _EntregaFinalSheet(titulo: titulo),
+      builder: (_) => _EntregaFinalSheet(titulo: titulo, aviso: aviso),
     );
   }
 
@@ -1368,138 +1630,147 @@ class _EntregaFinalSheetState extends State<_EntregaFinalSheet> {
           color: AppColors.cardBg,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: AppColors.border,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            Text(
-              widget.titulo,
-              style: TextStyle(
-                color: AppColors.textMain,
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              'Foto y novedad obligatorias.',
-              style: TextStyle(color: AppColors.textSub, fontSize: 13),
-            ),
-            const SizedBox(height: 16),
-            TapArea(
-              onTap: _pickFoto,
-              child: Container(
-                width: double.infinity,
-                padding: EdgeInsets.symmetric(
-                  vertical: _foto == null ? 20 : 14,
-                  horizontal: 14,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.bgGray,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: fotoFaltante ? AppColors.red : AppColors.border,
-                    width: 1.5,
+        // Desplazable: con el aviso de cobro la hoja es más alta, y en un
+        // celular chico con el teclado abierto ya no cabría entera (el botón
+        // "Confirmar" quedaría cortado, sin forma de alcanzarlo).
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                child: Column(
-                  children: [
-                    Icon(
-                      _foto == null
-                          ? Icons.camera_alt_outlined
-                          : Icons.check_circle,
-                      color: _foto == null
-                          ? AppColors.textSub
-                          : AppColors.green,
-                      size: _foto == null ? 26 : 22,
+              ),
+              Text(
+                widget.titulo,
+                style: TextStyle(
+                  color: AppColors.textMain,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Foto y novedad obligatorias.',
+                style: TextStyle(color: AppColors.textSub, fontSize: 13),
+              ),
+              if (widget.aviso != null) ...[
+                const SizedBox(height: 12),
+                _cajaAviso(widget.aviso!),
+              ],
+              const SizedBox(height: 16),
+              TapArea(
+                onTap: _pickFoto,
+                child: Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.symmetric(
+                    vertical: _foto == null ? 20 : 14,
+                    horizontal: 14,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.bgGray,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: fotoFaltante ? AppColors.red : AppColors.border,
+                      width: 1.5,
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      _foto == null
-                          ? 'Adjuntar foto'
-                          : '${_foto!.name} · ${_formatBytes(_foto!.size)}',
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(
+                        _foto == null
+                            ? Icons.camera_alt_outlined
+                            : Icons.check_circle,
                         color: _foto == null
                             ? AppColors.textSub
-                            : AppColors.textMain,
-                        fontWeight: FontWeight.w600,
+                            : AppColors.green,
+                        size: _foto == null ? 26 : 22,
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 6),
+                      Text(
+                        _foto == null
+                            ? 'Adjuntar foto'
+                            : '${_foto!.name} · ${_formatBytes(_foto!.size)}',
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: _foto == null
+                              ? AppColors.textSub
+                              : AppColors.textMain,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            if (_errorPeso != null || fotoFaltante) ...[
-              const SizedBox(height: 6),
-              Text(
-                _errorPeso ?? 'Adjunta una foto de evidencia',
-                style: TextStyle(color: AppColors.red, fontSize: 12),
+              if (_errorPeso != null || fotoFaltante) ...[
+                const SizedBox(height: 6),
+                Text(
+                  _errorPeso ?? 'Adjunta una foto de evidencia',
+                  style: TextStyle(color: AppColors.red, fontSize: 12),
+                ),
+              ],
+              const SizedBox(height: 14),
+              TextField(
+                controller: _obsCtrl,
+                maxLines: 2,
+                maxLength: _novedadMaxLength,
+                onChanged: (_) {
+                  if (_intentoConfirmar) setState(() {});
+                },
+                style: TextStyle(color: AppColors.textMain),
+                decoration: InputDecoration(
+                  hintText: 'Novedad',
+                  hintStyle: TextStyle(color: AppColors.textSub),
+                  filled: true,
+                  fillColor: AppColors.bgGray,
+                  errorText: novedadFaltante ? 'Escribe una novedad' : null,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: AppColors.border),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: AppColors.border),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: acento, width: 1.5),
+                  ),
+                ),
               ),
-            ],
-            const SizedBox(height: 14),
-            TextField(
-              controller: _obsCtrl,
-              maxLines: 2,
-              maxLength: _novedadMaxLength,
-              onChanged: (_) {
-                if (_intentoConfirmar) setState(() {});
-              },
-              style: TextStyle(color: AppColors.textMain),
-              decoration: InputDecoration(
-                hintText: 'Novedad',
-                hintStyle: TextStyle(color: AppColors.textSub),
-                filled: true,
-                fillColor: AppColors.bgGray,
-                errorText: novedadFaltante ? 'Escribe una novedad' : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: AppColors.border),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: AppColors.border),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: acento, width: 1.5),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TapArea(
-              onTap: _confirmar,
-              child: Container(
-                width: double.infinity,
-                height: 50,
-                decoration: BoxDecoration(
-                  color: acento,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Center(
-                  child: Text(
-                    'Confirmar',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 16,
+              const SizedBox(height: 16),
+              TapArea(
+                onTap: _confirmar,
+                child: Container(
+                  width: double.infinity,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: acento,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Center(
+                    child: Text(
+                      'Confirmar',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -17,33 +17,6 @@ class PaqueteService {
     return [];
   }
 
-  // PATCH /api/paquetes/:id/evidencia — sube la foto de evidencia (form-data)
-  // y deja el paquete en 'Entregado' o 'Devuelto' (ver paqueteController.subirEvidencia).
-  Future<Map<String, dynamic>> subirEvidencia(
-    int idPaquete, {
-    required String estado,
-    required PlatformFile foto,
-    String observacion = '',
-  }) async {
-    try {
-      final formData = FormData.fromMap({
-        'estado': estado,
-        'observacion': observacion,
-        'file': await MultipartFile.fromFile(foto.path!, filename: foto.name),
-      });
-      final resp = await _api.patch(
-        '/api/paquetes/$idPaquete/evidencia',
-        data: formData,
-      );
-      if (resp.statusCode == 200) {
-        return {'success': true, 'data': resp.data['data']};
-      }
-      return {'success': false, 'message': 'No se pudo actualizar el paquete'};
-    } catch (e) {
-      return {'success': false, 'message': _mensajeError(e)};
-    }
-  }
-
   // PATCH /api/paquetes/sede — el conductor del tramo troncal marca DE UNA VEZ
   // todos los paquetes "Por entregar" de la sede del destino final como "En
   // sede de destino". Foto y novedades son opcionales (ver dejarPaquetesEnSede).
